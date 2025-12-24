@@ -10,25 +10,33 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
+CREATE TABLE "batches" (
+    "id" SERIAL NOT NULL,
+    "purchase_date" DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "arrival_date" DATE,
+    "total_price" DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    "quantity" INTEGER NOT NULL,
+    "tracking_number" VARCHAR(100),
+    "description" TEXT,
+    "shipping_price_usd" DECIMAL(10,2),
+    "shipping_price_uyu" DECIMAL(10,2),
+    "weight" DECIMAL(10,2),
+
+    CONSTRAINT "batches_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "catalog_products" (
     "id" SERIAL NOT NULL,
     "team" VARCHAR(100) NOT NULL,
     "season" VARCHAR(20) NOT NULL,
     "version" VARCHAR(50),
+    "color" VARCHAR(50) NOT NULL,
+    "number" INTEGER,
+    "player" VARCHAR(100),
     "description" TEXT,
 
     CONSTRAINT "catalog_products_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "batches" (
-    "id" SERIAL NOT NULL,
-    "purchase_date" DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "total_price" DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    "quantity" INTEGER NOT NULL,
-    "tracking_number" VARCHAR(100),
-
-    CONSTRAINT "batches_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -37,8 +45,9 @@ CREATE TABLE "inventory_items" (
     "catalog_product_id" INTEGER NOT NULL,
     "batch_id" INTEGER NOT NULL,
     "size" VARCHAR(10) NOT NULL,
-    "base_price" DECIMAL(10,2) NOT NULL,
-    "final_price" DECIMAL(10,2),
+    "base_price_usd" DECIMAL(10,2) NOT NULL,
+    "final_price_usd" DECIMAL(10,2),
+    "final_price_uyu" DECIMAL(10,2),
     "status" VARCHAR(20) NOT NULL DEFAULT 'available',
 
     CONSTRAINT "inventory_items_pkey" PRIMARY KEY ("id")
@@ -52,6 +61,7 @@ CREATE TABLE "sales" (
     "price" DECIMAL(10,2) NOT NULL,
     "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "method" VARCHAR(150),
+    "description" TEXT,
 
     CONSTRAINT "sales_pkey" PRIMARY KEY ("id")
 );

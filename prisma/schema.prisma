@@ -17,26 +17,34 @@ model User {
   @@map("users")
 }
 
+model Batch {
+  id                Int             @id @default(autoincrement())
+  purchaseDate      DateTime        @default(now()) @map("purchase_date") @db.Date
+  arrivalDate       DateTime?       @map("arrival_date") @db.Date 
+  totalPrice        Decimal         @default(0.00) @map("total_price") @db.Decimal(10, 2)
+  quantity          Int
+  trackingNumber    String?         @map("tracking_number") @db.VarChar(100)
+  description       String?         @db.Text 
+  shippingPriceUsd  Decimal?        @map("shipping_price_usd") @db.Decimal(10, 2) 
+  shippingPriceUyu  Decimal?        @map("shipping_price_uyu") @db.Decimal(10, 2) 
+  weight            Decimal?        @db.Decimal(10, 2) 
+  items             InventoryItem[]
+
+  @@map("batches")
+}
+
 model CatalogProduct {
   id          Int             @id @default(autoincrement())
   team        String          @db.VarChar(100)
   season      String          @db.VarChar(20)
   version     String?         @db.VarChar(50)
+  color       String          @db.VarChar(50) 
+  number      Int?            
+  player      String?         @db.VarChar(100) 
   description String?         @db.Text
   items       InventoryItem[]
 
   @@map("catalog_products")
-}
-
-model Batch {
-  id             Int             @id @default(autoincrement())
-  purchaseDate   DateTime        @default(now()) @map("purchase_date") @db.Date
-  totalPrice     Decimal         @default(0.00) @map("total_price") @db.Decimal(10, 2)
-  quantity       Int
-  trackingNumber String?         @map("tracking_number") @db.VarChar(100)
-  items          InventoryItem[]
-
-  @@map("batches")
 }
 
 model InventoryItem {
@@ -44,8 +52,9 @@ model InventoryItem {
   catalogProductId Int            @map("catalog_product_id")
   batchId          Int            @map("batch_id")
   size             String         @db.VarChar(10)
-  basePrice        Decimal        @map("base_price") @db.Decimal(10, 2)
-  finalPrice       Decimal?       @map("final_price") @db.Decimal(10, 2)
+  basePriceUsd     Decimal        @map("base_price_usd") @db.Decimal(10, 2) 
+  finalPriceUsd    Decimal?       @map("final_price_usd") @db.Decimal(10, 2) 
+  finalPriceUyu    Decimal?       @map("final_price_uyu") @db.Decimal(10, 2) 
   status           String         @default("available") @db.VarChar(20)
   
   product          CatalogProduct @relation(fields: [catalogProductId], references: [id])
@@ -62,6 +71,7 @@ model Sale {
   price           Decimal       @db.Decimal(10, 2)
   date            DateTime      @default(now())
   method          String?       @db.VarChar(150)
+  description     String?       @db.Text 
 
   item            InventoryItem @relation(fields: [inventoryItemId], references: [id])
   user            User          @relation(fields: [userId], references: [id])
