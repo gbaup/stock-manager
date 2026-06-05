@@ -15,11 +15,20 @@ const modelSchema = z.object({
   description: z.string().optional(),
 });
 
+function parseNumber(n: string | undefined): number | null {
+  if (!n || n.trim() === '') return null;
+  const parsed = parseInt(n, 10);
+  return isNaN(parsed) ? null : parsed;
+}
+
 export async function createModel(_prev: unknown, formData: FormData) {
   const result = modelSchema.safeParse(Object.fromEntries(formData));
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const model = await prisma.catalogProduct.create({ data: result.data });
+  const { number, ...rest } = result.data;
+  const model = await prisma.catalogProduct.create({
+    data: { ...rest, number: parseNumber(number) },
+  });
   revalidatePath('/inventory');
   redirect(`/inventory/${model.id}`);
 }
@@ -28,7 +37,11 @@ export async function updateModel(id: string, _prev: unknown, formData: FormData
   const result = modelSchema.safeParse(Object.fromEntries(formData));
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  await prisma.catalogProduct.update({ where: { id }, data: result.data });
+  const { number, ...rest } = result.data;
+  await prisma.catalogProduct.update({
+    where: { id },
+    data: { ...rest, number: parseNumber(number) },
+  });
   revalidatePath('/inventory');
   revalidatePath(`/inventory/${id}`);
   redirect(`/inventory/${id}`);

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
+import { USD_RATE } from '@/app/lib/domain';
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
 
@@ -13,10 +14,9 @@ export async function createPurchase(data: {
   description?: string;
   items: PurchaseItem[];
 }) {
-  const batch = await prisma.batch.create({
+  await prisma.batch.create({
     data: {
       purchaseDate: new Date(data.purchaseDate),
-      supplier: data.supplier || null,
       trackingNumber: data.trackingNumber || null,
       description: data.description || null,
       quantity: data.items.length,
@@ -25,6 +25,8 @@ export async function createPurchase(data: {
           catalogProductId: it.modelId,
           size: it.size,
           basePriceUsd: it.basePriceUsd,
+          basePriceUyu: it.basePriceUsd * USD_RATE,
+          status: 'available',
         })),
       },
     },

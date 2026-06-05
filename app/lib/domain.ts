@@ -54,7 +54,7 @@ export type ModelMeta = {
   id: string;
   team: string;
   season: string;
-  version: string;
+  version: string | null;
   color: string;
   number: string | null;
   player: string | null;

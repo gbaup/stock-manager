@@ -1,7 +1,7 @@
 import { prisma } from './prisma';
 import type {
   ModelWithStats, ModelDetail, BatchSummary, ItemInBatch,
-  ModelMeta, PurchaseStatus, TimelineEvent,
+  ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord,
 } from './domain';
 
 function toISODate(d: Date | null): string | null {
@@ -9,27 +9,35 @@ function toISODate(d: Date | null): string | null {
   return d.toISOString().split('T')[0];
 }
 
-function productMeta(p: { id: string; team: string; season: string; version: string; color: string; number: string | null; player: string | null }): ModelMeta {
-  return { id: p.id, team: p.team, season: p.season, version: p.version, color: p.color, number: p.number, player: p.player };
+function productMeta(p: {
+  id: string; team: string; season: string; version: string | null;
+  color: string; number: number | null; player: string | null;
+}): ModelMeta {
+  return {
+    id: p.id, team: p.team, season: p.season,
+    version: p.version, color: p.color,
+    number: p.number !== null ? String(p.number) : null,
+    player: p.player,
+  };
 }
 
 export async function getModels(): Promise<ModelWithStats[]> {
   const products = await prisma.catalogProduct.findMany({
     include: {
-      items: { include: { batch: { select: { arrivalDate: true } } } },
-      sales: { select: { quantity: true } },
+      items: { select: { status: true, batch: { select: { arrivalDate: true } } } },
     },
     orderBy: { createdAt: 'desc' },
   });
 
   return products.map((p) => {
-    const arrivedCount = p.items.filter((i) => i.batch.arrivalDate !== null).length;
-    const soldQty = p.sales.reduce((s, x) => s + x.quantity, 0);
+    const arrivedItems = p.items.filter((i) => i.batch.arrivalDate !== null);
+    const stock = arrivedItems.filter((i) => i.status === 'available').length;
+    const inTransit = p.items.filter((i) => i.batch.arrivalDate === null).length;
     return {
       ...productMeta(p),
       description: p.description,
-      stock: Math.max(0, arrivedCount - soldQty),
-      inTransit: p.items.filter((i) => i.batch.arrivalDate === null).length,
+      stock,
+      inTransit,
     };
   });
 }
@@ -38,24 +46,29 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const p = await prisma.catalogProduct.findUnique({
     where: { id },
     include: {
-      items: { include: { batch: true }, orderBy: { createdAt: 'asc' } },
-      sales: { orderBy: { date: 'desc' } },
+      items: {
+        include: {
+          batch: true,
+          sale: { select: { id: true, price: true, date: true, method: true, description: true, userId: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   });
   if (!p) return null;
 
-  const arrivedCount = p.items.filter((i) => i.batch.arrivalDate !== null).length;
-  const soldQty = p.sales.reduce((s, x) => s + x.quantity, 0);
-  const stock = Math.max(0, arrivedCount - soldQty);
+  const arrivedItems = p.items.filter((i) => i.batch.arrivalDate !== null);
+  const stock = arrivedItems.filter((i) => i.status === 'available').length;
   const inTransit = p.items.filter((i) => i.batch.arrivalDate === null).length;
-  const revenue = p.sales.reduce((s, x) => s + Number(x.price) * x.quantity, 0);
+  const soldItems = p.items.filter((i) => i.sale !== null);
+  const sold = soldItems.length;
+  const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);
 
-  // Group items by batch
+  // Group items by batch for transit/arrived events
   const batchMap = new Map<string, { batch: typeof p.items[0]['batch']; items: typeof p.items }>();
   for (const item of p.items) {
-    const key = item.batchId;
-    if (!batchMap.has(key)) batchMap.set(key, { batch: item.batch, items: [] });
-    batchMap.get(key)!.items.push(item);
+    if (!batchMap.has(item.batchId)) batchMap.set(item.batchId, { batch: item.batch, items: [] });
+    batchMap.get(item.batchId)!.items.push(item);
   }
 
   const events: TimelineEvent[] = [];
@@ -64,7 +77,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     const qty = items.length;
     const batchData: BatchSummary = {
       id: batch.id,
-      supplier: batch.supplier,
+      supplier: null,
       purchaseDate: toISODate(batch.purchaseDate)!,
       arrivalDate: toISODate(batch.arrivalDate),
       quantity: qty,
@@ -83,28 +96,37 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       })),
     };
     const date = toISODate(batch.arrivalDate ?? batch.purchaseDate)!;
-    if (batch.arrivalDate) {
-      events.push({ type: 'arrived', date, data: batchData, qty });
+    events.push(batch.arrivalDate
+      ? { type: 'arrived', date, data: batchData, qty }
+      : { type: 'transit', date, data: batchData, qty }
+    );
+  }
+
+  // Group sales by ISO date → one timeline event per day
+  const saleByDate = new Map<string, { price: number; qty: number; s: typeof soldItems[0]['sale'] }>();
+  for (const item of soldItems) {
+    const s = item.sale!;
+    const dateKey = toISODate(s.date)!;
+    const existing = saleByDate.get(dateKey);
+    if (existing) {
+      existing.price += Number(s.price);
+      existing.qty += 1;
     } else {
-      events.push({ type: 'transit', date, data: batchData, qty });
+      saleByDate.set(dateKey, { price: Number(s.price), qty: 1, s });
     }
   }
 
-  for (const s of p.sales) {
-    events.push({
-      type: 'sale',
-      date: toISODate(s.date)!,
-      qty: s.quantity,
-      data: {
-        id: s.id,
-        catalogProductId: s.catalogProductId,
-        price: Number(s.price),
-        quantity: s.quantity,
-        date: toISODate(s.date)!,
-        method: s.method,
-        description: s.description,
-      },
-    });
+  for (const [dateKey, { price, qty, s }] of saleByDate) {
+    const saleData: SaleRecord = {
+      id: s!.id,
+      catalogProductId: id,
+      price,
+      quantity: qty,
+      date: dateKey,
+      method: s!.method,
+      description: s!.description,
+    };
+    events.push({ type: 'sale', date: dateKey, data: saleData, qty });
   }
 
   events.sort((a, b) => b.date.localeCompare(a.date));
@@ -114,7 +136,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     description: p.description,
     stock,
     inTransit,
-    sold: soldQty,
+    sold,
     revenue,
     events,
   };
@@ -128,7 +150,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
 
   return batches.map((b) => ({
     id: b.id,
-    supplier: b.supplier,
+    supplier: null,
     purchaseDate: toISODate(b.purchaseDate)!,
     arrivalDate: toISODate(b.arrivalDate),
     quantity: b.items.length,
@@ -157,7 +179,7 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
 
   return {
     id: b.id,
-    supplier: b.supplier,
+    supplier: null,
     purchaseDate: toISODate(b.purchaseDate)!,
     arrivalDate: toISODate(b.arrivalDate),
     quantity: b.items.length,
@@ -180,8 +202,7 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
 export async function getPublicModels() {
   const products = await prisma.catalogProduct.findMany({
     include: {
-      items: { include: { batch: { select: { arrivalDate: true } } } },
-      sales: { select: { quantity: true } },
+      items: { select: { status: true, batch: { select: { arrivalDate: true } } } },
     },
     orderBy: { team: 'asc' },
   });
@@ -189,11 +210,9 @@ export async function getPublicModels() {
   return products
     .map((p) => ({
       ...productMeta(p),
-      stock: Math.max(
-        0,
-        p.items.filter((i) => i.batch.arrivalDate !== null).length -
-          p.sales.reduce((s, x) => s + x.quantity, 0)
-      ),
+      stock: p.items
+        .filter((i) => i.batch.arrivalDate !== null && i.status === 'available')
+        .length,
     }))
     .filter((p) => p.stock > 0);
 }

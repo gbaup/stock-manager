@@ -11,7 +11,7 @@ type PublicModel = {
   id: string;
   team: string;
   season: string;
-  version: string;
+  version: string | null;
   color: string;
   number: string | null;
   player: string | null;
@@ -28,7 +28,7 @@ export function PublicScreen({ models }: { models: PublicModel[] }) {
     !q || [m.team, m.season, m.version, m.color, m.player, m.number].filter(Boolean).join(' ').toLowerCase().includes(q)
   );
   rows = [...rows].sort((a, b) =>
-    sort === 'stock' ? b.stock - a.stock : a.team.localeCompare(b.team) || a.version.localeCompare(b.version)
+    sort === 'stock' ? b.stock - a.stock : a.team.localeCompare(b.team) || (a.version ?? '').localeCompare(b.version ?? '')
   );
   const totalUnits = rows.reduce((s, m) => s + m.stock, 0);
 
