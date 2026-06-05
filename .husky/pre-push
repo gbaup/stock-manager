@@ -1,0 +1,4 @@
+set -e
+echo "🚧 Pre-push checks..."
+npm run lint
+npm run build
