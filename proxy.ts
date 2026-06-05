@@ -4,7 +4,7 @@ import { decrypt } from '@/app/lib/auth';
 
 const protectedPrefixes = ['/inventory', '/purchases', '/dashboard'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isProtected = protectedPrefixes.some((p) => path.startsWith(p));
 
