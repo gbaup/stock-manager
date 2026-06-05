@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import type {
-  ModelWithStats, ModelDetail, BatchSummary, ItemInBatch,
+  ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord,
 } from './domain';
 
