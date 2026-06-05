@@ -1,52 +1,33 @@
-'use server'
+'use server';
 
-import { PrismaClient } from '@prisma/client';
-import { createSession, verifyPassword } from '@/app/lib/auth';
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { PrismaPg } from '@prisma/adapter-pg';
-
-
-const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL!,
-});
-
-const prisma = new PrismaClient({ adapter });
+import { redirect } from 'next/navigation';
+import { prisma } from '@/app/lib/prisma';
+import { createSession, deleteSession, verifyPassword } from '@/app/lib/auth';
 
 const loginSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(1, 'Password is required'),
+  email: z.string().email(),
+  password: z.string().min(1),
 });
 
-export async function login(prevState: any, formData: FormData) {
-    const result = loginSchema.safeParse(Object.fromEntries(formData));
+export async function login(_prev: unknown, formData: FormData) {
+  const result = loginSchema.safeParse(Object.fromEntries(formData));
+  if (!result.success) {
+    return { errors: result.error.flatten().fieldErrors };
+  }
 
-    if (!result.success) {
-        return {
-            errors: result.error.flatten().fieldErrors,
-        };
-    }
+  const { email, password } = result.data;
+  const user = await prisma.user.findUnique({ where: { email } });
 
-    const { email, password } = result.data;
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    return { message: 'Credenciales inválidas' };
+  }
 
-    const user = await prisma.user.findUnique({
-        where: { email },
-    });
+  await createSession(user.id);
+  redirect('/inventory');
+}
 
-    if (!user) {
-        return {
-            message: 'Invalid credentials',
-        };
-    }
-
-    const isValidPassword = await verifyPassword(password, user.passwordHash);
-
-    if (!isValidPassword) {
-        return {
-            message: 'Invalid credentials',
-        };
-    }
-
-    await createSession(user.id.toString());
-    redirect('/dashboard');
+export async function logout() {
+  await deleteSession();
+  redirect('/login');
 }
