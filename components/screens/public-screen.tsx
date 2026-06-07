@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
@@ -25,17 +25,15 @@ export function PublicScreen({ models }: { models: PublicModel[] }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'team' | 'newest'>('team');
-  const [view, setView] = useState<View>('grid');
+  const [view, setView] = useState<View>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(VIEW_KEY) : null;
+    return saved === 'list' || saved === 'grid' ? (saved as View) : 'grid';
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
   const [filterSizes, setFilterSizes] = useState<string[]>([]);
   const [filterVersions, setFilterVersions] = useState<string[]>([]);
   const [viewer, setViewer] = useState<{ model: PublicModel; idx: number } | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(VIEW_KEY);
-    if (saved === 'list' || saved === 'grid') setView(saved as View);
-  }, []);
 
   function setViewPersisted(v: View) {
     setView(v);
