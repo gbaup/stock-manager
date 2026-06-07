@@ -880,87 +880,54 @@ body {
   transition: all .15s;
   font-family: var(--font-mono);
 }
-.mchip.is-active {
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-  color: var(--accent-press);
-}
+.mchip.is-active { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 /* ---------- photo gallery ---------- */
-.photo-gallery { }
-.photo-dropzone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 2px dashed var(--border-strong);
-  border-radius: var(--r-md);
-  padding: 22px 16px;
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
+.photo-gallery { margin: 8px 0 18px; }
+.photo-gallery .pg-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: 100%; padding: 18px; cursor: pointer;
+  background: var(--surface-2); border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md); transition: border-color .15s ease, background .15s ease;
 }
-.photo-dropzone:hover { border-color: var(--accent-line); background: var(--accent-soft); }
-.photo-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+.photo-gallery .pg-empty:hover { border-color: var(--accent); background: var(--surface); }
+.photo-gallery .pg-empty-cta {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 14px; font-weight: 600; color: var(--accent-press);
 }
-.photo-thumb {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: var(--r-sm);
-  overflow: hidden;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: border-color .15s;
+.photo-gallery .pg-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
 }
-.photo-thumb.is-cover { border-color: var(--accent); }
-.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.photo-thumb-badge {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: var(--r-pill);
-  letter-spacing: 0.04em;
+.photo-gallery .pg-thumb {
+  position: relative; aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface-2); cursor: pointer;
 }
-.photo-thumb-del {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.55);
-  color: #fff;
-  border: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+.photo-gallery .pg-thumb.is-cover { border: 2px solid var(--accent); }
+.photo-gallery .pg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-gallery .pg-cover-badge {
+  position: absolute; left: 5px; bottom: 5px; z-index: 2;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 2px 7px; border-radius: var(--r-pill);
+  background: var(--accent); color: var(--on-accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
-.photo-add-tile {
-  aspect-ratio: 1;
-  border-radius: var(--r-sm);
-  border: 2px dashed var(--border-strong);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  cursor: pointer;
-  color: var(--text-faint);
-  font-size: 11.5px;
-  font-weight: 600;
-  transition: border-color .15s, background .15s;
+.photo-gallery .pg-remove {
+  position: absolute; top: 4px; right: 4px; z-index: 2;
+  width: 24px; height: 24px; border-radius: var(--r-pill); padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20,24,33,0.78); color: #fff; border: none; cursor: pointer;
+  backdrop-filter: blur(4px);
 }
-.photo-add-tile:hover { border-color: var(--accent-line); background: var(--accent-soft); }
-.photo-hint { font-size: 11.5px; color: var(--text-faint); margin-top: 6px; text-align: center; }
+.photo-gallery .pg-remove:hover { background: var(--danger); }
+.photo-gallery .pg-add {
+  aspect-ratio: 1; border-radius: var(--r-sm); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: var(--surface-2); border: 1px dashed var(--border-strong);
+  color: var(--text-muted); font-size: 12px; font-weight: 600;
+  transition: border-color .15s ease, color .15s ease;
+}
+.photo-gallery .pg-add:hover { border-color: var(--accent); color: var(--accent-press); }
+.photo-gallery .pg-hint { font-size: 11.5px; color: var(--text-faint); text-align: center; margin-top: 9px; }
 
 /* ---------- saldos screen ---------- */
 .biz-strip {

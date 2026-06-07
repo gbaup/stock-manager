@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import { Icon } from './icon';
+import { Swatch } from './swatch';
 
 function resizeImageFile(file: File, maxEdge: number): Promise<string> {
   return new Promise((resolve) => {
@@ -26,12 +27,14 @@ function resizeImageFile(file: File, maxEdge: number): Promise<string> {
 
 export function PhotoGallery({
   photos,
+  color,
+  number,
   onChange,
-  previewColor,
 }: {
   photos: string[];
+  color: string;
+  number?: string;
   onChange: (photos: string[]) => void;
-  previewColor?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -55,73 +58,56 @@ export function PhotoGallery({
     onChange(next);
   }
 
-  if (photos.length === 0) {
-    return (
-      <div>
-        <div
-          className="photo-dropzone"
-          onClick={() => inputRef.current?.click()}
-        >
-          {previewColor && (
-            <div style={{
-              width: 60, height: 60, borderRadius: 10,
-              background: previewColor, opacity: 0.7,
-            }} />
-          )}
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-muted)' }}>
+  return (
+    <div className="photo-gallery">
+      {photos.length === 0 ? (
+        <button type="button" className="pg-empty" onClick={() => inputRef.current?.click()}>
+          <Swatch color={color} number={number} style={{ width: 84, height: 96, borderRadius: 'var(--r-sm)' }} />
+          <span className="pg-empty-cta">
+            <Icon name="image" size={17} />
             Agregar fotos
           </span>
-          <Icon name="camera" size={20} style={{ color: 'var(--text-faint)' }} />
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          style={{ display: 'none' }}
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="photo-grid">
-        {photos.map((src, i) => (
-          <div
-            key={i}
-            className={`photo-thumb${i === 0 ? ' is-cover' : ''}`}
-            onClick={() => promote(i)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" />
-            {i === 0 && <span className="photo-thumb-badge">Portada</span>}
-            <button
-              type="button"
-              className="photo-thumb-del"
-              onClick={(e) => { e.stopPropagation(); remove(i); }}
+        </button>
+      ) : (
+        <div className="pg-grid">
+          {photos.map((src, i) => (
+            <div
+              key={i}
+              className={`pg-thumb${i === 0 ? ' is-cover' : ''}`}
+              onClick={() => promote(i)}
             >
-              <Icon name="x" size={12} />
-            </button>
-          </div>
-        ))}
-        <div className="photo-add-tile" onClick={() => inputRef.current?.click()}>
-          <Icon name="plus" size={18} />
-          <span>Más</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" />
+              {i === 0 && <span className="pg-cover-badge">Portada</span>}
+              <button
+                type="button"
+                className="pg-remove"
+                onClick={(e) => { e.stopPropagation(); remove(i); }}
+                aria-label="Quitar foto"
+              >
+                <Icon name="x" size={14} strokeWidth={2.6} />
+              </button>
+            </div>
+          ))}
+          <button type="button" className="pg-add" onClick={() => inputRef.current?.click()} aria-label="Agregar más fotos">
+            <Icon name="plus" size={24} strokeWidth={2} />
+            <span>Más</span>
+          </button>
         </div>
-      </div>
-      <div className="photo-hint">
-        {photos.length} foto{photos.length !== 1 ? 's' : ''} · tocá una para usarla de portada
-      </div>
+      )}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
         multiple
         style={{ display: 'none' }}
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
       />
+      {photos.length > 0 && (
+        <div className="pg-hint">
+          {photos.length} {photos.length === 1 ? 'foto' : 'fotos'} · tocá una para usarla de portada
+        </div>
+      )}
     </div>
   );
 }

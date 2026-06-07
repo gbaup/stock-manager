@@ -71,16 +71,16 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
       />
       <div className="body">
         <div className="body-pad">
-          <div className="section-label">Fotos</div>
           <PhotoGallery
             photos={f.photos}
+            color={f.color}
+            number={f.number}
             onChange={(photos) => set('photos', photos)}
-            previewColor={undefined}
           />
 
           <div className="section-label">Identificación</div>
           <Field label="Equipo">
-            <TextInput value={f.team} onChange={(v) => set('team', v)} placeholder="Ej: Nacional, Real Madrid…" />
+            <TextInput value={f.team} onChange={(v) => set('team', v)} placeholder="Ej: Peñarol, Real Madrid…" />
           </Field>
           <div className="field-row">
             <Field label="Temporada">
@@ -96,15 +96,8 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
           <Field label="Manga">
             <Segmented options={SLEEVES} value={f.sleeve} onChange={(v) => set('sleeve', v)} full />
           </Field>
+
           <div className="section-label">Apariencia</div>
-          <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 14px' }}>
-            <Swatch
-              color={f.color}
-              number={f.number}
-              photo={f.photos[0] ?? null}
-              style={{ width: 84, height: 96, fontSize: 32 }}
-            />
-          </div>
           <Field label="Color principal">
             <ColorPicker value={f.color} onChange={(v) => set('color', v)} />
           </Field>
