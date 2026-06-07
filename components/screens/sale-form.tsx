@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Segmented } from '@/components/ui/segmented';
@@ -10,24 +12,32 @@ import { METHODS, PEOPLE, usd, uyu, toUsd, todayISO } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createSale } from '@/app/actions/sales';
 import { coverOf } from '@/components/ui/swatch';
+import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
 
 export function SaleForm({ model, stock }: { model: ModelWithStats; stock: number }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [f, setF] = useState({
-    price: '', quantity: '1', date: todayISO(),
-    method: '', description: '', collectedBy: '',
+  const {
+    control,
+    handleSubmit,
+    register,
+    watch,
+    formState: { errors },
+  } = useForm<SaleFormValues>({
+    resolver: zodResolver(makeSaleSchema(stock)),
+    defaultValues: {
+      price: '', quantity: '1', date: todayISO(),
+      method: '', description: '', collectedBy: '',
+    },
   });
-  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const qty = parseInt(f.quantity, 10) || 0;
-  const price = parseFloat(f.price) || 0;
-  const overStock = qty > stock;
-  const canSave = price > 0 && qty > 0 && !overStock && !!f.collectedBy;
 
-  function handleSave() {
-    if (!canSave) return;
+  const price = parseFloat(watch('price')) || 0;
+  const qty = parseInt(watch('quantity'), 10) || 0;
+  const collectedBy = watch('collectedBy');
+
+  function onSubmit(data: SaleFormValues) {
     startTransition(async () => {
-      await createSale(model.id, f);
+      await createSale(model.id, data);
     });
   }
 
@@ -36,8 +46,8 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
       <FormHead
         onCancel={() => router.back()}
         title="Registrar venta"
-        onSave={handleSave}
-        canSave={canSave && !pending}
+        onSave={handleSubmit(onSubmit)}
+        canSave={!pending}
       />
       <div className="body">
         <div className="body-pad">
@@ -55,8 +65,14 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
           </div>
 
           <div className="section-label">Venta</div>
-          <Field label="Precio de venta (UYU)">
-            <MoneyInput value={f.price} onChange={(v) => set('price', v)} placeholder="2200" />
+          <Field label="Precio de venta (UYU)" error={errors.price?.message}>
+            <Controller
+              name="price"
+              control={control}
+              render={({ field }) => (
+                <MoneyInput value={field.value} onChange={field.onChange} placeholder="2200" />
+              )}
+            />
           </Field>
           {price > 0 && (
             <div style={{ fontSize: 12.5, color: 'var(--text-faint)', margin: '-6px 2px 12px', fontFamily: 'var(--font-mono)' }}>
@@ -65,44 +81,68 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
           )}
 
           <div className="field-row">
-            <Field label="Cantidad">
-              <TextInput value={f.quantity} onChange={(v) => set('quantity', v.replace(/[^\d]/g, ''))} mono inputMode="numeric" />
+            <Field label="Cantidad" error={errors.quantity?.message}>
+              <Controller
+                name="quantity"
+                control={control}
+                render={({ field }) => (
+                  <TextInput
+                    value={field.value}
+                    onChange={(v) => field.onChange(v.replace(/[^\d]/g, ''))}
+                    mono
+                    inputMode="numeric"
+                  />
+                )}
+              />
             </Field>
-            <Field label="Fecha">
-              <input className="input mono" type="date" value={f.date} onChange={(e) => set('date', e.target.value)} />
+            <Field label="Fecha" error={errors.date?.message}>
+              <input className="input mono" type="date" {...register('date')} />
             </Field>
           </div>
-          {overStock && (
-            <div style={{ fontSize: 12.5, color: 'var(--danger)', margin: '-6px 2px 12px' }}>
-              Solo hay {stock} en stock.
-            </div>
-          )}
 
           <Field label="Método de pago" optional>
-            <SelectInput value={f.method} onChange={(v) => set('method', v)} options={METHODS} placeholder="Elegí un método…" />
+            <Controller
+              name="method"
+              control={control}
+              render={({ field }) => (
+                <SelectInput value={field.value ?? ''} onChange={field.onChange} options={METHODS} placeholder="Elegí un método…" />
+              )}
+            />
           </Field>
 
           <div className="section-label">Cobro</div>
-          <Field label="¿Quién cobró?">
-            <Segmented options={PEOPLE} value={f.collectedBy} onChange={(v) => set('collectedBy', v)} full />
+          <Field label="¿Quién cobró?" error={errors.collectedBy?.message}>
+            <Controller
+              name="collectedBy"
+              control={control}
+              render={({ field }) => (
+                <Segmented options={PEOPLE} value={field.value} onChange={field.onChange} full />
+              )}
+            />
           </Field>
           <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
             Suma al saldo en mano de quien recibe la plata.
           </div>
 
-          {f.collectedBy && price > 0 && (
+          {collectedBy && price > 0 && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
               <span className="mov-chip pos" style={{ fontSize: 14 }}>
-                {f.collectedBy} cobra {uyu(price * qty)}
+                {collectedBy} cobra {uyu(price * qty)}
               </span>
             </div>
           )}
 
           <Field label="Descripción" optional>
-            <TextAreaInput value={f.description} onChange={(v) => set('description', v)} placeholder="Comprador, notas…" />
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <TextAreaInput value={field.value ?? ''} onChange={field.onChange} placeholder="Comprador, notas…" />
+              )}
+            />
           </Field>
 
-          <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!canSave || pending} onClick={handleSave}>
+          <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
             Registrar venta
           </button>
         </div>

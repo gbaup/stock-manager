@@ -481,6 +481,7 @@ body {
 .field { margin-bottom: 13px; }
 .field-label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block; }
 .field-label .opt { color: var(--text-faint); font-weight: 500; }
+.field-error { font-size: 12px; color: var(--danger); margin-top: 5px; display: block; }
 .input, .select, .textarea {
   width: 100%;
   font-family: var(--font-ui);

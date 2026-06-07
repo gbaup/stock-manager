@@ -1,56 +1,57 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
-import { Swatch } from '@/components/ui/swatch';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
 import { VERSIONS, SHIRT_TYPES, SLEEVES } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
-
-type FormState = {
-  team: string; season: string; version: string;
-  type: string; sleeve: string;
-  color: string; number: string; player: string; description: string;
-  photos: string[];
-};
+import { modelSchema, type ModelFormValues } from '@/app/lib/schemas';
 
 export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [f, setF] = useState<FormState>({
-    team: initial?.team ?? '',
-    season: initial?.season ?? '',
-    version: initial?.version ?? 'Home',
-    type: initial?.type ?? 'Fan',
-    sleeve: initial?.sleeve ?? 'Corta',
-    color: initial?.color ?? 'Blanco',
-    number: initial?.number ?? '',
-    player: initial?.player ?? '',
-    description: initial?.description ?? '',
-    photos: initial?.photos ?? [],
+  const {
+    control,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<ModelFormValues>({
+    resolver: zodResolver(modelSchema),
+    defaultValues: {
+      team: initial?.team ?? '',
+      season: initial?.season ?? '',
+      version: initial?.version ?? 'Home',
+      type: initial?.type ?? 'Fan',
+      sleeve: initial?.sleeve ?? 'Corta',
+      color: initial?.color ?? 'Blanco',
+      number: initial?.number ?? '',
+      player: initial?.player ?? '',
+      description: initial?.description ?? '',
+      photos: initial?.photos ?? [],
+    },
   });
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
-    setF((s) => ({ ...s, [k]: v }));
 
-  const canSave = f.team.trim().length > 0 && f.season.trim().length > 0;
+  const color = watch('color');
+  const number = watch('number');
 
-  function handleSave() {
-    if (!canSave) return;
+  function onSubmit(data: ModelFormValues) {
     const fd = new FormData();
-    fd.set('team', f.team);
-    fd.set('season', f.season);
-    fd.set('version', f.version);
-    fd.set('type', f.type);
-    fd.set('sleeve', f.sleeve);
-    fd.set('color', f.color);
-    fd.set('number', f.number);
-    fd.set('player', f.player);
-    fd.set('description', f.description);
-    fd.set('photos', JSON.stringify(f.photos));
+    fd.set('team', data.team);
+    fd.set('season', data.season);
+    fd.set('version', data.version);
+    fd.set('type', data.type);
+    fd.set('sleeve', data.sleeve);
+    fd.set('color', data.color);
+    fd.set('number', data.number ?? '');
+    fd.set('player', data.player ?? '');
+    fd.set('description', data.description ?? '');
+    fd.set('photos', JSON.stringify(data.photos));
     startTransition(async () => {
       if (initial?.id) {
         await updateModel(initial.id, undefined, fd);
@@ -65,67 +66,127 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
       <FormHead
         onCancel={() => router.back()}
         title={initial ? 'Editar modelo' : 'Nuevo modelo'}
-        onSave={handleSave}
+        onSave={handleSubmit(onSubmit)}
         saveLabel={initial ? 'Guardar cambios' : 'Crear modelo'}
-        canSave={canSave && !pending}
+        canSave={!pending}
       />
       <div className="body">
         <div className="body-pad">
-          <PhotoGallery
-            photos={f.photos}
-            color={f.color}
-            number={f.number}
-            onChange={(photos) => set('photos', photos)}
+          <Controller
+            name="photos"
+            control={control}
+            render={({ field }) => (
+              <PhotoGallery
+                photos={field.value}
+                color={color}
+                number={number ?? ''}
+                onChange={field.onChange}
+              />
+            )}
           />
 
           <div className="section-label">Identificación</div>
-          <Field label="Equipo">
-            <TextInput value={f.team} onChange={(v) => set('team', v)} placeholder="Ej: Peñarol, Real Madrid…" />
+          <Field label="Equipo" error={errors.team?.message}>
+            <Controller
+              name="team"
+              control={control}
+              render={({ field }) => (
+                <TextInput value={field.value} onChange={field.onChange} placeholder="Ej: Peñarol, Real Madrid…" />
+              )}
+            />
           </Field>
           <div className="field-row">
-            <Field label="Temporada">
-              <TextInput value={f.season} onChange={(v) => set('season', v)} placeholder="2025/26" mono />
+            <Field label="Temporada" error={errors.season?.message}>
+              <Controller
+                name="season"
+                control={control}
+                render={({ field }) => (
+                  <TextInput value={field.value} onChange={field.onChange} placeholder="2025/26" mono />
+                )}
+              />
             </Field>
             <Field label="Versión">
-              <SelectInput value={f.version} onChange={(v) => set('version', v)} options={VERSIONS} />
+              <Controller
+                name="version"
+                control={control}
+                render={({ field }) => (
+                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} />
+                )}
+              />
             </Field>
           </div>
           <Field label="Tipo">
-            <Segmented options={SHIRT_TYPES} value={f.type} onChange={(v) => set('type', v)} full />
+            <Controller
+              name="type"
+              control={control}
+              render={({ field }) => (
+                <Segmented options={SHIRT_TYPES} value={field.value} onChange={field.onChange} full />
+              )}
+            />
           </Field>
           <Field label="Manga">
-            <Segmented options={SLEEVES} value={f.sleeve} onChange={(v) => set('sleeve', v)} full />
+            <Controller
+              name="sleeve"
+              control={control}
+              render={({ field }) => (
+                <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} full />
+              )}
+            />
           </Field>
 
           <div className="section-label">Apariencia</div>
           <Field label="Color principal">
-            <ColorPicker value={f.color} onChange={(v) => set('color', v)} />
+            <Controller
+              name="color"
+              control={control}
+              render={({ field }) => (
+                <ColorPicker value={field.value} onChange={field.onChange} />
+              )}
+            />
           </Field>
           <div className="field-row">
             <Field label="Número" optional>
-              <TextInput
-                value={f.number}
-                onChange={(v) => set('number', v.replace(/[^\d]/g, '').slice(0, 2))}
-                placeholder="10"
-                mono
-                inputMode="numeric"
+              <Controller
+                name="number"
+                control={control}
+                render={({ field }) => (
+                  <TextInput
+                    value={field.value ?? ''}
+                    onChange={(v) => field.onChange(v.replace(/[^\d]/g, '').slice(0, 2))}
+                    placeholder="10"
+                    mono
+                    inputMode="numeric"
+                  />
+                )}
               />
             </Field>
             <Field label="Jugador" optional>
-              <TextInput value={f.player} onChange={(v) => set('player', v)} placeholder="Ej: Messi" />
+              <Controller
+                name="player"
+                control={control}
+                render={({ field }) => (
+                  <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Messi" />
+                )}
+              />
             </Field>
           </div>
 
           <div className="section-label">Notas</div>
           <Field label="Descripción" optional>
-            <TextAreaInput
-              value={f.description}
-              onChange={(v) => set('description', v)}
-              placeholder="Detalles, edición especial, observaciones…"
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <TextAreaInput
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  placeholder="Detalles, edición especial, observaciones…"
+                />
+              )}
             />
           </Field>
 
-          <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!canSave || pending} onClick={handleSave}>
+          <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
             {initial ? 'Guardar cambios' : 'Crear modelo'}
           </button>
         </div>

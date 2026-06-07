@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
@@ -11,29 +13,44 @@ import { PEOPLE, usd, todayISO } from '@/app/lib/domain';
 import type { BatchSummary } from '@/app/lib/domain';
 import { markArrived } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
+import { arrivalSchema, type ArrivalFormValues } from '@/app/lib/schemas';
 
 export function ArrivalForm({ batch }: { batch: BatchSummary }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [f, setF] = useState({
-    arrivalDate: todayISO(),
-    shippingPriceUsd: '',
-    shippingPriceUyu: '',
-    weight: '',
-    shippingPaidBy: '',
+  const {
+    control,
+    handleSubmit,
+    register,
+    watch,
+    formState: { errors },
+  } = useForm<ArrivalFormValues>({
+    resolver: zodResolver(arrivalSchema),
+    defaultValues: {
+      arrivalDate: todayISO(),
+      shippingPriceUsd: '',
+      shippingPriceUyu: '',
+      weight: '',
+      shippingPaidBy: '',
+    },
   });
-  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
+  const shippingPriceUsd = watch('shippingPriceUsd');
+  const shippingPriceUyu = watch('shippingPriceUyu');
   const hasShipping =
-    (parseFloat(f.shippingPriceUsd) || 0) > 0 ||
-    (parseFloat(f.shippingPriceUyu) || 0) > 0;
-  const canSave = !!f.arrivalDate && (!hasShipping || !!f.shippingPaidBy);
+    (parseFloat(shippingPriceUsd ?? '') || 0) > 0 ||
+    (parseFloat(shippingPriceUyu ?? '') || 0) > 0;
   const qty = batch.items.length;
 
-  function handleSave() {
-    if (!canSave) return;
+  function onSubmit(data: ArrivalFormValues) {
     startTransition(async () => {
-      await markArrived(batch.id, f);
+      await markArrived(batch.id, {
+        arrivalDate: data.arrivalDate,
+        shippingPriceUsd: data.shippingPriceUsd,
+        shippingPriceUyu: data.shippingPriceUyu,
+        weight: data.weight,
+        shippingPaidBy: data.shippingPaidBy,
+      });
     });
   }
 
@@ -42,9 +59,9 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
       <FormHead
         onCancel={() => router.back()}
         title="Marcar llegada"
-        onSave={handleSave}
+        onSave={handleSubmit(onSubmit)}
         saveLabel="Confirmar"
-        canSave={canSave && !pending}
+        canSave={!pending}
       />
       <div className="body">
         <div className="body-pad">
@@ -70,30 +87,53 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
           </div>
 
           <div className="section-label">Recepción</div>
-          <Field label="Fecha de llegada">
-            <input className="input mono" type="date" value={f.arrivalDate}
-              onChange={(e) => set('arrivalDate', e.target.value)} />
+          <Field label="Fecha de llegada" error={errors.arrivalDate?.message}>
+            <input className="input mono" type="date" {...register('arrivalDate')} />
           </Field>
           <div className="field-row">
             <Field label="Envío (USD)" optional>
-              <MoneyInput prefix="US$" value={f.shippingPriceUsd} onChange={(v) => set('shippingPriceUsd', v)} />
+              <Controller
+                name="shippingPriceUsd"
+                control={control}
+                render={({ field }) => (
+                  <MoneyInput prefix="US$" value={field.value ?? ''} onChange={field.onChange} />
+                )}
+              />
             </Field>
             <Field label="Envío (UYU)" optional>
-              <MoneyInput prefix="$U" value={f.shippingPriceUyu} onChange={(v) => set('shippingPriceUyu', v)} />
+              <Controller
+                name="shippingPriceUyu"
+                control={control}
+                render={({ field }) => (
+                  <MoneyInput prefix="$U" value={field.value ?? ''} onChange={field.onChange} />
+                )}
+              />
             </Field>
           </div>
           <Field label="Peso (kg)" optional>
-            <WeightInput value={f.weight} onChange={(v) => set('weight', v)} />
+            <Controller
+              name="weight"
+              control={control}
+              render={({ field }) => (
+                <WeightInput value={field.value ?? ''} onChange={field.onChange} />
+              )}
+            />
           </Field>
 
           {hasShipping && (
             <div style={{ marginTop: 4, marginBottom: 4 }}>
-              <Field label="¿Quién pagó el envío?">
-                <Segmented
-                  options={PEOPLE}
-                  value={f.shippingPaidBy}
-                  onChange={(v) => set('shippingPaidBy', v)}
-                  full
+              <Field label="¿Quién pagó el envío?" error={errors.shippingPaidBy?.message}>
+                <Controller
+                  name="shippingPaidBy"
+                  control={control}
+                  render={({ field }) => (
+                    <Segmented
+                      options={PEOPLE}
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      full
+                    />
+                  )}
                 />
               </Field>
               <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
@@ -107,7 +147,7 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
             <span>Al confirmar, las <strong>{qty} unidades</strong> entran al stock disponible.</span>
           </div>
 
-          <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!canSave || pending} onClick={handleSave}>
+          <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
             Confirmar llegada
           </button>
         </div>

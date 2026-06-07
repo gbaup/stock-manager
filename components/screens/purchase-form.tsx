@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
@@ -13,8 +15,7 @@ import { SIZES, PEOPLE, usd, todayISO } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createPurchase } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
-
-type Item = { key: string; modelId: string; size: string; basePriceUsd: string };
+import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 
 export function PurchaseForm({
   models,
@@ -26,52 +27,59 @@ export function PurchaseForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
-  const [batch, setBatch] = useState({
-    purchaseDate: todayISO(),
-    supplier: '',
-    trackingNumber: '',
-    description: '',
-    supplierPaidBy: '',
+
+  const {
+    control,
+    handleSubmit,
+    register,
+    watch,
+    trigger,
+    formState: { errors },
+  } = useForm<PurchaseFormValues>({
+    resolver: zodResolver(purchaseSchema),
+    defaultValues: {
+      purchaseDate: todayISO(),
+      supplier: '',
+      trackingNumber: '',
+      description: '',
+      supplierPaidBy: '',
+      items: presetModelId
+        ? [{ modelId: presetModelId, size: '', basePriceUsd: '' }]
+        : [],
+    },
   });
-  const [items, setItems] = useState<Item[]>(
-    presetModelId ? [{ key: 'i0', modelId: presetModelId, size: '', basePriceUsd: '' }] : []
-  );
-  const setB = (k: keyof typeof batch, v: string) => setBatch((s) => ({ ...s, [k]: v }));
+
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
   const modelLabel = (m: ModelWithStats) => `${m.team} · ${m.version} · ${m.season}`;
   const modelByLabel: Record<string, string> = {};
   models.forEach((m) => { modelByLabel[modelLabel(m)] = m.id; });
 
-  const addItem = () => setItems((s) => [...s, { key: `i${Date.now()}`, modelId: '', size: '', basePriceUsd: '' }]);
-  const updItem = (key: string, k: keyof Item, v: string) =>
-    setItems((s) => s.map((it) => it.key === key ? { ...it, [k]: v } : it));
-  const delItem = (key: string) => setItems((s) => s.filter((it) => it.key !== key));
-
-  const validItems = items.filter((it) => it.modelId);
-  const allRowsValid = items.length > 0 && items.every((it) => it.modelId && it.size);
-  const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd) || 0), 0);
+  const watchedItems = watch('items');
+  const validItems = watchedItems.filter((it) => it.modelId);
+  const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0), 0);
   const needsSupplierPayer = totalUsd > 0;
-  const step1Valid = !!batch.purchaseDate;
-  const canSave =
-    step === 2 &&
-    validItems.length > 0 &&
-    allRowsValid &&
-    (!needsSupplierPayer || !!batch.supplierPaidBy);
 
-  function handleSave() {
-    if (!canSave) return;
+  async function handleNextStep() {
+    const valid = await trigger(['purchaseDate']);
+    if (valid) setStep(2);
+  }
+
+  function onSubmit(data: PurchaseFormValues) {
     startTransition(async () => {
       await createPurchase({
-        purchaseDate: batch.purchaseDate,
-        supplier: batch.supplier || undefined,
-        trackingNumber: batch.trackingNumber || undefined,
-        description: batch.description || undefined,
-        supplierPaidBy: batch.supplierPaidBy || undefined,
-        items: validItems.map((it) => ({
-          modelId: it.modelId,
-          size: it.size,
-          basePriceUsd: parseFloat(it.basePriceUsd) || 0,
-        })),
+        purchaseDate: data.purchaseDate,
+        supplier: data.supplier || undefined,
+        trackingNumber: data.trackingNumber || undefined,
+        description: data.description || undefined,
+        supplierPaidBy: data.supplierPaidBy || undefined,
+        items: data.items
+          .filter((it) => it.modelId)
+          .map((it) => ({
+            modelId: it.modelId,
+            size: it.size,
+            basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
+          })),
       });
     });
   }
@@ -81,9 +89,9 @@ export function PurchaseForm({
       <FormHead
         onCancel={step === 1 ? () => router.back() : () => setStep(1)}
         title={step === 1 ? 'Nueva compra · info' : 'Nueva compra · items'}
-        onSave={step === 1 ? () => { if (step1Valid) setStep(2); } : handleSave}
+        onSave={step === 1 ? handleNextStep : handleSubmit(onSubmit)}
         saveLabel={step === 1 ? 'Siguiente' : 'Registrar'}
-        canSave={step === 1 ? step1Valid : canSave && !pending}
+        canSave={!pending}
       />
       <Stepper step={step} labels={['Info del batch', 'Items']} />
 
@@ -92,30 +100,46 @@ export function PurchaseForm({
           {step === 1 ? (
             <>
               <div className="section-label">Info del batch</div>
-              <Field label="Fecha de compra">
-                <input className="input mono" type="date" value={batch.purchaseDate}
-                  onChange={(e) => setB('purchaseDate', e.target.value)} />
+              <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
+                <input className="input mono" type="date" {...register('purchaseDate')} />
               </Field>
               <Field label="Cantidad">
                 <div className="calc-field">
-                  <span className="calc-val">{items.length}</span>
+                  <span className="calc-val">{fields.length}</span>
                   <span className="calc-hint">se calcula de los items</span>
                 </div>
               </Field>
 
               <div className="section-label">Seguimiento</div>
               <Field label="Proveedor" optional>
-                <TextInput value={batch.supplier} onChange={(v) => setB('supplier', v)} placeholder="Ej: Yupoo — Kingjerseys" />
+                <Controller
+                  name="supplier"
+                  control={control}
+                  render={({ field }) => (
+                    <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
+                  )}
+                />
               </Field>
               <Field label="Número de tracking" optional>
-                <TextInput value={batch.trackingNumber} onChange={(v) => setB('trackingNumber', v)} placeholder="Nº de seguimiento" mono />
+                <Controller
+                  name="trackingNumber"
+                  control={control}
+                  render={({ field }) => (
+                    <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Nº de seguimiento" mono />
+                  )}
+                />
               </Field>
               <Field label="Descripción" optional>
-                <TextAreaInput value={batch.description} onChange={(v) => setB('description', v)} placeholder="Notas del pedido…" />
+                <Controller
+                  name="description"
+                  control={control}
+                  render={({ field }) => (
+                    <TextAreaInput value={field.value ?? ''} onChange={field.onChange} placeholder="Notas del pedido…" />
+                  )}
+                />
               </Field>
 
-              <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!step1Valid}
-                onClick={() => step1Valid && setStep(2)}>
+              <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
                 Siguiente: agregar items
                 <Icon name="chevR" size={18} />
               </button>
@@ -123,16 +147,22 @@ export function PurchaseForm({
           ) : (
             <>
               <div className="section-label">Items del batch</div>
-              {items.length === 0 && (
+              {fields.length === 0 && (
                 <Empty title="Sin items todavía" desc="Agregá un item por cada camiseta del pedido." icon="box" />
               )}
+              {errors.items?.root?.message && (
+                <span className="field-error" style={{ marginBottom: 8, display: 'block' }}>
+                  {errors.items.root.message}
+                </span>
+              )}
               <div className="item-list">
-                {items.map((it, i) => {
-                  const m = models.find((x) => x.id === it.modelId);
+                {fields.map((field, index) => {
+                  const modelId = watch(`items.${index}.modelId`);
+                  const m = models.find((x) => x.id === modelId);
                   return (
-                    <div key={it.key} className="item-card">
+                    <div key={field.id} className="item-card">
                       <div className="item-head">
-                        <span className="item-idx">{i + 1}</span>
+                        <span className="item-idx">{index + 1}</span>
                         {m ? (
                           <Swatch
                             color={m.color}
@@ -143,26 +173,49 @@ export function PurchaseForm({
                         ) : (
                           <div className="item-swatch-empty"><Icon name="shirt" size={16} /></div>
                         )}
-                        <select
-                          className="select item-model"
-                          value={m ? modelLabel(m) : ''}
-                          onChange={(e) => updItem(it.key, 'modelId', modelByLabel[e.target.value] || '')}
-                        >
-                          <option value="">Elegí un producto…</option>
-                          {models.map((mm) => (
-                            <option key={mm.id} value={modelLabel(mm)}>{modelLabel(mm)}</option>
-                          ))}
-                        </select>
-                        <button className="iconbtn plain item-del" type="button" onClick={() => delItem(it.key)}>
+                        <Controller
+                          name={`items.${index}.modelId`}
+                          control={control}
+                          render={({ field: f }) => (
+                            <select
+                              className="select item-model"
+                              value={m ? modelLabel(m) : ''}
+                              onChange={(e) => f.onChange(modelByLabel[e.target.value] || '')}
+                            >
+                              <option value="">Elegí un producto…</option>
+                              {models.map((mm) => (
+                                <option key={mm.id} value={modelLabel(mm)}>{modelLabel(mm)}</option>
+                              ))}
+                            </select>
+                          )}
+                        />
+                        <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
                           <Icon name="x" size={17} />
                         </button>
                       </div>
+                      {errors.items?.[index]?.modelId?.message && (
+                        <span className="field-error" style={{ marginTop: 4, display: 'block' }}>
+                          {errors.items[index].modelId.message}
+                        </span>
+                      )}
                       <div className="field-row" style={{ marginTop: 10 }}>
-                        <Field label="Talle">
-                          <SelectInput value={it.size} onChange={(v) => updItem(it.key, 'size', v)} options={SIZES} placeholder="Talle…" />
+                        <Field label="Talle" error={errors.items?.[index]?.size?.message}>
+                          <Controller
+                            name={`items.${index}.size`}
+                            control={control}
+                            render={({ field: f }) => (
+                              <SelectInput value={f.value} onChange={f.onChange} options={SIZES} placeholder="Talle…" />
+                            )}
+                          />
                         </Field>
                         <Field label="Precio base">
-                          <MoneyInput prefix="US$" value={it.basePriceUsd} onChange={(v) => updItem(it.key, 'basePriceUsd', v)} placeholder="0" />
+                          <Controller
+                            name={`items.${index}.basePriceUsd`}
+                            control={control}
+                            render={({ field: f }) => (
+                              <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                            )}
+                          />
                         </Field>
                       </div>
                     </div>
@@ -170,7 +223,12 @@ export function PurchaseForm({
                 })}
               </div>
 
-              <button className="btn btn-secondary" style={{ marginTop: 12 }} type="button" onClick={addItem}>
+              <button
+                className="btn btn-secondary"
+                style={{ marginTop: 12 }}
+                type="button"
+                onClick={() => append({ modelId: '', size: '', basePriceUsd: '' })}
+              >
                 <Icon name="plus" size={19} />Agregar item
               </button>
 
@@ -192,12 +250,18 @@ export function PurchaseForm({
                   <div className="section-label" style={{ margin: '0 0 8px' }}>
                     Pago al proveedor
                   </div>
-                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`}>
-                    <Segmented
-                      options={PEOPLE}
-                      value={batch.supplierPaidBy}
-                      onChange={(v) => setB('supplierPaidBy', v)}
-                      full
+                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} error={errors.supplierPaidBy?.message}>
+                    <Controller
+                      name="supplierPaidBy"
+                      control={control}
+                      render={({ field: f }) => (
+                        <Segmented
+                          options={PEOPLE}
+                          value={f.value ?? ''}
+                          onChange={f.onChange}
+                          full
+                        />
+                      )}
                     />
                   </Field>
                   <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
@@ -211,7 +275,7 @@ export function PurchaseForm({
                 <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
               </div>
 
-              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!canSave || pending} onClick={handleSave}>
+              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
                 Registrar compra
               </button>
             </>

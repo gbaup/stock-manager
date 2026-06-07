@@ -1,40 +1,49 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, MoneyInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PEOPLE, todayISO, uyu, usd } from '@/app/lib/domain';
 import { createExpense } from '@/app/actions/expenses';
+import { gastoSchema, type GastoFormValues } from '@/app/lib/schemas';
 
 export function GastoForm() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [f, setF] = useState({
-    title: '',
-    amount: '',
-    currency: 'UYU' as 'UYU' | 'USD',
-    paidBy: '',
-    date: todayISO(),
+  const {
+    control,
+    handleSubmit,
+    register,
+    watch,
+    formState: { errors },
+  } = useForm<GastoFormValues>({
+    resolver: zodResolver(gastoSchema),
+    defaultValues: {
+      title: '',
+      amount: '',
+      currency: 'UYU',
+      paidBy: '',
+      date: todayISO(),
+    },
   });
-  const set = <K extends keyof typeof f>(k: K, v: typeof f[K]) =>
-    setF((s) => ({ ...s, [k]: v }));
 
-  const amount = parseFloat(f.amount) || 0;
-  const canSave = f.title.trim().length > 0 && amount > 0 && !!f.paidBy;
+  const currency = watch('currency');
+  const amount = parseFloat(watch('amount')) || 0;
+  const paidBy = watch('paidBy');
+  const previewMoney = currency === 'UYU' ? uyu(amount) : usd(amount);
 
-  const previewMoney = f.currency === 'UYU' ? uyu(amount) : usd(amount);
-
-  function handleSave() {
-    if (!canSave) return;
+  function onSubmit(data: GastoFormValues) {
     startTransition(async () => {
       await createExpense({
-        title: f.title,
-        amount: f.amount,
-        currency: f.currency,
-        paidBy: f.paidBy,
-        date: f.date,
+        title: data.title,
+        amount: data.amount,
+        currency: data.currency,
+        paidBy: data.paidBy,
+        date: data.date,
       });
     });
   }
@@ -44,59 +53,74 @@ export function GastoForm() {
       <FormHead
         onCancel={() => router.back()}
         title="Nuevo gasto"
-        onSave={handleSave}
+        onSave={handleSubmit(onSubmit)}
         saveLabel="Registrar gasto"
-        canSave={canSave && !pending}
+        canSave={!pending}
       />
       <div className="body">
         <div className="body-pad">
           <div className="section-label">Gasto extra</div>
-          <Field label="Título">
-            <TextInput
-              value={f.title}
-              onChange={(v) => set('title', v)}
-              placeholder="Pack de 100 sobres manila…"
+          <Field label="Título" error={errors.title?.message}>
+            <Controller
+              name="title"
+              control={control}
+              render={({ field }) => (
+                <TextInput value={field.value} onChange={field.onChange} placeholder="Pack de 100 sobres manila…" />
+              )}
             />
           </Field>
           <div className="field-row">
-            <Field label="Monto">
-              <MoneyInput
-                prefix={f.currency === 'UYU' ? '$U' : 'US$'}
-                value={f.amount}
-                onChange={(v) => set('amount', v)}
-                placeholder="0"
+            <Field label="Monto" error={errors.amount?.message}>
+              <Controller
+                name="amount"
+                control={control}
+                render={({ field }) => (
+                  <MoneyInput
+                    prefix={currency === 'UYU' ? '$U' : 'US$'}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="0"
+                  />
+                )}
               />
             </Field>
             <Field label="Moneda">
-              <Segmented
-                options={['UYU', 'USD'] as const}
-                value={f.currency}
-                onChange={(v) => set('currency', v as 'UYU' | 'USD')}
-                full
+              <Controller
+                name="currency"
+                control={control}
+                render={({ field }) => (
+                  <Segmented
+                    options={['UYU', 'USD'] as const}
+                    value={field.value}
+                    onChange={field.onChange}
+                    full
+                  />
+                )}
               />
             </Field>
           </div>
-          <Field label="Fecha">
-            <input
-              className="input mono"
-              type="date"
-              value={f.date}
-              onChange={(e) => set('date', e.target.value)}
-            />
+          <Field label="Fecha" error={errors.date?.message}>
+            <input className="input mono" type="date" {...register('date')} />
           </Field>
 
           <div className="section-label">Pago</div>
-          <Field label="¿Quién lo pagó?">
-            <Segmented options={PEOPLE} value={f.paidBy} onChange={(v) => set('paidBy', v)} full />
+          <Field label="¿Quién lo pagó?" error={errors.paidBy?.message}>
+            <Controller
+              name="paidBy"
+              control={control}
+              render={({ field }) => (
+                <Segmented options={PEOPLE} value={field.value} onChange={field.onChange} full />
+              )}
+            />
           </Field>
           <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
-            Se descuenta del saldo de quien lo pagó, en {f.currency === 'UYU' ? 'pesos' : 'dólares'}.
+            Se descuenta del saldo de quien lo pagó, en {currency === 'UYU' ? 'pesos' : 'dólares'}.
           </div>
 
-          {f.paidBy && amount > 0 && (
+          {paidBy && amount > 0 && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
               <span className="mov-chip neg" style={{ fontSize: 14 }}>
-                {f.paidBy} paga − {previewMoney}
+                {paidBy} paga − {previewMoney}
               </span>
             </div>
           )}
@@ -104,8 +128,8 @@ export function GastoForm() {
           <button
             className="btn btn-primary"
             style={{ marginTop: 4 }}
-            disabled={!canSave || pending}
-            onClick={handleSave}
+            disabled={pending}
+            onClick={handleSubmit(onSubmit)}
           >
             Registrar gasto
           </button>

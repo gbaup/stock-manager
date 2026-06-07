@@ -6,10 +6,12 @@ import { Icon } from './icon';
 export function Field({
   label,
   optional,
+  error,
   children,
 }: {
   label?: string;
   optional?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -21,6 +23,7 @@ export function Field({
         </label>
       )}
       {children}
+      {error && <span className="field-error">{error}</span>}
     </div>
   );
 }
