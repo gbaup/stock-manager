@@ -38,6 +38,8 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
 
   const active = pathname.startsWith('/purchases')
     ? 'purchases'
+    : pathname.startsWith('/saldos')
+    ? 'saldos'
     : pathname.startsWith('/public')
     ? 'public'
     : 'inventory';
@@ -45,6 +47,7 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   const items = [
     { id: 'inventory', label: 'Inventario', icon: 'box' as const, href: '/inventory' },
     { id: 'purchases', label: 'Compras', icon: 'truck' as const, href: '/purchases', badge: transitCount },
+    { id: 'saldos', label: 'Saldos', icon: 'wallet' as const, href: '/saldos' },
     { id: 'public', label: 'Pública', icon: 'eye' as const, href: '/public' },
   ];
 

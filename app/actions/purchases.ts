@@ -12,6 +12,7 @@ export async function createPurchase(data: {
   supplier?: string;
   trackingNumber?: string;
   description?: string;
+  supplierPaidBy?: string;
   items: PurchaseItem[];
 }) {
   await prisma.batch.create({
@@ -20,6 +21,7 @@ export async function createPurchase(data: {
       trackingNumber: data.trackingNumber || null,
       description: data.description || null,
       quantity: data.items.length,
+      supplierPaidBy: data.supplierPaidBy || null,
       items: {
         create: data.items.map((it) => ({
           catalogProductId: it.modelId,
@@ -34,6 +36,7 @@ export async function createPurchase(data: {
 
   revalidatePath('/purchases');
   revalidatePath('/inventory');
+  revalidatePath('/saldos');
   redirect('/purchases');
 }
 
@@ -44,6 +47,7 @@ export async function markArrived(
     shippingPriceUsd?: string;
     shippingPriceUyu?: string;
     weight?: string;
+    shippingPaidBy?: string;
   }
 ) {
   await prisma.batch.update({
@@ -53,10 +57,12 @@ export async function markArrived(
       shippingPriceUsd: data.shippingPriceUsd ? parseFloat(data.shippingPriceUsd) : null,
       shippingPriceUyu: data.shippingPriceUyu ? parseFloat(data.shippingPriceUyu) : null,
       weight: data.weight ? parseFloat(data.weight) : null,
+      shippingPaidBy: data.shippingPaidBy || null,
     },
   });
 
   revalidatePath('/purchases');
   revalidatePath('/inventory');
+  revalidatePath('/saldos');
   redirect('/purchases');
 }

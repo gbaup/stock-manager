@@ -10,9 +10,13 @@ const modelSchema = z.object({
   season: z.string().min(1),
   version: z.string().default('Home'),
   color: z.string().default('Blanco'),
+  type: z.string().default('Fan'),
+  sleeve: z.string().default('Corta'),
   number: z.string().max(2).optional(),
   player: z.string().optional(),
   description: z.string().optional(),
+  photos: z.string().optional(),
+  sizes: z.string().optional(),
 });
 
 function parseNumber(n: string | undefined): number | null {
@@ -21,13 +25,23 @@ function parseNumber(n: string | undefined): number | null {
   return isNaN(parsed) ? null : parsed;
 }
 
+function parseJsonArray(s: string | undefined): string[] {
+  if (!s) return [];
+  try { return JSON.parse(s); } catch { return []; }
+}
+
 export async function createModel(_prev: unknown, formData: FormData) {
   const result = modelSchema.safeParse(Object.fromEntries(formData));
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { number, ...rest } = result.data;
+  const { number, photos, sizes, ...rest } = result.data;
   const model = await prisma.catalogProduct.create({
-    data: { ...rest, number: parseNumber(number) },
+    data: {
+      ...rest,
+      number: parseNumber(number),
+      photos: parseJsonArray(photos),
+      sizes: parseJsonArray(sizes),
+    },
   });
   revalidatePath('/inventory');
   redirect(`/inventory/${model.id}`);
@@ -37,10 +51,15 @@ export async function updateModel(id: string, _prev: unknown, formData: FormData
   const result = modelSchema.safeParse(Object.fromEntries(formData));
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { number, ...rest } = result.data;
+  const { number, photos, sizes, ...rest } = result.data;
   await prisma.catalogProduct.update({
     where: { id },
-    data: { ...rest, number: parseNumber(number) },
+    data: {
+      ...rest,
+      number: parseNumber(number),
+      photos: parseJsonArray(photos),
+      sizes: parseJsonArray(sizes),
+    },
   });
   revalidatePath('/inventory');
   revalidatePath(`/inventory/${id}`);

@@ -5,17 +5,29 @@ import { useRouter } from 'next/navigation';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
+import { Segmented } from '@/components/ui/segmented';
 import { Field, MoneyInput, WeightInput } from '@/components/ui/field';
-import { usd, todayISO } from '@/app/lib/domain';
+import { PEOPLE, usd, todayISO } from '@/app/lib/domain';
 import type { BatchSummary } from '@/app/lib/domain';
 import { markArrived } from '@/app/actions/purchases';
+import { coverOf } from '@/components/ui/swatch';
 
 export function ArrivalForm({ batch }: { batch: BatchSummary }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [f, setF] = useState({ arrivalDate: todayISO(), shippingPriceUsd: '', shippingPriceUyu: '', weight: '' });
+  const [f, setF] = useState({
+    arrivalDate: todayISO(),
+    shippingPriceUsd: '',
+    shippingPriceUyu: '',
+    weight: '',
+    shippingPaidBy: '',
+  });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const canSave = !!f.arrivalDate;
+
+  const hasShipping =
+    (parseFloat(f.shippingPriceUsd) || 0) > 0 ||
+    (parseFloat(f.shippingPriceUyu) || 0) > 0;
+  const canSave = !!f.arrivalDate && (!hasShipping || !!f.shippingPaidBy);
   const qty = batch.items.length;
 
   function handleSave() {
@@ -40,7 +52,12 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
           <div className="arrival-items">
             {batch.items.map((it, i) => (
               <div key={i} className="arrival-item">
-                <Swatch color={it.product.color} number={it.product.number} style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }} />
+                <Swatch
+                  color={it.product.color}
+                  number={it.product.number}
+                  photo={coverOf(it.product)}
+                  style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }}
+                />
                 <div className="ai-main">
                   <div className="ai-team">{it.product.team} · {it.product.version}</div>
                   <div className="ai-meta">
@@ -68,6 +85,22 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
           <Field label="Peso (kg)" optional>
             <WeightInput value={f.weight} onChange={(v) => set('weight', v)} />
           </Field>
+
+          {hasShipping && (
+            <div style={{ marginTop: 4, marginBottom: 4 }}>
+              <Field label="¿Quién pagó el envío?">
+                <Segmented
+                  options={PEOPLE}
+                  value={f.shippingPaidBy}
+                  onChange={(v) => set('shippingPaidBy', v)}
+                  full
+                />
+              </Field>
+              <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
+                Se descuenta del saldo de quien pagó (puede ser distinto a quien pagó el proveedor).
+              </div>
+            </div>
+          )}
 
           <div className="callout callout-ok">
             <Icon name="check" size={18} style={{ flexShrink: 0, marginTop: 1 }} />

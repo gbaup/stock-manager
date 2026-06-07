@@ -5,7 +5,7 @@ export function Empty({
   title,
   desc,
 }: {
-  icon?: 'box' | 'search' | 'truck' | 'cart' | 'shirt';
+  icon?: 'box' | 'search' | 'truck' | 'cart' | 'shirt' | 'wallet' | 'receipt';
   title: string;
   desc?: string;
 }) {

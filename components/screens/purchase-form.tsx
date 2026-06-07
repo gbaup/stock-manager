@@ -7,10 +7,12 @@ import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
+import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { SIZES, usd, todayISO } from '@/app/lib/domain';
+import { SIZES, PEOPLE, usd, todayISO } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createPurchase } from '@/app/actions/purchases';
+import { coverOf } from '@/components/ui/swatch';
 
 type Item = { key: string; modelId: string; size: string; basePriceUsd: string };
 
@@ -24,7 +26,13 @@ export function PurchaseForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
-  const [batch, setBatch] = useState({ purchaseDate: todayISO(), supplier: '', trackingNumber: '', description: '' });
+  const [batch, setBatch] = useState({
+    purchaseDate: todayISO(),
+    supplier: '',
+    trackingNumber: '',
+    description: '',
+    supplierPaidBy: '',
+  });
   const [items, setItems] = useState<Item[]>(
     presetModelId ? [{ key: 'i0', modelId: presetModelId, size: '', basePriceUsd: '' }] : []
   );
@@ -42,8 +50,13 @@ export function PurchaseForm({
   const validItems = items.filter((it) => it.modelId);
   const allRowsValid = items.length > 0 && items.every((it) => it.modelId && it.size);
   const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd) || 0), 0);
+  const needsSupplierPayer = totalUsd > 0;
   const step1Valid = !!batch.purchaseDate;
-  const canSave = step === 2 && validItems.length > 0 && allRowsValid;
+  const canSave =
+    step === 2 &&
+    validItems.length > 0 &&
+    allRowsValid &&
+    (!needsSupplierPayer || !!batch.supplierPaidBy);
 
   function handleSave() {
     if (!canSave) return;
@@ -53,6 +66,7 @@ export function PurchaseForm({
         supplier: batch.supplier || undefined,
         trackingNumber: batch.trackingNumber || undefined,
         description: batch.description || undefined,
+        supplierPaidBy: batch.supplierPaidBy || undefined,
         items: validItems.map((it) => ({
           modelId: it.modelId,
           size: it.size,
@@ -120,7 +134,12 @@ export function PurchaseForm({
                       <div className="item-head">
                         <span className="item-idx">{i + 1}</span>
                         {m ? (
-                          <Swatch color={m.color} number={m.number} style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }} />
+                          <Swatch
+                            color={m.color}
+                            number={m.number}
+                            photo={coverOf(m)}
+                            style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }}
+                          />
                         ) : (
                           <div className="item-swatch-empty"><Icon name="shirt" size={16} /></div>
                         )}
@@ -164,6 +183,25 @@ export function PurchaseForm({
                   <div className="bs-row">
                     <span>Costo base total</span>
                     <strong>{usd(totalUsd)}</strong>
+                  </div>
+                </div>
+              )}
+
+              {needsSupplierPayer && (
+                <div style={{ marginTop: 14 }}>
+                  <div className="section-label" style={{ margin: '0 0 8px' }}>
+                    Pago al proveedor
+                  </div>
+                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`}>
+                    <Segmented
+                      options={PEOPLE}
+                      value={batch.supplierPaidBy}
+                      onChange={(v) => setB('supplierPaidBy', v)}
+                      full
+                    />
+                  </Field>
+                  <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
+                    Se descuenta del saldo en US$ de quien pagó. El envío se carga aparte al marcar la llegada.
                   </div>
                 </div>
               )}

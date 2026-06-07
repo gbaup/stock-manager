@@ -4,20 +4,25 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
+import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, SelectInput, TextAreaInput, MoneyInput } from '@/components/ui/field';
-import { METHODS, usd, uyu, toUsd, todayISO } from '@/app/lib/domain';
+import { METHODS, PEOPLE, usd, uyu, toUsd, todayISO } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createSale } from '@/app/actions/sales';
+import { coverOf } from '@/components/ui/swatch';
 
 export function SaleForm({ model, stock }: { model: ModelWithStats; stock: number }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [f, setF] = useState({ price: '', quantity: '1', date: todayISO(), method: '', description: '' });
+  const [f, setF] = useState({
+    price: '', quantity: '1', date: todayISO(),
+    method: '', description: '', collectedBy: '',
+  });
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
   const qty = parseInt(f.quantity, 10) || 0;
   const price = parseFloat(f.price) || 0;
   const overStock = qty > stock;
-  const canSave = price > 0 && qty > 0 && !overStock;
+  const canSave = price > 0 && qty > 0 && !overStock && !!f.collectedBy;
 
   function handleSave() {
     if (!canSave) return;
@@ -37,7 +42,12 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
       <div className="body">
         <div className="body-pad">
           <div className="detail-hero" style={{ marginBottom: 4 }}>
-            <Swatch color={model.color} number={model.number} style={{ width: 64, height: 74, fontSize: 24 }} />
+            <Swatch
+              color={model.color}
+              number={model.number}
+              photo={coverOf(model)}
+              style={{ width: 64, height: 74, fontSize: 24 }}
+            />
             <div>
               <div className="detail-team" style={{ fontSize: 19 }}>{model.team}</div>
               <div className="detail-meta">{model.season} · {model.version} · {stock} en stock</div>
@@ -71,6 +81,23 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
           <Field label="Método de pago" optional>
             <SelectInput value={f.method} onChange={(v) => set('method', v)} options={METHODS} placeholder="Elegí un método…" />
           </Field>
+
+          <div className="section-label">Cobro</div>
+          <Field label="¿Quién cobró?">
+            <Segmented options={PEOPLE} value={f.collectedBy} onChange={(v) => set('collectedBy', v)} full />
+          </Field>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
+            Suma al saldo en mano de quien recibe la plata.
+          </div>
+
+          {f.collectedBy && price > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+              <span className="mov-chip pos" style={{ fontSize: 14 }}>
+                {f.collectedBy} cobra {uyu(price * qty)}
+              </span>
+            </div>
+          )}
+
           <Field label="Descripción" optional>
             <TextAreaInput value={f.description} onChange={(v) => set('description', v)} placeholder="Comprador, notas…" />
           </Field>

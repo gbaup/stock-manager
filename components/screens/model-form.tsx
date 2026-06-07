@@ -5,13 +5,18 @@ import { useRouter } from 'next/navigation';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker } from '@/components/ui/field';
-import { VERSIONS } from '@/app/lib/domain';
+import { Segmented } from '@/components/ui/segmented';
+import { MultiChips } from '@/components/ui/multi-chips';
+import { PhotoGallery } from '@/components/ui/photo-gallery';
+import { VERSIONS, SHIRT_TYPES, SLEEVES, SIZES } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 
 type FormState = {
   team: string; season: string; version: string;
+  type: string; sleeve: string;
   color: string; number: string; player: string; description: string;
+  photos: string[]; sizes: string[];
 };
 
 export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
@@ -21,18 +26,34 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
     team: initial?.team ?? '',
     season: initial?.season ?? '',
     version: initial?.version ?? 'Home',
+    type: initial?.type ?? 'Fan',
+    sleeve: initial?.sleeve ?? 'Corta',
     color: initial?.color ?? 'Blanco',
     number: initial?.number ?? '',
     player: initial?.player ?? '',
     description: initial?.description ?? '',
+    photos: initial?.photos ?? [],
+    sizes: initial?.sizes ?? [],
   });
-  const set = (k: keyof FormState, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+    setF((s) => ({ ...s, [k]: v }));
+
   const canSave = f.team.trim().length > 0 && f.season.trim().length > 0;
 
   function handleSave() {
     if (!canSave) return;
     const fd = new FormData();
-    Object.entries(f).forEach(([k, v]) => fd.set(k, v));
+    fd.set('team', f.team);
+    fd.set('season', f.season);
+    fd.set('version', f.version);
+    fd.set('type', f.type);
+    fd.set('sleeve', f.sleeve);
+    fd.set('color', f.color);
+    fd.set('number', f.number);
+    fd.set('player', f.player);
+    fd.set('description', f.description);
+    fd.set('photos', JSON.stringify(f.photos));
+    fd.set('sizes', JSON.stringify(f.sizes));
     startTransition(async () => {
       if (initial?.id) {
         await updateModel(initial.id, undefined, fd);
@@ -53,9 +74,12 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
       />
       <div className="body">
         <div className="body-pad">
-          <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 18px' }}>
-            <Swatch color={f.color} number={f.number} style={{ width: 84, height: 96, fontSize: 32 }} />
-          </div>
+          <div className="section-label">Fotos</div>
+          <PhotoGallery
+            photos={f.photos}
+            onChange={(photos) => set('photos', photos)}
+            previewColor={undefined}
+          />
 
           <div className="section-label">Identificación</div>
           <Field label="Equipo">
@@ -69,8 +93,25 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
               <SelectInput value={f.version} onChange={(v) => set('version', v)} options={VERSIONS} />
             </Field>
           </div>
+          <Field label="Tipo">
+            <Segmented options={SHIRT_TYPES} value={f.type} onChange={(v) => set('type', v)} full />
+          </Field>
+          <Field label="Manga">
+            <Segmented options={SLEEVES} value={f.sleeve} onChange={(v) => set('sleeve', v)} full />
+          </Field>
+          <Field label="Talles disponibles" optional>
+            <MultiChips options={SIZES} selected={f.sizes} onChange={(v) => set('sizes', v)} />
+          </Field>
 
           <div className="section-label">Apariencia</div>
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 14px' }}>
+            <Swatch
+              color={f.color}
+              number={f.number}
+              photo={f.photos[0] ?? null}
+              style={{ width: 84, height: 96, fontSize: 32 }}
+            />
+          </div>
           <Field label="Color principal">
             <ColorPicker value={f.color} onChange={(v) => set('color', v)} />
           </Field>

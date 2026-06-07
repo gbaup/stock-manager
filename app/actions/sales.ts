@@ -13,6 +13,7 @@ export async function createSale(
     date: string;
     method?: string;
     description?: string;
+    collectedBy?: string;
   }
 ) {
   const userId = await getCurrentUserId();
@@ -22,7 +23,6 @@ export async function createSale(
   const price = parseFloat(data.price);
   const saleDate = new Date(data.date);
 
-  // Find available items for this product in arrived batches
   const availableItems = await prisma.inventoryItem.findMany({
     where: {
       catalogProductId: modelId,
@@ -36,7 +36,6 @@ export async function createSale(
     throw new Error('Stock insuficiente');
   }
 
-  // Create one Sale per item and mark items as sold
   await prisma.$transaction(
     availableItems.map((item) =>
       prisma.inventoryItem.update({
@@ -51,6 +50,7 @@ export async function createSale(
               date: saleDate,
               method: data.method || null,
               description: data.description || null,
+              collectedBy: data.collectedBy || null,
             },
           },
         },
@@ -60,5 +60,6 @@ export async function createSale(
 
   revalidatePath('/inventory');
   revalidatePath(`/inventory/${modelId}`);
+  revalidatePath('/saldos');
   redirect(`/inventory/${modelId}`);
 }

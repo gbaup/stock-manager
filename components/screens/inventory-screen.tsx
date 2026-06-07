@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav } from '@/components/ui/chrome';
-import { Swatch, ColorDot } from '@/components/ui/swatch';
+import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
@@ -28,7 +28,7 @@ export function InventoryScreen({
   const q = query.trim().toLowerCase();
   let list = models.filter((m) => {
     if (!q) return true;
-    return [m.team, m.season, m.version, m.color, m.player, m.number]
+    return [m.team, m.season, m.version, m.color, m.player, m.number, m.type]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
@@ -70,7 +70,7 @@ export function InventoryScreen({
                 title={l}
               >
                 <Icon
-                  name={l === 'cards' ? 'box' : l === 'rows' ? 'filter' : 'trend'}
+                  name={l === 'cards' ? 'box' : l === 'rows' ? 'list' : 'grid'}
                   size={16}
                   strokeWidth={1.8}
                 />
@@ -134,7 +134,7 @@ function CardList({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: strin
     <div className="card-list">
       {list.map((m) => (
         <div key={m.id} className="mcard" onClick={() => onOpen(m.id)}>
-          <Swatch color={m.color} number={m.number} />
+          <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 56, height: 64, fontSize: 21 }} />
           <div className="mcard-main">
             <div className="mcard-team">{m.team}</div>
             <div className="mcard-meta">{m.season} · {m.version}</div>
@@ -167,7 +167,7 @@ function DenseRows({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: stri
       </div>
       {list.map((m) => (
         <div key={m.id} className="row" onClick={() => onOpen(m.id)}>
-          <Swatch color={m.color} number={m.number} style={{ width: 30, height: 30, fontSize: 12 }} />
+          <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 30, height: 30, fontSize: 12 }} />
           <div className="row-main">
             <div className="row-team">{m.team} · {m.version}</div>
             <div className="row-meta">{m.season}{m.player ? ` · ${m.player}` : ''} · {m.color}</div>
@@ -187,14 +187,25 @@ function VisualGrid({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: str
     <div className="grid">
       {list.map((m) => {
         const c = colorByName(m.color);
+        const cover = coverOf(m);
         return (
           <div key={m.id} className="tile" onClick={() => onOpen(m.id)}>
-            <div className="tile-top" style={{ background: c.bg, color: c.fg }}>
-              <span className="tile-badge">{m.stock} stk</span>
-              {m.number ? (
-                <span className="tile-num">{m.number}</span>
-              ) : (
-                <Icon name="shirt" size={42} strokeWidth={1.3} style={{ position: 'relative', zIndex: 1, opacity: 0.9 }} />
+            <div className="tile-top" style={{ background: c.bg, color: c.fg, overflow: 'hidden' }}>
+              {cover && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cover}
+                  alt=""
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}
+                />
+              )}
+              <span className="tile-badge" style={{ zIndex: 2 }}>{m.stock} stk</span>
+              {!cover && (
+                m.number ? (
+                  <span className="tile-num">{m.number}</span>
+                ) : (
+                  <Icon name="shirt" size={42} strokeWidth={1.3} style={{ position: 'relative', zIndex: 1, opacity: 0.9 }} />
+                )
               )}
             </div>
             <div className="tile-body">

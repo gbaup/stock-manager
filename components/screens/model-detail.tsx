@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { DetailHead, BottomNav } from '@/components/ui/chrome';
-import { Swatch, ColorDot } from '@/components/ui/swatch';
+import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
@@ -17,6 +17,7 @@ export function ModelDetailScreen({
   transitCount: number;
 }) {
   const router = useRouter();
+  const cover = coverOf(model);
 
   return (
     <div className="screen">
@@ -28,12 +29,23 @@ export function ModelDetailScreen({
       <div className="body">
         <div className="body-pad">
           <div className="detail-hero">
-            <Swatch color={model.color} number={model.number} style={{ width: 88, height: 100, fontSize: 34, borderRadius: 'var(--r-md)' }} />
+            <Swatch
+              color={model.color}
+              number={model.number}
+              photo={cover}
+              style={{ width: 88, height: 100, fontSize: 34, borderRadius: 'var(--r-md)' }}
+            />
             <div style={{ minWidth: 0 }}>
               <div className="detail-team">{model.team}</div>
-              <div className="detail-meta">{model.season} · {model.version}</div>
+              <div className="detail-meta">
+                {model.season} · {model.version}
+                {model.type ? ` · ${model.type}` : ''}
+                {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
+              </div>
               <div className="detail-tags">
                 <Tag><ColorDot color={model.color} />{model.color}</Tag>
+                {model.type && <Tag>{model.type}</Tag>}
+                {model.sleeve && <Tag>Manga {model.sleeve}</Tag>}
                 {model.player && <Tag kind="player">{model.player}</Tag>}
                 {model.number && <Tag kind="player">#{model.number}</Tag>}
               </div>
@@ -43,6 +55,15 @@ export function ModelDetailScreen({
           {model.description && (
             <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.5 }}>
               {model.description}
+            </div>
+          )}
+
+          {model.photos.length > 1 && (
+            <div className="detail-gallery">
+              {model.photos.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={src} alt="" />
+              ))}
             </div>
           )}
 
@@ -99,7 +120,10 @@ function EventRow({ ev, onArrive }: { ev: TimelineEvent; onArrive: (id: string) 
         <div className="event-main">
           <div className="event-title">Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}</div>
           <div className="event-sub">
-            {fmtDate(s.date)}{s.method ? ` · ${s.method}` : ''}{s.description ? ` · ${s.description}` : ''}
+            {fmtDate(s.date)}
+            {s.method ? ` · ${s.method}` : ''}
+            {s.collectedBy ? ` · cobró ${s.collectedBy}` : ''}
+            {s.description ? ` · ${s.description}` : ''}
           </div>
         </div>
         <div className="event-amt">
@@ -127,7 +151,6 @@ function EventRow({ ev, onArrive }: { ev: TimelineEvent; onArrive: (id: string) 
     );
   }
 
-  // arrived
   const b = ev.data;
   const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`, b.weight ? `${b.weight} kg` : null].filter(Boolean).join(' · ');
   return (
