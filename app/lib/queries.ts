@@ -13,9 +13,9 @@ function productMeta(p: {
   id: string; team: string; season: string; version: string | null;
   color: string; number: number | null; player: string | null;
   type: string | null; sleeve: string | null;
-  photos: unknown; sizes: unknown;
+  photos: unknown;
   description?: string | null;
-}): ModelMeta {
+}, sizes: string[] = []): ModelMeta {
   return {
     id: p.id, team: p.team, season: p.season,
     version: p.version, color: p.color,
@@ -24,7 +24,7 @@ function productMeta(p: {
     type: p.type,
     sleeve: p.sleeve,
     photos: Array.isArray(p.photos) ? (p.photos as string[]) : [],
-    sizes: Array.isArray(p.sizes) ? (p.sizes as string[]) : [],
+    sizes,
     description: p.description ?? null,
   };
 }
@@ -197,18 +197,22 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
 export async function getPublicModels() {
   const products = await prisma.catalogProduct.findMany({
     include: {
-      items: { select: { status: true, batch: { select: { arrivalDate: true } } } },
+      items: { select: { status: true, size: true, batch: { select: { arrivalDate: true } } } },
     },
     orderBy: { team: 'asc' },
   });
 
   return products
-    .map((p) => ({
-      ...productMeta(p),
-      stock: p.items
-        .filter((i) => i.batch.arrivalDate !== null && i.status === 'available')
-        .length,
-    }))
+    .map((p) => {
+      const availableItems = p.items.filter(
+        (i) => i.batch.arrivalDate !== null && i.status === 'available'
+      );
+      const sizes = [...new Set(availableItems.map((i) => i.size).filter(Boolean))];
+      return {
+        ...productMeta(p, sizes),
+        stock: availableItems.length,
+      };
+    })
     .filter((p) => p.stock > 0);
 }
 

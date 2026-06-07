@@ -6,9 +6,8 @@ import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
-import { MultiChips } from '@/components/ui/multi-chips';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { VERSIONS, SHIRT_TYPES, SLEEVES, SIZES } from '@/app/lib/domain';
+import { VERSIONS, SHIRT_TYPES, SLEEVES } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 
@@ -16,7 +15,7 @@ type FormState = {
   team: string; season: string; version: string;
   type: string; sleeve: string;
   color: string; number: string; player: string; description: string;
-  photos: string[]; sizes: string[];
+  photos: string[];
 };
 
 export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
@@ -33,7 +32,6 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
     player: initial?.player ?? '',
     description: initial?.description ?? '',
     photos: initial?.photos ?? [],
-    sizes: initial?.sizes ?? [],
   });
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setF((s) => ({ ...s, [k]: v }));
@@ -53,7 +51,6 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
     fd.set('player', f.player);
     fd.set('description', f.description);
     fd.set('photos', JSON.stringify(f.photos));
-    fd.set('sizes', JSON.stringify(f.sizes));
     startTransition(async () => {
       if (initial?.id) {
         await updateModel(initial.id, undefined, fd);
@@ -99,10 +96,6 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
           <Field label="Manga">
             <Segmented options={SLEEVES} value={f.sleeve} onChange={(v) => set('sleeve', v)} full />
           </Field>
-          <Field label="Talles disponibles" optional>
-            <MultiChips options={SIZES} selected={f.sizes} onChange={(v) => set('sizes', v)} />
-          </Field>
-
           <div className="section-label">Apariencia</div>
           <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 14px' }}>
             <Swatch

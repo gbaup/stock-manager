@@ -82,7 +82,7 @@ export type ModelMeta = {
   type: string | null;
   sleeve: string | null;
   photos: string[];
-  sizes: string[];
+  sizes: string[];  // derived from in-stock InventoryItem.size values
   description: string | null;
 };
 

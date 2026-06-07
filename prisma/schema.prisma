@@ -52,7 +52,6 @@ model CatalogProduct {
   type        String?         @db.VarChar(20)
   sleeve      String?         @db.VarChar(10)
   photos      Json            @default("[]")
-  sizes       Json            @default("[]")
   items       InventoryItem[]
 
   createdAt   DateTime        @default(now()) @map("created_at")

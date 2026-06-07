@@ -16,7 +16,6 @@ const modelSchema = z.object({
   player: z.string().optional(),
   description: z.string().optional(),
   photos: z.string().optional(),
-  sizes: z.string().optional(),
 });
 
 function parseNumber(n: string | undefined): number | null {
@@ -34,13 +33,12 @@ export async function createModel(_prev: unknown, formData: FormData) {
   const result = modelSchema.safeParse(Object.fromEntries(formData));
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { number, photos, sizes, ...rest } = result.data;
+  const { number, photos, ...rest } = result.data;
   const model = await prisma.catalogProduct.create({
     data: {
       ...rest,
       number: parseNumber(number),
       photos: parseJsonArray(photos),
-      sizes: parseJsonArray(sizes),
     },
   });
   revalidatePath('/inventory');
@@ -51,14 +49,13 @@ export async function updateModel(id: string, _prev: unknown, formData: FormData
   const result = modelSchema.safeParse(Object.fromEntries(formData));
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { number, photos, sizes, ...rest } = result.data;
+  const { number, photos, ...rest } = result.data;
   await prisma.catalogProduct.update({
     where: { id },
     data: {
       ...rest,
       number: parseNumber(number),
       photos: parseJsonArray(photos),
-      sizes: parseJsonArray(sizes),
     },
   });
   revalidatePath('/inventory');
