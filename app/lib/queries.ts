@@ -10,14 +10,14 @@ function toISODate(d: Date | null): string | null {
 }
 
 function productMeta(p: {
-  id: string; team: string; season: string; version: string | null;
+  id: string; team: { name: string }; season: string; version: string | null;
   color: string; number: number | null; player: string | null;
   type: string | null; sleeve: string | null;
   photos: unknown;
   description?: string | null;
 }, sizes: string[] = []): ModelMeta {
   return {
-    id: p.id, team: p.team, season: p.season,
+    id: p.id, team: p.team.name, season: p.season,
     version: p.version, color: p.color,
     number: p.number !== null ? String(p.number) : null,
     player: p.player,
@@ -62,9 +62,15 @@ function batchToSummary(
   };
 }
 
+export async function getTeams(): Promise<{ id: string; name: string }[]> {
+  const teams = await prisma.team.findMany({ orderBy: { name: 'asc' } });
+  return teams.map((t) => ({ id: t.id, name: t.name }));
+}
+
 export async function getModels(): Promise<ModelWithStats[]> {
   const products = await prisma.catalogProduct.findMany({
     include: {
+      team: true,
       items: { select: { status: true, batch: { select: { arrivalDate: true } } } },
     },
     orderBy: { createdAt: 'desc' },
@@ -86,6 +92,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const p = await prisma.catalogProduct.findUnique({
     where: { id },
     include: {
+      team: true,
       items: {
         include: {
           batch: true,
@@ -175,7 +182,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
 export async function getPurchases(): Promise<BatchSummary[]> {
   const batches = await prisma.batch.findMany({
-    include: { items: { include: { product: true } } },
+    include: { items: { include: { product: { include: { team: true } } } } },
     orderBy: { purchaseDate: 'desc' },
   });
 
@@ -187,7 +194,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
 export async function getBatchById(id: string): Promise<BatchSummary | null> {
   const b = await prisma.batch.findUnique({
     where: { id },
-    include: { items: { include: { product: true } } },
+    include: { items: { include: { product: { include: { team: true } } } } },
   });
   if (!b) return null;
 
@@ -197,9 +204,10 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
 export async function getPublicModels() {
   const products = await prisma.catalogProduct.findMany({
     include: {
+      team: true,
       items: { select: { status: true, size: true, batch: { select: { arrivalDate: true } } } },
     },
-    orderBy: { team: 'asc' },
+    orderBy: { team: { name: 'asc' } },
   });
 
   return products
@@ -235,13 +243,13 @@ export async function getExpenses(): Promise<ExpenseRecord[]> {
 export async function getSaldosData() {
   const [batches, soldItems, expenses] = await Promise.all([
     prisma.batch.findMany({
-      include: { items: { include: { product: true } } },
+      include: { items: { include: { product: { include: { team: true } } } } },
       orderBy: { purchaseDate: 'desc' },
     }),
     prisma.inventoryItem.findMany({
       where: { status: 'sold' },
       include: {
-        product: true,
+        product: { include: { team: true } },
         sale: { select: { id: true, price: true, date: true, collectedBy: true } },
         batch: { select: { arrivalDate: true } },
       },
@@ -261,7 +269,7 @@ export async function getSaldosData() {
       price: Number(i.sale!.price),
       collectedBy: i.sale!.collectedBy,
       quantity: 1,
-      model: i.product.team,
+      model: i.product.team.name,
     }));
 
   const expenseList: ExpenseRecord[] = expenses.map((e) => ({

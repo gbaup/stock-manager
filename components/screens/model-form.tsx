@@ -5,15 +5,22 @@ import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
-import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker } from '@/components/ui/field';
+import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
 import { VERSIONS, SHIRT_TYPES, SLEEVES } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
+import { createTeam } from '@/app/actions/teams';
 import { modelSchema, type ModelFormValues } from '@/app/lib/schemas';
 
-export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
+export function ModelForm({
+  initial,
+  teams,
+}: {
+  initial?: ModelWithStats | null;
+  teams: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const {
@@ -24,7 +31,7 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
   } = useForm<ModelFormValues>({
     resolver: zodResolver(modelSchema),
     defaultValues: {
-      team: initial?.team ?? '',
+      teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : '',
       season: initial?.season ?? '',
       version: initial?.version ?? 'Home',
       type: initial?.type ?? 'Fan',
@@ -42,7 +49,7 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
 
   function onSubmit(data: ModelFormValues) {
     const fd = new FormData();
-    fd.set('team', data.team);
+    fd.set('teamId', data.teamId);
     fd.set('season', data.season);
     fd.set('version', data.version);
     fd.set('type', data.type);
@@ -86,12 +93,17 @@ export function ModelForm({ initial }: { initial?: ModelWithStats | null }) {
           />
 
           <div className="section-label">Identificación</div>
-          <Field label="Equipo" error={errors.team?.message}>
+          <Field label="Equipo" error={errors.teamId?.message}>
             <Controller
-              name="team"
+              name="teamId"
               control={control}
               render={({ field }) => (
-                <TextInput value={field.value} onChange={field.onChange} placeholder="Ej: Peñarol, Real Madrid…" />
+                <TeamCombobox
+                  value={field.value}
+                  onChange={field.onChange}
+                  teams={teams}
+                  onCreateTeam={createTeam}
+                />
               )}
             />
           </Field>

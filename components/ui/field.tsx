@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import { JERSEY_COLORS } from '@/app/lib/domain';
 import { Icon } from './icon';
 
@@ -160,6 +161,109 @@ export function ColorPicker({
           onClick={() => onChange(c.name)}
         />
       ))}
+    </div>
+  );
+}
+
+type TeamOption = { id: string; name: string };
+
+export function TeamCombobox({
+  value,
+  onChange,
+  teams,
+  onCreateTeam,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  teams: TeamOption[];
+  onCreateTeam: (name: string) => Promise<TeamOption>;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selectedTeam = teams.find((t) => t.id === value);
+
+  useEffect(() => {
+    if (!open && selectedTeam) setQuery(selectedTeam.name);
+  }, [open, selectedTeam]);
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  const normalized = query.trim().toLowerCase();
+  const filtered = normalized
+    ? teams.filter((t) => t.name.toLowerCase().includes(normalized))
+    : teams;
+  const exactMatch = teams.find((t) => t.name.toLowerCase() === normalized);
+  const showCreate = normalized.length > 0 && !exactMatch;
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      const team = await onCreateTeam(query.trim());
+      onChange(team.id);
+      setQuery(team.name);
+      setOpen(false);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="combobox" ref={ref}>
+      <input
+        className="input"
+        value={open ? query : (selectedTeam?.name ?? '')}
+        placeholder="Ej: Peñarol, Real Madrid…"
+        onFocus={() => {
+          setQuery(selectedTeam?.name ?? '');
+          setOpen(true);
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+      />
+      {open && (
+        <div className="combobox-drop">
+          {filtered.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`combobox-opt${t.id === value ? ' is-active' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(t.id);
+                setQuery(t.name);
+                setOpen(false);
+              }}
+            >
+              {t.name}
+            </button>
+          ))}
+          {showCreate && (
+            <button
+              type="button"
+              className="combobox-opt combobox-create"
+              disabled={creating}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCreate}
+            >
+              {creating ? 'Creando…' : `Crear "${query.trim()}"`}
+            </button>
+          )}
+          {filtered.length === 0 && !showCreate && (
+            <div className="combobox-empty">Sin resultados</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

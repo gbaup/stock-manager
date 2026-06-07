@@ -13,10 +13,10 @@ export async function createExpense(data: {
 }) {
   await prisma.expense.create({
     data: {
-      title: data.title,
+      title: data.title.trim().toLowerCase(),
       amount: parseFloat(data.amount),
       currency: data.currency,
-      paidBy: data.paidBy,
+      paidBy: data.paidBy.trim().toLowerCase(),
       date: new Date(data.date),
     },
   });

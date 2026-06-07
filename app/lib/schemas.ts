@@ -46,7 +46,7 @@ export const arrivalSchema = z
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
 export const modelSchema = z.object({
-  team: z.string().min(1, 'Requerido'),
+  teamId: z.string().min(1, 'Requerido'),
   season: z.string().min(1, 'Requerido'),
   version: z.string(),
   type: z.string(),

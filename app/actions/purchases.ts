@@ -18,14 +18,14 @@ export async function createPurchase(data: {
   await prisma.batch.create({
     data: {
       purchaseDate: new Date(data.purchaseDate),
-      trackingNumber: data.trackingNumber || null,
-      description: data.description || null,
+      trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
+      description: data.description?.trim().toLowerCase() || null,
       quantity: data.items.length,
-      supplierPaidBy: data.supplierPaidBy || null,
+      supplierPaidBy: data.supplierPaidBy?.trim().toLowerCase() || null,
       items: {
         create: data.items.map((it) => ({
           catalogProductId: it.modelId,
-          size: it.size,
+          size: it.size.trim().toLowerCase(),
           basePriceUsd: it.basePriceUsd,
           basePriceUyu: it.basePriceUsd * USD_RATE,
           status: 'available',
@@ -57,7 +57,7 @@ export async function markArrived(
       shippingPriceUsd: data.shippingPriceUsd ? parseFloat(data.shippingPriceUsd) : null,
       shippingPriceUyu: data.shippingPriceUyu ? parseFloat(data.shippingPriceUyu) : null,
       weight: data.weight ? parseFloat(data.weight) : null,
-      shippingPaidBy: data.shippingPaidBy || null,
+      shippingPaidBy: data.shippingPaidBy?.trim().toLowerCase() || null,
     },
   });
 

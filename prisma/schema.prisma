@@ -40,9 +40,21 @@ model Batch {
   @@map("batches")
 }
 
+model Team {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String           @unique @db.VarChar(100)
+  products  CatalogProduct[]
+
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  @@map("teams")
+}
+
 model CatalogProduct {
   id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  team        String          @db.VarChar(100)
+  teamId      String          @map("team_id") @db.Uuid
+  team        Team            @relation(fields: [teamId], references: [id])
   season      String          @db.VarChar(20)
   version     String?         @db.VarChar(50)
   color       String          @db.VarChar(50)
@@ -57,6 +69,7 @@ model CatalogProduct {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at")
 
+  @@unique([teamId, season, version, color, number, sleeve, type])
   @@map("catalog_products")
 }
 
