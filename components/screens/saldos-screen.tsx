@@ -7,7 +7,7 @@ import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import {
-  uyu, usd, fmtDate, fmtRate, personInitial, PEOPLE,
+  uyu, usd, fmtDate, personInitial, PEOPLE,
 } from '@/app/lib/domain';
 import { buildMovements, balancesByPerson } from '@/app/lib/ledger';
 import type { Movement, PersonBalance } from '@/app/lib/ledger';
@@ -341,14 +341,14 @@ function LedgerRow({ m }: { m: Movement }) {
 
   const chips = isConv && m.conv
     ? [
-        { cur: m.conv.fromCur, n: -(m.conv.fromAmount) },
-        { cur: m.conv.toCur, n: +(m.conv.toAmount) },
-      ]
+      { cur: m.conv.fromCur, n: -(m.conv.fromAmount) },
+      { cur: m.conv.toCur, n: +(m.conv.toAmount) },
+    ]
     : m.uyu !== 0 || m.usd !== 0
       ? [
-          ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
-          ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
-        ]
+        ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
+        ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
+      ]
       : [];
 
   const convFlow = isConv && m.conv
@@ -404,13 +404,13 @@ function MovCard({ m }: { m: Movement }) {
 
   const chips = isConv && m.conv
     ? [
-        { cur: m.conv.fromCur, n: -(m.conv.fromAmount) },
-        { cur: m.conv.toCur, n: +(m.conv.toAmount) },
-      ]
+      { cur: m.conv.fromCur, n: -(m.conv.fromAmount) },
+      { cur: m.conv.toCur, n: +(m.conv.toAmount) },
+    ]
     : [
-        ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
-        ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
-      ];
+      ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
+      ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
+    ];
 
   const convFlow = isConv && m.conv
     ? m.conv.fromPerson !== m.conv.toPerson
