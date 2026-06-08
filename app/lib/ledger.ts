@@ -24,6 +24,13 @@ export type PersonBalance = {
   outUsd: number;
 };
 
+export type SettleTransfer = {
+  from: string;
+  to: string;
+  amount: number;
+  currency: 'UYU' | 'USD';
+};
+
 export function buildMovements({
   sales,
   purchases,
@@ -135,7 +142,6 @@ export function buildMovements({
 
 export function balancesByPerson(
   movements: Movement[],
-  conversions: ConversionRecord[],
   users: UserSummary[],
 ): Record<string, PersonBalance> {
   const result: Record<string, PersonBalance> = {};
@@ -145,7 +151,22 @@ export function balancesByPerson(
   }
 
   for (const m of movements) {
-    if (m.kind === 'cambio') continue;
+    if (m.kind === 'cambio') {
+      if (!m.conv) continue;
+      const c = m.conv;
+      const fb = result[c.fromUserAlias];
+      const tb = result[c.toUserAlias];
+      if (fb) {
+        if (c.fromCur === 'USD') { fb.usd -= c.fromAmount; fb.outUsd += c.fromAmount; }
+        else { fb.uyu -= c.fromAmount; fb.outUyu += c.fromAmount; }
+      }
+      if (tb) {
+        if (c.toCur === 'USD') { tb.usd += c.toAmount; tb.inUsd += c.toAmount; }
+        else { tb.uyu += c.toAmount; tb.inUyu += c.toAmount; }
+      }
+      continue;
+    }
+
     const b = result[m.person];
     if (!b) continue;
     b.uyu += m.uyu;
@@ -156,20 +177,53 @@ export function balancesByPerson(
     if (m.usd < 0) b.outUsd += Math.abs(m.usd);
   }
 
-  for (const c of conversions) {
-    const fAmt = c.fromAmount;
-    const tAmt = c.toAmount;
-    const fb = result[c.fromUserAlias];
-    const tb = result[c.toUserAlias];
-    if (fb) {
-      if (c.fromCur === 'USD') { fb.usd -= fAmt; fb.outUsd += fAmt; }
-      else { fb.uyu -= fAmt; fb.outUyu += fAmt; }
-    }
-    if (tb) {
-      if (c.toCur === 'USD') { tb.usd += tAmt; tb.inUsd += tAmt; }
-      else { tb.uyu += tAmt; tb.inUyu += tAmt; }
-    }
+  return result;
+}
+
+export function hasUsdActivity(b: PersonBalance): boolean {
+  return b.inUsd > 0 || b.outUsd > 0 || b.usd !== 0;
+}
+
+export function balanceTotals(
+  balances: Record<string, PersonBalance>,
+  users: UserSummary[],
+): { uyu: number; usd: number } {
+  return {
+    uyu: users.reduce((s, u) => s + (balances[u.alias]?.uyu ?? 0), 0),
+    usd: users.reduce((s, u) => s + (balances[u.alias]?.usd ?? 0), 0),
+  };
+}
+
+export function settleBalances(
+  balances: Record<string, PersonBalance>,
+  users: UserSummary[],
+): SettleTransfer[] {
+  const [u1, u2] = users;
+  if (!u1 || !u2) return [];
+
+  const b1 = balances[u1.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
+  const b2 = balances[u2.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
+  const transfers: SettleTransfer[] = [];
+
+  const diffUyu = b1.uyu - b2.uyu;
+  if (Math.abs(diffUyu) >= 1) {
+    transfers.push({
+      from: diffUyu > 0 ? u1.alias : u2.alias,
+      to: diffUyu > 0 ? u2.alias : u1.alias,
+      amount: Math.abs(diffUyu) / 2,
+      currency: 'UYU',
+    });
   }
 
-  return result;
+  const diffUsd = b1.usd - b2.usd;
+  if (Math.abs(diffUsd) >= 0.01) {
+    transfers.push({
+      from: diffUsd > 0 ? u1.alias : u2.alias,
+      to: diffUsd > 0 ? u2.alias : u1.alias,
+      amount: Math.abs(diffUsd) / 2,
+      currency: 'USD',
+    });
+  }
+
+  return transfers;
 }

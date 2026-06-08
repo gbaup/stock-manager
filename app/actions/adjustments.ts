@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
-import { ajusteSchema } from '@/app/lib/schemas';
+import { ajusteSchema, parseOrThrow } from '@/app/lib/schemas';
 import { getCurrentUserId } from '@/app/lib/auth';
 
 export async function createAdjustment(data: {
@@ -13,7 +13,7 @@ export async function createAdjustment(data: {
   date: string;
   note?: string;
 }) {
-  if (!ajusteSchema.safeParse(data).success) throw new Error('Invalid adjustment data');
+  parseOrThrow(ajusteSchema, data);
 
   const loggedBy = await getCurrentUserId();
   if (!loggedBy) redirect('/login');

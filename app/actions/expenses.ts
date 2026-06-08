@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
-import { gastoSchema } from '@/app/lib/schemas';
+import { gastoSchema, parseOrThrow } from '@/app/lib/schemas';
 import { getCurrentUserId } from '@/app/lib/auth';
 
 export async function createExpense(data: {
@@ -13,7 +13,7 @@ export async function createExpense(data: {
   paidByUserId: string;
   date: string;
 }) {
-  if (!gastoSchema.safeParse(data).success) throw new Error('Invalid expense data');
+  parseOrThrow(gastoSchema, data);
 
   const userId = await getCurrentUserId();
   if (!userId) redirect('/login');

@@ -51,3 +51,8 @@ export async function fetchExchangeRate(): Promise<ExchangeRateData> {
     venta: parseFloat(xmlCotiz.match(/<TCV>(.*?)<\/TCV>/)?.[1] ?? "0"),
   };
 }
+
+export async function getExchangeRate(): Promise<number> {
+  const data = await fetchExchangeRate();
+  return data.compra;
+}

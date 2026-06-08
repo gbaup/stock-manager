@@ -4,14 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { arrivalSchema } from '@/app/lib/schemas';
-import { fetchExchangeRate } from '@/app/lib/exchange-rate';
+import { getExchangeRate } from '@/app/lib/exchange-rate';
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
-
-async function getExchangeRate(): Promise<number> {
-  const data = await fetchExchangeRate();
-  return data.compra;
-}
 
 export async function createPurchase(data: {
   purchaseDate: string;

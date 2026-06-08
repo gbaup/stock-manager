@@ -10,7 +10,7 @@ import {
   uyu, usd, fmtDate, personInitial,
 } from '@/app/lib/domain';
 import type { UserSummary } from '@/app/lib/domain';
-import { buildMovements, balancesByPerson } from '@/app/lib/ledger';
+import { buildMovements, balancesByPerson, balanceTotals, hasUsdActivity, settleBalances } from '@/app/lib/ledger';
 import type { Movement, PersonBalance } from '@/app/lib/ledger';
 import type { BatchSummary, ExpenseRecord, ConversionRecord, AdjustmentRecord } from '@/app/lib/domain';
 
@@ -55,10 +55,8 @@ export function SaldosScreen({
   const [layout, setLayout] = useState<Layout>('resumen');
 
   const movements = buildMovements({ sales, purchases, expenses, conversions, adjustments });
-  const balances = balancesByPerson(movements, conversions, users);
-
-  const totalUyu = users.reduce((s, u) => s + (balances[u.alias]?.uyu ?? 0), 0);
-  const totalUsd = users.reduce((s, u) => s + (balances[u.alias]?.usd ?? 0), 0);
+  const balances = balancesByPerson(movements, users);
+  const { uyu: totalUyu, usd: totalUsd } = balanceTotals(balances, users);
 
   return (
     <div className="screen">
@@ -130,7 +128,7 @@ function CardsHeader({
 }) {
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
-    return b && ((b.inUsd ?? 0) > 0 || (b.outUsd ?? 0) > 0 || b.usd !== 0);
+    return b ? hasUsdActivity(b) : false;
   });
 
   return (
@@ -148,7 +146,7 @@ function CardsHeader({
       <div className="bal-cards">
         {users.map((user) => {
           const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
-          const showUsd = b.inUsd > 0 || b.outUsd > 0 || b.usd !== 0;
+          const showUsd = hasUsdActivity(b);
           return (
             <div key={user.id} className="bal-card">
               <div className="bal-head">
@@ -194,24 +192,11 @@ function SettleHeader({
   totalUsd: number;
   users: UserSummary[];
 }) {
-  const [u1, u2] = users;
-  const b1 = balances[u1?.alias ?? ''] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
-  const b2 = balances[u2?.alias ?? ''] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
-    return b && ((b.inUsd ?? 0) > 0 || (b.outUsd ?? 0) > 0);
+    return b ? hasUsdActivity(b) : false;
   });
-
-  const diffUyu = b1.uyu - b2.uyu;
-  const diffUsd = b1.usd - b2.usd;
-  const halfUyu = Math.abs(diffUyu) / 2;
-  const halfUsd = Math.abs(diffUsd) / 2;
-  const fromUyu = diffUyu > 0 ? u1?.alias : u2?.alias;
-  const toUyu = diffUyu > 0 ? u2?.alias : u1?.alias;
-  const fromUsd = diffUsd > 0 ? u1?.alias : u2?.alias;
-  const toUsd = diffUsd > 0 ? u2?.alias : u1?.alias;
-  const evenUyu = Math.abs(diffUyu) < 1;
-  const evenUsd = Math.abs(diffUsd) < 0.01;
+  const transfers = settleBalances(balances, users);
 
   return (
     <>
@@ -230,33 +215,23 @@ function SettleHeader({
           <Icon name="swap" size={14} />
           Para emparejar la caja
         </div>
-        {evenUyu && evenUsd ? (
+        {transfers.length === 0 ? (
           <div className="settle-eq">
             <Icon name="check" size={16} />
             Están a la par
           </div>
         ) : (
           <>
-            {!evenUyu && (
-              <div className="settle-row">
+            {transfers.map((t, i) => (
+              <div key={i} className="settle-row">
                 <div className="settle-flow">
-                  <span>{fromUyu}</span>
+                  <span>{t.from}</span>
                   <Icon name="chevR" size={16} />
-                  <span>{toUyu}</span>
+                  <span>{t.to}</span>
                 </div>
-                <span className="settle-amt">{uyu(halfUyu)}</span>
+                <span className="settle-amt">{t.currency === 'USD' ? usd(t.amount) : uyu(t.amount)}</span>
               </div>
-            )}
-            {!evenUsd && (
-              <div className="settle-row">
-                <div className="settle-flow">
-                  <span>{fromUsd}</span>
-                  <Icon name="chevR" size={16} />
-                  <span>{toUsd}</span>
-                </div>
-                <span className="settle-amt">{usd(halfUsd)}</span>
-              </div>
-            )}
+            ))}
           </>
         )}
       </div>
@@ -264,7 +239,7 @@ function SettleHeader({
       <div className="bal-mini-list">
         {users.map((user) => {
           const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
-          const showUsd = b.inUsd > 0 || b.outUsd > 0 || b.usd !== 0;
+          const showUsd = hasUsdActivity(b);
           return (
             <div key={user.id} className="bal-mini">
               <Avatar name={user.alias} size={34} />
@@ -306,7 +281,7 @@ function LedgerLayout({
 }) {
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
-    return b && ((b.inUsd ?? 0) > 0 || b.usd !== 0);
+    return b ? hasUsdActivity(b) : false;
   });
 
   return (

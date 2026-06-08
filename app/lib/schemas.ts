@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
+  const result = schema.safeParse(data);
+  if (!result.success) throw new Error(result.error.issues[0]?.message ?? 'Datos inválidos');
+  return result.data;
+}
+
 const saleFields = {
   price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
   quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),

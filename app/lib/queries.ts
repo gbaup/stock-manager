@@ -257,12 +257,8 @@ export async function getTransitCount(): Promise<number> {
   return prisma.batch.count({ where: { arrivalDate: null } });
 }
 
-export async function getExpenses(): Promise<ExpenseRecord[]> {
-  const rows = await prisma.expense.findMany({
-    orderBy: { date: 'desc' },
-    include: { paidByUser: true },
-  });
-  return rows.map((e) => ({
+function toExpenseRecord(e: { id: string; title: string; amount: unknown; currency: string; paidByUserId: string; paidByUser: { alias: string }; date: Date }): ExpenseRecord {
+  return {
     id: e.id,
     title: e.title,
     amount: Number(e.amount),
@@ -270,7 +266,43 @@ export async function getExpenses(): Promise<ExpenseRecord[]> {
     paidByUserId: e.paidByUserId,
     paidByAlias: e.paidByUser.alias,
     date: toISODate(e.date)!,
-  }));
+  };
+}
+
+function toConversionRecord(c: { id: string; date: Date; fromUserId: string; fromUser: { alias: string }; fromCur: string; toUserId: string; toUser: { alias: string }; toCur: string; fromAmount: unknown; rate: unknown; toAmount: unknown }): ConversionRecord {
+  return {
+    id: c.id,
+    date: toISODate(c.date)!,
+    fromUserId: c.fromUserId,
+    fromUserAlias: c.fromUser.alias,
+    fromCur: c.fromCur as 'UYU' | 'USD',
+    toUserId: c.toUserId,
+    toUserAlias: c.toUser.alias,
+    toCur: c.toCur as 'UYU' | 'USD',
+    fromAmount: Number(c.fromAmount),
+    rate: Number(c.rate),
+    toAmount: Number(c.toAmount),
+  };
+}
+
+function toAdjustmentRecord(a: { id: string; userId: string; user: { alias: string }; amountUyu: unknown; amountUsd: unknown; date: Date; note: string | null }): AdjustmentRecord {
+  return {
+    id: a.id,
+    userId: a.userId,
+    userAlias: a.user.alias,
+    amountUyu: Number(a.amountUyu),
+    amountUsd: Number(a.amountUsd),
+    date: toISODate(a.date)!,
+    note: a.note,
+  };
+}
+
+export async function getExpenses(): Promise<ExpenseRecord[]> {
+  const rows = await prisma.expense.findMany({
+    orderBy: { date: 'desc' },
+    include: { paidByUser: true },
+  });
+  return rows.map(toExpenseRecord);
 }
 
 export async function getSaldosData() {
@@ -327,39 +359,11 @@ export async function getSaldosData() {
       model: i.product.team.name,
     }));
 
-  const expenseList: ExpenseRecord[] = expenses.map((e) => ({
-    id: e.id,
-    title: e.title,
-    amount: Number(e.amount),
-    currency: e.currency as 'UYU' | 'USD',
-    paidByUserId: e.paidByUserId,
-    paidByAlias: e.paidByUser.alias,
-    date: toISODate(e.date)!,
-  }));
-
-  const conversions: ConversionRecord[] = convRows.map((c) => ({
-    id: c.id,
-    date: toISODate(c.date)!,
-    fromUserId: c.fromUserId,
-    fromUserAlias: c.fromUser.alias,
-    fromCur: c.fromCur as 'UYU' | 'USD',
-    toUserId: c.toUserId,
-    toUserAlias: c.toUser.alias,
-    toCur: c.toCur as 'UYU' | 'USD',
-    fromAmount: Number(c.fromAmount),
-    rate: Number(c.rate),
-    toAmount: Number(c.toAmount),
-  }));
-
-  const adjustments: AdjustmentRecord[] = adjRows.map((a) => ({
-    id: a.id,
-    userId: a.userId,
-    userAlias: a.user.alias,
-    amountUyu: Number(a.amountUyu),
-    amountUsd: Number(a.amountUsd),
-    date: toISODate(a.date)!,
-    note: a.note,
-  }));
-
-  return { purchases, sales, expenses: expenseList, conversions, adjustments };
+  return {
+    purchases,
+    sales,
+    expenses: expenses.map(toExpenseRecord),
+    conversions: convRows.map(toConversionRecord),
+    adjustments: adjRows.map(toAdjustmentRecord),
+  };
 }
