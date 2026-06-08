@@ -27,14 +27,3 @@ ALTER TABLE "expenses" ALTER COLUMN "paid_by_user_id" SET NOT NULL;
 ALTER TABLE "expenses" DROP COLUMN "paid_by";
 ALTER TABLE "expenses" ADD CONSTRAINT "expenses_paid_by_user_id_fkey" FOREIGN KEY ("paid_by_user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Conversion: add FK columns (nullable), populate, make NOT NULL, drop old cols
-ALTER TABLE "conversions" ADD COLUMN "from_user_id" UUID;
-ALTER TABLE "conversions" ADD COLUMN "to_user_id" UUID;
-UPDATE "conversions" c SET "from_user_id" = u."id" FROM "users" u WHERE LOWER(u."alias") = c."from_person";
-UPDATE "conversions" c SET "to_user_id" = u."id" FROM "users" u WHERE LOWER(u."alias") = c."to_person";
-ALTER TABLE "conversions" ALTER COLUMN "from_user_id" SET NOT NULL;
-ALTER TABLE "conversions" ALTER COLUMN "to_user_id" SET NOT NULL;
-ALTER TABLE "conversions" DROP COLUMN "from_person";
-ALTER TABLE "conversions" DROP COLUMN "to_person";
-ALTER TABLE "conversions" ADD CONSTRAINT "conversions_from_user_id_fkey" FOREIGN KEY ("from_user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "conversions" ADD CONSTRAINT "conversions_to_user_id_fkey" FOREIGN KEY ("to_user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
