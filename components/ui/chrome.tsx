@@ -39,10 +39,10 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   const active = pathname.startsWith('/purchases')
     ? 'purchases'
     : pathname.startsWith('/saldos')
-    ? 'saldos'
-    : pathname.startsWith('/public')
-    ? 'public'
-    : 'inventory';
+      ? 'saldos'
+      : pathname.startsWith('/public')
+        ? 'public'
+        : 'inventory';
 
   const items = [
     { id: 'inventory', label: 'Inventario', icon: 'box' as const, href: '/inventory' },
@@ -114,7 +114,7 @@ export function DetailHead({
       <button className="link" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Icon name="chevL" size={20} /> Atrás
       </button>
-      <div className="title">{title}</div>
+      <div className="title capitalize">{title}</div>
       {editHref ? (
         <Link href={editHref} className="link accent" style={{ textDecoration: 'none' }}>Editar</Link>
       ) : (

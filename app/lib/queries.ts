@@ -2,7 +2,7 @@ import { prisma } from './prisma';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord, ConversionRecord,
-  UserSummary,
+  AdjustmentRecord, UserSummary,
 } from './domain';
 
 function toISODate(d: Date | null): string | null {
@@ -274,7 +274,7 @@ export async function getExpenses(): Promise<ExpenseRecord[]> {
 }
 
 export async function getSaldosData() {
-  const [batches, soldItems, expenses, convRows] = await Promise.all([
+  const [batches, soldItems, expenses, convRows, adjRows] = await Promise.all([
     prisma.batch.findMany({
       include: {
         items: { include: { product: { include: { team: true } } } },
@@ -304,6 +304,10 @@ export async function getSaldosData() {
     prisma.conversion.findMany({
       orderBy: { date: 'desc' },
       include: { fromUser: true, toUser: true },
+    }),
+    prisma.adjustment.findMany({
+      orderBy: { date: 'desc' },
+      include: { user: true },
     }),
   ]);
 
@@ -347,5 +351,15 @@ export async function getSaldosData() {
     toAmount: Number(c.toAmount),
   }));
 
-  return { purchases, sales, expenses: expenseList, conversions };
+  const adjustments: AdjustmentRecord[] = adjRows.map((a) => ({
+    id: a.id,
+    userId: a.userId,
+    userAlias: a.user.alias,
+    amountUyu: Number(a.amountUyu),
+    amountUsd: Number(a.amountUsd),
+    date: toISODate(a.date)!,
+    note: a.note,
+  }));
+
+  return { purchases, sales, expenses: expenseList, conversions, adjustments };
 }

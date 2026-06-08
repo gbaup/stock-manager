@@ -1,7 +1,7 @@
-import type { BatchSummary, ExpenseRecord, ConversionRecord, UserSummary } from './domain';
+import type { BatchSummary, ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from './domain';
 import { fmtRate } from './domain';
 
-export type MovementKind = 'cobro' | 'pago-prov' | 'pago-envio' | 'gasto' | 'cambio';
+export type MovementKind = 'cobro' | 'pago-prov' | 'pago-envio' | 'gasto' | 'cambio' | 'ajuste';
 
 export type Movement = {
   id: string;
@@ -29,11 +29,13 @@ export function buildMovements({
   purchases,
   expenses,
   conversions = [],
+  adjustments = [],
 }: {
   sales: Array<{ id: string; date: string; price: number; collectedByUserId: string | null; collectedByAlias: string | null; quantity: number; model: string }>;
   purchases: BatchSummary[];
   expenses: ExpenseRecord[];
   conversions?: ConversionRecord[];
+  adjustments?: AdjustmentRecord[];
 }): Movement[] {
   const movements: Movement[] = [];
 
@@ -111,6 +113,19 @@ export function buildMovements({
       uyu: 0,
       usd: 0,
       conv: c,
+    });
+  }
+
+  for (const a of adjustments) {
+    movements.push({
+      id: `ajuste-${a.id}`,
+      kind: 'ajuste',
+      date: a.date,
+      person: a.userAlias,
+      title: a.note ?? 'Ajuste',
+      sub: '',
+      uyu: a.amountUyu,
+      usd: a.amountUsd,
     });
   }
 

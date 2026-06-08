@@ -150,6 +150,16 @@ export type ExpenseRecord = {
   date: string;
 };
 
+export type AdjustmentRecord = {
+  id: string;
+  userId: string;
+  userAlias: string;
+  amountUyu: number;
+  amountUsd: number;
+  date: string;
+  note: string | null;
+};
+
 export type ConversionRecord = {
   id: string;
   date: string;

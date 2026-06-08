@@ -23,6 +23,8 @@ model User {
   conversionsReceived Conversion[] @relation("ConversionReceiver")
   batchesSupplierPaid Batch[]      @relation("BatchSupplierPayer")
   batchesShippingPaid Batch[]      @relation("BatchShippingPayer")
+  adjustments         Adjustment[] @relation("AdjustmentUser")
+  adjustmentsLogged   Adjustment[] @relation("AdjustmentLogger")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -175,4 +177,22 @@ model Conversion {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("conversions")
+}
+
+model Adjustment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation("AdjustmentUser", fields: [userId], references: [id])
+  amountUyu Decimal  @default(0) @map("amount_uyu") @db.Decimal(12, 2)
+  amountUsd Decimal  @default(0) @map("amount_usd") @db.Decimal(12, 2)
+  date      DateTime @db.Date
+  note      String?  @db.VarChar(200)
+
+  loggedByUserId String? @map("logged_by_user_id") @db.Uuid
+  loggedBy       User?   @relation("AdjustmentLogger", fields: [loggedByUserId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("adjustments")
 }

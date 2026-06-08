@@ -38,13 +38,13 @@ export function ModelDetailScreen({
               style={{ width: 88, height: 100, fontSize: 34, borderRadius: 'var(--r-md)' }}
             />
             <div style={{ minWidth: 0 }}>
-              <div className="detail-team">{model.team}</div>
-              <div className="detail-meta">
+              <div className="detail-team capitalize">{model.team}</div>
+              <div className="detail-meta capitalize">
                 {model.season} · {model.version}
                 {model.type ? ` · ${model.type}` : ''}
                 {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
               </div>
-              <div className="detail-tags">
+              <div className="detail-tags capitalize">
                 <Tag><ColorDot color={model.color} />{model.color}</Tag>
                 {model.type && <Tag>{model.type}</Tag>}
                 {model.sleeve && <Tag>Manga {model.sleeve}</Tag>}

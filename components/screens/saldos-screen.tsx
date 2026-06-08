@@ -12,7 +12,7 @@ import {
 import type { UserSummary } from '@/app/lib/domain';
 import { buildMovements, balancesByPerson } from '@/app/lib/ledger';
 import type { Movement, PersonBalance } from '@/app/lib/ledger';
-import type { BatchSummary, ExpenseRecord, ConversionRecord } from '@/app/lib/domain';
+import type { BatchSummary, ExpenseRecord, ConversionRecord, AdjustmentRecord } from '@/app/lib/domain';
 
 type SaleRow = { id: string; date: string; price: number; collectedByUserId: string | null; collectedByAlias: string | null; quantity: number; model: string };
 type Layout = 'resumen' | 'saldar' | 'planilla';
@@ -39,6 +39,7 @@ export function SaldosScreen({
   sales,
   expenses,
   conversions,
+  adjustments,
   transitCount,
   users,
 }: {
@@ -46,13 +47,14 @@ export function SaldosScreen({
   sales: SaleRow[];
   expenses: ExpenseRecord[];
   conversions: ConversionRecord[];
+  adjustments: AdjustmentRecord[];
   transitCount: number;
   users: UserSummary[];
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState<Layout>('resumen');
 
-  const movements = buildMovements({ sales, purchases, expenses, conversions });
+  const movements = buildMovements({ sales, purchases, expenses, conversions, adjustments });
   const balances = balancesByPerson(movements, conversions, users);
 
   const totalUyu = users.reduce((s, u) => s + (balances[u.alias]?.uyu ?? 0), 0);

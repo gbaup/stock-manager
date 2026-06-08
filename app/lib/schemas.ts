@@ -76,6 +76,25 @@ export const conversionSchema = z
 
 export type ConversionFormValues = z.infer<typeof conversionSchema>;
 
+export const ajusteSchema = z
+  .object({
+    userId: z.string().uuid('Seleccioná el socio'),
+    amountUyu: z.string().optional(),
+    amountUsd: z.string().optional(),
+    date: z.string().min(1, 'Requerido'),
+    note: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      const uyu = parseFloat(data.amountUyu ?? '') || 0;
+      const usd = parseFloat(data.amountUsd ?? '') || 0;
+      return uyu !== 0 || usd !== 0;
+    },
+    { message: 'Ingresá al menos un monto', path: ['amountUyu'] }
+  );
+
+export type AjusteFormValues = z.infer<typeof ajusteSchema>;
+
 export const modelSchema = z.object({
   teamId: z.string().min(1, 'Requerido'),
   season: z.string().min(1, 'Requerido'),
