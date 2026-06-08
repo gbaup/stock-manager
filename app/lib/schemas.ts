@@ -82,11 +82,16 @@ export const conversionSchema = z
 
 export type ConversionFormValues = z.infer<typeof conversionSchema>;
 
+const numericOptional = z
+  .string()
+  .optional()
+  .refine((v) => v === undefined || v === '' || !isNaN(parseFloat(v)), 'Monto inválido');
+
 export const ajusteSchema = z
   .object({
     userId: z.string().uuid('Seleccioná el socio'),
-    amountUyu: z.string().optional(),
-    amountUsd: z.string().optional(),
+    amountUyu: numericOptional,
+    amountUsd: numericOptional,
     date: z.string().min(1, 'Requerido'),
     note: z.string().optional(),
   })

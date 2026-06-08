@@ -32,7 +32,13 @@ export function PhotoGallery({
 
   async function remove(idx: number) {
     const url = photos[idx];
-    if (url.startsWith('https://')) await deleteFile(url);
+    if (url.startsWith('https://')) {
+      try {
+        await deleteFile(url);
+      } catch {
+        return;
+      }
+    }
     onChange(photos.filter((_, i) => i !== idx));
   }
 

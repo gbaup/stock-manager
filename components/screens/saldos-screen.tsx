@@ -88,14 +88,7 @@ export function SaldosScreen({
 
           {layout !== 'planilla' && (
             <>
-              <button className="conv-action" onClick={() => router.push('/saldos/cambio/new')}>
-                <span className="conv-ico"><Icon name="swap" size={18} strokeWidth={2} /></span>
-                <span className="conv-tx">
-                  <span className="conv-t">Cambiar monedas</span>
-                  <span className="conv-s">Entre socios y/o de pesos a dólares, a un TC a mano</span>
-                </span>
-                <Icon name="chevR" size={18} strokeWidth={1.8} />
-              </button>
+              <ConvActionButton />
 
               <div className="section-label">Movimientos</div>
               {movements.length === 0 ? (

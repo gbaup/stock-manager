@@ -1,4 +1,5 @@
 import axios from "axios";
+import { unstable_cache } from "next/cache";
 
 export type ExchangeRateData = {
   fecha: string;
@@ -7,7 +8,7 @@ export type ExchangeRateData = {
   nombre: string;
 };
 
-export async function fetchExchangeRate(): Promise<ExchangeRateData> {
+async function _fetchExchangeRate(): Promise<ExchangeRateData> {
   const { data: xmlCierre } = await axios.post(
     "https://cotizaciones.bcu.gub.uy/wscotizaciones/servlet/awsultimocierre",
     `<?xml version="1.0" encoding="UTF-8"?>
@@ -19,7 +20,7 @@ export async function fetchExchangeRate(): Promise<ExchangeRateData> {
     </cot:wsbcuultimocierre.Execute>
   </soapenv:Body>
 </soapenv:Envelope>`,
-    { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' } }
+    { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' }, timeout: 8000 }
   );
 
   const fecha = xmlCierre.match(/<Fecha>(.*?)<\/Fecha>/)?.[1];
@@ -41,16 +42,26 @@ export async function fetchExchangeRate(): Promise<ExchangeRateData> {
     </cot:wsbcucotizaciones.Execute>
   </soapenv:Body>
 </soapenv:Envelope>`,
-    { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' } }
+    { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' }, timeout: 8000 }
   );
+
+  const compra = parseFloat(xmlCotiz.match(/<TCC>(.*?)<\/TCC>/)?.[1] ?? "");
+  if (!compra) throw new Error("No se pudo obtener la cotización del dólar");
 
   return {
     fecha,
     nombre: xmlCotiz.match(/<Nombre>(.*?)<\/Nombre>/)?.[1] ?? "",
-    compra: parseFloat(xmlCotiz.match(/<TCC>(.*?)<\/TCC>/)?.[1] ?? "0"),
+    compra,
     venta: parseFloat(xmlCotiz.match(/<TCV>(.*?)<\/TCV>/)?.[1] ?? "0"),
   };
 }
+
+// BCU publishes once daily; cache for 1 hour across all renders and actions
+export const fetchExchangeRate = unstable_cache(
+  _fetchExchangeRate,
+  ["exchange-rate"],
+  { revalidate: 3600 }
+);
 
 export async function getExchangeRate(): Promise<number> {
   const data = await fetchExchangeRate();

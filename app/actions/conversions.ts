@@ -12,9 +12,9 @@ const conversionActionSchema = z.object({
   fromCur: z.enum(['UYU', 'USD']),
   toUserId: z.string().uuid(),
   toCur: z.enum(['UYU', 'USD']),
-  fromAmount: z.number().positive(),
-  rate: z.number().min(0),
-  toAmount: z.number().positive(),
+  fromAmount: z.number().finite().positive(),
+  rate: z.number().finite().min(0),
+  toAmount: z.number().finite().positive(),
   date: z.string().min(1),
 });
 
