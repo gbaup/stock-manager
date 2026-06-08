@@ -18,6 +18,7 @@ export const JERSEY_COLORS = [
   { name: 'naranja', bg: '#e8702a', fg: '#ffffff' },
   { name: 'violeta', bg: '#6b3fb5', fg: '#ffffff' },
   { name: 'rosa', bg: '#e95fa0', fg: '#3a0d24' },
+  { name: 'gris', bg: '#c4c4c4ff', fg: '#3a2c05' },
 ] as const;
 
 export type JerseyColor = typeof JERSEY_COLORS[number];
