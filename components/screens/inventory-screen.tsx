@@ -136,11 +136,11 @@ function CardList({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: strin
         <div key={m.id} className="mcard" onClick={() => onOpen(m.id)}>
           <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 56, height: 64, fontSize: 21 }} />
           <div className="mcard-main">
-            <div className="mcard-team">{m.team}</div>
+            <div className="mcard-team capitalize">{m.team}</div>
             <div className="mcard-meta">{m.season} · {m.version}</div>
-            <div className="mcard-tags">
+            <div className="mcard-tags capitalize">
               <Tag><ColorDot color={m.color} />{m.color}</Tag>
-              {m.player && <Tag kind="player">{m.player}</Tag>}
+              {m.player && <Tag kind="player" className="capitalize">{m.player}</Tag>}
               {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}
             </div>
           </div>

@@ -247,7 +247,7 @@ export function TeamCombobox({
     <>
       <div className="combo">
         <input
-          className="input"
+          className="input capitalize"
           value={open ? query : (selectedTeam?.name ?? '')}
           placeholder="Buscá o creá un equipo…"
           autoComplete="off"
@@ -282,7 +282,7 @@ export function TeamCombobox({
                   onMouseEnter={() => setHi(i)}
                   onClick={() => pick(t)}
                 >
-                  <span className="combo-team">{t.name}</span>
+                  <span className="combo-team capitalize">{t.name}</span>
                   {(t.count ?? 0) > 0 && <span className="combo-count">{t.count}</span>}
                   {isExact && <Icon name="check" size={16} strokeWidth={2.2} className="combo-check" />}
                 </button>

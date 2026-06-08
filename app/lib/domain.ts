@@ -10,17 +10,17 @@ export const SHIRT_TYPES = ['Fan', 'Player', 'Retro'] as const;
 export const SLEEVES = ['Corta', 'Larga'] as const;
 
 export const JERSEY_COLORS = [
-  { name: 'Blanco',   bg: '#f4f5f7', fg: '#1b2330' },
-  { name: 'Negro',    bg: '#1c1f26', fg: '#f4f5f7' },
-  { name: 'Azul',     bg: '#1d4fd7', fg: '#ffffff' },
-  { name: 'Celeste',  bg: '#4aa3e8', fg: '#0c2740' },
-  { name: 'Rojo',     bg: '#d22d3a', fg: '#ffffff' },
-  { name: 'Amarillo', bg: '#f2c43d', fg: '#3a2c05' },
-  { name: 'Verde',    bg: '#1f9d57', fg: '#ffffff' },
-  { name: 'Bordó',    bg: '#7c1f2e', fg: '#ffffff' },
-  { name: 'Naranja',  bg: '#e8702a', fg: '#ffffff' },
-  { name: 'Violeta',  bg: '#6b3fb5', fg: '#ffffff' },
-  { name: 'Rosa',     bg: '#e95fa0', fg: '#3a0d24' },
+  { name: 'blanco', bg: '#f4f5f7', fg: '#1b2330' },
+  { name: 'negro', bg: '#1c1f26', fg: '#f4f5f7' },
+  { name: 'azul', bg: '#1d4fd7', fg: '#ffffff' },
+  { name: 'celeste', bg: '#4aa3e8', fg: '#0c2740' },
+  { name: 'rojo', bg: '#da2332ff', fg: '#ffffff' },
+  { name: 'amarillo', bg: '#f2c43d', fg: '#3a2c05' },
+  { name: 'verde', bg: '#1f9d57', fg: '#ffffff' },
+  { name: 'bordó', bg: '#7c1f2e', fg: '#ffffff' },
+  { name: 'naranja', bg: '#e8702a', fg: '#ffffff' },
+  { name: 'violeta', bg: '#6b3fb5', fg: '#ffffff' },
+  { name: 'rosa', bg: '#e95fa0', fg: '#3a0d24' },
 ] as const;
 
 export type JerseyColor = typeof JERSEY_COLORS[number];
@@ -33,7 +33,7 @@ export function personInitial(name: string): string {
   return name.charAt(0).toUpperCase();
 }
 
-const MONTHS = ['ene','feb','mar','abr','may','jun','jul','ago','set','oct','nov','dic'];
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 export function fmtDate(date: Date | string | null | undefined): string {
   if (!date) return '—';
@@ -130,9 +130,9 @@ export type SaleRecord = {
 };
 
 export type TimelineEvent =
-  | { type: 'sale';    date: string; data: SaleRecord;    qty: number }
-  | { type: 'transit'; date: string; data: BatchSummary;  qty: number }
-  | { type: 'arrived'; date: string; data: BatchSummary;  qty: number };
+  | { type: 'sale'; date: string; data: SaleRecord; qty: number }
+  | { type: 'transit'; date: string; data: BatchSummary; qty: number }
+  | { type: 'arrived'; date: string; data: BatchSummary; qty: number };
 
 export type ModelDetail = ModelWithStats & {
   sold: number;
