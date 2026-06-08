@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import { getModelById, getUsers } from '@/app/lib/queries';
 import { fetchExchangeRate } from '@/app/lib/exchange-rate';

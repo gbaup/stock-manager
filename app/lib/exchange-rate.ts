@@ -1,5 +1,5 @@
 import axios from "axios";
-import { unstable_cache } from "next/cache";
+import { cacheTag, cacheLife } from "next/cache";
 
 export type ExchangeRateData = {
   fecha: string;
@@ -8,7 +8,12 @@ export type ExchangeRateData = {
   nombre: string;
 };
 
-async function _fetchExchangeRate(): Promise<ExchangeRateData> {
+// BCU publishes once daily; cache for 1 hour across all renders and actions
+export async function fetchExchangeRate(): Promise<ExchangeRateData> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('exchange-rate');
+
   const { data: xmlCierre } = await axios.post(
     "https://cotizaciones.bcu.gub.uy/wscotizaciones/servlet/awsultimocierre",
     `<?xml version="1.0" encoding="UTF-8"?>
@@ -55,13 +60,6 @@ async function _fetchExchangeRate(): Promise<ExchangeRateData> {
     venta: parseFloat(xmlCotiz.match(/<TCV>(.*?)<\/TCV>/)?.[1] ?? "0"),
   };
 }
-
-// BCU publishes once daily; cache for 1 hour across all renders and actions
-export const fetchExchangeRate = unstable_cache(
-  _fetchExchangeRate,
-  ["exchange-rate"],
-  { revalidate: 3600 }
-);
 
 export async function getExchangeRate(): Promise<number> {
   const data = await fetchExchangeRate();

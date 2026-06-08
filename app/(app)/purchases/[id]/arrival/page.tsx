@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import { getBatchById, getUsers } from '@/app/lib/queries';
 import { ArrivalForm } from '@/components/screens/arrival-form';

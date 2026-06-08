@@ -1,3 +1,4 @@
+import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
@@ -70,16 +71,25 @@ function batchToSummary(
 }
 
 export async function getUsers(): Promise<UserSummary[]> {
+  'use cache';
+  cacheLife('days');
+  cacheTag('users');
   const rows = await prisma.user.findMany({ select: { id: true, alias: true }, orderBy: { alias: 'asc' } });
   return rows.map((u) => ({ id: u.id, alias: u.alias }));
 }
 
 export async function getTeams(): Promise<{ id: string; name: string }[]> {
+  'use cache';
+  cacheLife('days');
+  cacheTag('teams');
   const teams = await prisma.team.findMany({ orderBy: { name: 'asc' } });
   return teams.map((t) => ({ id: t.id, name: t.name }));
 }
 
 export async function getModels(): Promise<ModelWithStats[]> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('models');
   const products = await prisma.catalogProduct.findMany({
     include: {
       team: true,
@@ -101,6 +111,9 @@ export async function getModels(): Promise<ModelWithStats[]> {
 }
 
 export async function getModelById(id: string): Promise<ModelDetail | null> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('models');
   const p = await prisma.catalogProduct.findUnique({
     where: { id },
     include: {
@@ -202,6 +215,9 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 }
 
 export async function getPurchases(): Promise<BatchSummary[]> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('purchases');
   const batches = await prisma.batch.findMany({
     include: {
       items: { include: { product: { include: { team: true } } } },
@@ -217,6 +233,9 @@ export async function getPurchases(): Promise<BatchSummary[]> {
 }
 
 export async function getBatchById(id: string): Promise<BatchSummary | null> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('purchases');
   const b = await prisma.batch.findUnique({
     where: { id },
     include: {
@@ -231,6 +250,9 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
 }
 
 export async function getPublicModels() {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('models');
   const products = await prisma.catalogProduct.findMany({
     include: {
       team: true,
@@ -254,6 +276,9 @@ export async function getPublicModels() {
 }
 
 export async function getTransitCount(): Promise<number> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('purchases');
   return prisma.batch.count({ where: { arrivalDate: null } });
 }
 
@@ -298,6 +323,9 @@ function toAdjustmentRecord(a: { id: string; userId: string; user: { alias: stri
 }
 
 export async function getExpenses(): Promise<ExpenseRecord[]> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('saldos');
   const rows = await prisma.expense.findMany({
     orderBy: { date: 'desc' },
     include: { paidByUser: true },
@@ -306,6 +334,9 @@ export async function getExpenses(): Promise<ExpenseRecord[]> {
 }
 
 export async function getSaldosData() {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('saldos');
   const [batches, soldItems, expenses, convRows, adjRows] = await Promise.all([
     prisma.batch.findMany({
       include: {
