@@ -14,7 +14,7 @@ export function Modal({
   onConfirm,
   onCancel,
 }: {
-  icon?: 'check' | 'shirt' | 'x' | 'trash' | null;
+  icon?: 'check' | 'shirt' | 'x' | 'trash' | 'swap' | null;
   title?: string;
   children?: React.ReactNode;
   confirmLabel?: string;

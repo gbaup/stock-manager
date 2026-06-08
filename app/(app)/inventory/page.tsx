@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { getModels, getTransitCount } from '@/app/lib/queries';
 import { InventoryScreen } from '@/components/screens/inventory-screen';
 

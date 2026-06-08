@@ -1,12 +1,11 @@
-export const dynamic = 'force-dynamic';
-
-import { getSaldosData, getTransitCount } from '@/app/lib/queries';
+import { getSaldosData, getTransitCount, getUsers } from '@/app/lib/queries';
 import { SaldosScreen } from '@/components/screens/saldos-screen';
 
 export default async function SaldosPage() {
-  const [{ purchases, sales, expenses }, transitCount] = await Promise.all([
+  const [{ purchases, sales, expenses, conversions, adjustments }, transitCount, users] = await Promise.all([
     getSaldosData(),
     getTransitCount(),
+    getUsers(),
   ]);
 
   return (
@@ -14,7 +13,10 @@ export default async function SaldosPage() {
       purchases={purchases}
       sales={sales}
       expenses={expenses}
+      conversions={conversions}
+      adjustments={adjustments}
       transitCount={transitCount}
+      users={users}
     />
   );
 }

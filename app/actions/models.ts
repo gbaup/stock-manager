@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/app/lib/prisma';
@@ -43,7 +43,7 @@ export async function createModel(data: ModelFormValues): Promise<{ errors: Reco
     }
     throw e;
   }
-  revalidatePath('/inventory');
+  updateTag('models');
   redirect(`/inventory/${modelId}`);
 }
 
@@ -75,7 +75,6 @@ export async function updateModel(id: string, data: ModelFormValues): Promise<{ 
     }
     throw e;
   }
-  revalidatePath('/inventory');
-  revalidatePath(`/inventory/${id}`);
+  updateTag('models');
   redirect(`/inventory/${id}`);
 }

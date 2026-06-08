@@ -1,10 +1,10 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { getCurrentUserId } from '@/app/lib/auth';
-import { saleSchema } from '@/app/lib/schemas';
+import { saleSchema, parseOrThrow } from '@/app/lib/schemas';
 
 export async function createSale(
   modelId: string,
@@ -14,13 +14,13 @@ export async function createSale(
     date: string;
     method?: string;
     description?: string;
-    collectedBy?: string;
+    collectedByUserId?: string;
   }
 ) {
   const userId = await getCurrentUserId();
   if (!userId) redirect('/login');
 
-  if (!saleSchema.safeParse(data).success) throw new Error('Invalid sale data');
+  parseOrThrow(saleSchema, data);
 
   const qty = parseInt(data.quantity, 10) || 1;
   const price = parseFloat(data.price);
@@ -57,14 +57,13 @@ export async function createSale(
           date: saleDate,
           method: data.method?.trim().toLowerCase() || null,
           description: data.description?.trim().toLowerCase() || null,
-          collectedBy: data.collectedBy?.trim().toLowerCase() || null,
+          collectedByUserId: data.collectedByUserId || null,
         },
       });
     }
   });
 
-  revalidatePath('/inventory');
-  revalidatePath(`/inventory/${modelId}`);
-  revalidatePath('/saldos');
+  updateTag('models');
+  updateTag('saldos');
   redirect(`/inventory/${modelId}`);
 }

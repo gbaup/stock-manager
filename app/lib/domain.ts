@@ -1,7 +1,4 @@
-export const USD_RATE = 40.5;
-
-export const PEOPLE = ['Caja', 'Bauer'] as const;
-export type Person = typeof PEOPLE[number];
+export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
 export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero', 'Retro'] as const;
@@ -21,6 +18,7 @@ export const JERSEY_COLORS = [
   { name: 'naranja', bg: '#e8702a', fg: '#ffffff' },
   { name: 'violeta', bg: '#6b3fb5', fg: '#ffffff' },
   { name: 'rosa', bg: '#e95fa0', fg: '#3a0d24' },
+  { name: 'gris', bg: '#c4c4c4ff', fg: '#3a2c05' },
 ] as const;
 
 export type JerseyColor = typeof JERSEY_COLORS[number];
@@ -53,8 +51,8 @@ export function usd(n: number): string {
   return `US$ ${new Intl.NumberFormat('es-UY').format(Math.round(n))}`;
 }
 
-export function toUsd(uyuAmount: number): number {
-  return uyuAmount / USD_RATE;
+export function toUsd(uyuAmount: number, rate: number): number {
+  return uyuAmount / rate;
 }
 
 export function signedUyu(n: number): string {
@@ -113,8 +111,10 @@ export type BatchSummary = {
   shippingPriceUyu: number | null;
   weight: number | null;
   status: PurchaseStatus;
-  supplierPaidBy: string | null;
-  shippingPaidBy: string | null;
+  supplierPaidByUserId: string | null;
+  supplierPaidByAlias: string | null;
+  shippingPaidByUserId: string | null;
+  shippingPaidByAlias: string | null;
   items: ItemInBatch[];
 };
 
@@ -126,7 +126,8 @@ export type SaleRecord = {
   date: string;
   method: string | null;
   description: string | null;
-  collectedBy: string | null;
+  collectedByUserId: string | null;
+  collectedByAlias: string | null;
 };
 
 export type TimelineEvent =
@@ -145,7 +146,49 @@ export type ExpenseRecord = {
   title: string;
   amount: number;
   currency: 'UYU' | 'USD';
-  paidBy: string;
+  paidByUserId: string;
+  paidByAlias: string;
   date: string;
 };
+
+export type AdjustmentRecord = {
+  id: string;
+  userId: string;
+  userAlias: string;
+  amountUyu: number;
+  amountUsd: number;
+  date: string;
+  note: string | null;
+};
+
+export type ConversionRecord = {
+  id: string;
+  date: string;
+  fromUserId: string;
+  fromUserAlias: string;
+  fromCur: 'UYU' | 'USD';
+  toUserId: string;
+  toUserAlias: string;
+  toCur: 'UYU' | 'USD';
+  fromAmount: number;
+  rate: number;
+  toAmount: number;
+};
+
+export function fmtRate(n: number): string {
+  return new Intl.NumberFormat('es-UY', { maximumFractionDigits: 2 }).format(n);
+}
+
+export function convertAmount(
+  fromAmount: number,
+  fromCur: 'UYU' | 'USD',
+  toCur: 'UYU' | 'USD',
+  rate: number,
+): number {
+  if (!fromAmount) return 0;
+  if (fromCur === toCur) return fromAmount;
+  if (fromCur === 'UYU' && toCur === 'USD') return rate ? Math.round((fromAmount / rate) * 100) / 100 : 0;
+  if (fromCur === 'USD' && toCur === 'UYU') return Math.round(fromAmount * rate);
+  return fromAmount;
+}
 

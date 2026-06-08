@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "catalog_products_team_id_season_version_color_number_sleeve_typ" RENAME TO "catalog_products_team_id_season_version_color_number_sleeve_key";
