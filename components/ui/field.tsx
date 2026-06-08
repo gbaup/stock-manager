@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { JERSEY_COLORS } from '@/app/lib/domain';
 import { Icon } from './icon';
+import { Modal } from './modal';
 
 export function Field({
   label,
@@ -165,7 +166,9 @@ export function ColorPicker({
   );
 }
 
-type TeamOption = { id: string; name: string };
+type TeamOption = { id: string; name: string; count?: number };
+
+const normTeam = (s: string) => (s || '').trim().replace(/\s+/g, ' ');
 
 export function TeamCombobox({
   value,
@@ -180,91 +183,142 @@ export function TeamCombobox({
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(-1);
+  const [pending, setPending] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedTeam = teams.find((t) => t.id === value);
 
   useEffect(() => {
-    if (!open && selectedTeam) setQuery(selectedTeam.name);
+    if (!open) setQuery(selectedTeam?.name ?? '');
   }, [open, selectedTeam]);
 
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
-  }, []);
+  const q = normTeam(query);
+  const ql = q.toLowerCase();
+  const matches = teams
+    .filter((t) => !ql || t.name.toLowerCase().includes(ql))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const exact = teams.some((t) => t.name.toLowerCase() === ql);
+  const showCreate = q.length > 0 && !exact;
+  const rows = matches.length + (showCreate ? 1 : 0);
 
-  const normalized = query.trim().toLowerCase();
-  const filtered = normalized
-    ? teams.filter((t) => t.name.toLowerCase().includes(normalized))
-    : teams;
-  const exactMatch = teams.find((t) => t.name.toLowerCase() === normalized);
-  const showCreate = normalized.length > 0 && !exactMatch;
+  const openMenu = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setOpen(true); };
+  const closeMenu = () => { setOpen(false); setHi(-1); };
+  const deferClose = () => { closeTimer.current = setTimeout(closeMenu, 120); };
 
-  async function handleCreate() {
+  const pick = (t: TeamOption) => { onChange(t.id); setQuery(t.name); closeMenu(); };
+  const askCreate = () => { setOpen(false); setPending(q); };
+  const cancelCreate = () => setPending(null);
+
+  async function confirmCreate() {
+    if (!pending) return;
     setCreating(true);
     try {
-      const team = await onCreateTeam(query.trim());
+      const team = await onCreateTeam(pending);
       onChange(team.id);
       setQuery(team.name);
-      setOpen(false);
     } finally {
       setCreating(false);
+      setPending(null);
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      openMenu();
+      setHi((h) => Math.min(h + 1, rows - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHi((h) => Math.max(h - 1, 0));
+    } else if (e.key === 'Enter') {
+      if (!open) return;
+      e.preventDefault();
+      if (hi >= 0 && hi < matches.length) pick(matches[hi]);
+      else if (showCreate && hi === matches.length) askCreate();
+    } else if (e.key === 'Escape') {
+      closeMenu();
     }
   }
 
   return (
-    <div className="combobox" ref={ref}>
-      <input
-        className="input"
-        value={open ? query : (selectedTeam?.name ?? '')}
-        placeholder="Ej: Peñarol, Real Madrid…"
-        onFocus={() => {
-          setQuery(selectedTeam?.name ?? '');
-          setOpen(true);
-        }}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-      />
-      {open && (
-        <div className="combobox-drop">
-          {filtered.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`combobox-opt${t.id === value ? ' is-active' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onChange(t.id);
-                setQuery(t.name);
-                setOpen(false);
-              }}
-            >
-              {t.name}
-            </button>
-          ))}
-          {showCreate && (
-            <button
-              type="button"
-              className="combobox-opt combobox-create"
-              disabled={creating}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleCreate}
-            >
-              {creating ? 'Creando…' : `Crear "${query.trim()}"`}
-            </button>
-          )}
-          {filtered.length === 0 && !showCreate && (
-            <div className="combobox-empty">Sin resultados</div>
-          )}
-        </div>
+    <>
+      <div className="combo">
+        <input
+          className="input"
+          value={open ? query : (selectedTeam?.name ?? '')}
+          placeholder="Buscá o creá un equipo…"
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+          onChange={(e) => { setQuery(e.target.value); openMenu(); setHi(-1); }}
+          onFocus={() => { setQuery(selectedTeam?.name ?? ''); openMenu(); }}
+          onBlur={deferClose}
+          onKeyDown={onKeyDown}
+        />
+        {(value || query) && (
+          <button
+            type="button"
+            className="combo-clear"
+            aria-label="Borrar"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { onChange(''); setQuery(''); openMenu(); }}
+          >
+            <Icon name="x" size={16} strokeWidth={2} />
+          </button>
+        )}
+        {open && (matches.length > 0 || showCreate) && (
+          <div className="combo-menu" onMouseDown={(e) => e.preventDefault()}>
+            {matches.map((t, i) => {
+              const isExact = t.name.toLowerCase() === ql;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`combo-opt${i === hi ? ' is-hi' : ''}`}
+                  onMouseEnter={() => setHi(i)}
+                  onClick={() => pick(t)}
+                >
+                  <span className="combo-team">{t.name}</span>
+                  {(t.count ?? 0) > 0 && <span className="combo-count">{t.count}</span>}
+                  {isExact && <Icon name="check" size={16} strokeWidth={2.2} className="combo-check" />}
+                </button>
+              );
+            })}
+            {showCreate && (
+              <>
+                {matches.length > 0 && <div className="combo-sep" />}
+                <button
+                  type="button"
+                  className={`combo-create${hi === matches.length ? ' is-hi' : ''}`}
+                  onMouseEnter={() => setHi(matches.length)}
+                  onClick={askCreate}
+                >
+                  <span className="cc-ico"><Icon name="plus" size={16} strokeWidth={2.2} /></span>
+                  <span>Crear equipo <strong>«{q}»</strong></span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {pending !== null && (
+        <Modal
+          icon="shirt"
+          title="¿Crear un equipo nuevo?"
+          confirmLabel={creating ? 'Creando…' : 'Sí, crear'}
+          cancelLabel="Cancelar"
+          onConfirm={confirmCreate}
+          onCancel={cancelCreate}
+        >
+          Vas a crear el equipo{' '}
+          <span className="modal-strong">«{normTeam(pending)}»</span>, que todavía no existe.
+          Revisá que esté bien escrito para no duplicar uno que ya tengas guardado.
+        </Modal>
       )}
-    </div>
+    </>
   );
 }
 
