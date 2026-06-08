@@ -1,0 +1,57 @@
+import { SignJWT, jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
+import bcrypt from 'bcryptjs';
+
+const secret = process.env.SESSION_SECRET;
+if (!secret) throw new Error('SESSION_SECRET env var is required');
+const encodedKey = new TextEncoder().encode(secret);
+
+export async function encrypt(payload: Record<string, unknown>) {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(encodedKey);
+}
+
+export async function decrypt(session: string | undefined = '') {
+  try {
+    const { payload } = await jwtVerify(session, encodedKey, { algorithms: ['HS256'] });
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export async function createSession(userId: string) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const session = await encrypt({ userId, expiresAt });
+  const cookieStore = await cookies();
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    expires: expiresAt,
+    sameSite: 'lax',
+    path: '/',
+  });
+}
+
+export async function deleteSession() {
+  const cookieStore = await cookies();
+  cookieStore.delete('session');
+}
+
+export async function getCurrentUserId(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get('session')?.value;
+  const payload = await decrypt(session);
+  return (payload?.userId as string) ?? null;
+}
+
+export async function verifyPassword(password: string, hash: string) {
+  return bcrypt.compare(password, hash);
+}
+
+export async function hashPassword(password: string) {
+  return bcrypt.hash(password, 10);
+}
