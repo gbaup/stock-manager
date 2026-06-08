@@ -2,9 +2,9 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 
-const encodedKey = new TextEncoder().encode(
-  process.env.SESSION_SECRET || 'default-secret-change-in-production'
-);
+const secret = process.env.SESSION_SECRET;
+if (!secret) throw new Error('SESSION_SECRET env var is required');
+const encodedKey = new TextEncoder().encode(secret);
 
 export async function encrypt(payload: Record<string, unknown>) {
   return new SignJWT(payload)

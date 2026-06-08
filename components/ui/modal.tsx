@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './icon';
 
@@ -23,14 +23,19 @@ export function Modal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const onConfirmRef = useRef(onConfirm);
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => { onConfirmRef.current = onConfirm; }, [onConfirm]);
+  useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-      else if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
+      if (e.key === 'Escape') { e.preventDefault(); onCancelRef.current(); }
+      else if (e.key === 'Enter') { e.preventDefault(); onConfirmRef.current(); }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onConfirm, onCancel]);
+  }, []);
 
   if (typeof document === 'undefined') return null;
   const host = document.querySelector('.app-shell') ?? document.body;

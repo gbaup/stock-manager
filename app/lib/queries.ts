@@ -141,21 +141,22 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     );
   }
 
-  // Group sales by date → one event per day
-  const saleByDate = new Map<string, { price: number; qty: number; s: typeof soldItems[0]['sale'] }>();
+  // Group sales by (date, collectedBy) so each collector gets their own event per day
+  const saleByKey = new Map<string, { price: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
   for (const item of soldItems) {
     const s = item.sale!;
     const dateKey = toISODate(s.date)!;
-    const existing = saleByDate.get(dateKey);
+    const key = `${dateKey}::${s.collectedBy ?? ''}`;
+    const existing = saleByKey.get(key);
     if (existing) {
       existing.price += Number(s.price);
       existing.qty += 1;
     } else {
-      saleByDate.set(dateKey, { price: Number(s.price), qty: 1, s });
+      saleByKey.set(key, { price: Number(s.price), qty: 1, s, dateKey });
     }
   }
 
-  for (const [dateKey, { price, qty, s }] of saleByDate) {
+  for (const [, { price, qty, s, dateKey }] of saleByKey) {
     const saleData: SaleRecord = {
       id: s!.id,
       catalogProductId: id,

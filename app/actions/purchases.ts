@@ -17,6 +17,7 @@ export async function createPurchase(data: {
   items: PurchaseItem[];
 }) {
   if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
+  if (data.items.some((it) => !it.modelId || !it.size)) throw new Error('Invalid item data');
 
   await prisma.batch.create({
     data: {

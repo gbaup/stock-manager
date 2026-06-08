@@ -1,13 +1,6 @@
-import { deleteSession } from '@/app/lib/auth';
-import { redirect } from 'next/navigation';
+import { logout } from '@/app/actions/auth';
 
 export default function DashboardPage() {
-    async function logout() {
-        'use server';
-        await deleteSession();
-        redirect('/login');
-    }
-
     return (
         <div className="min-h-screen bg-gray-950 text-gray-100 p-8">
             <div className="max-w-4xl mx-auto">
