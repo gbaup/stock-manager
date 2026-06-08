@@ -1,7 +1,8 @@
 import { prisma } from './prisma';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
-  ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord,
+  ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord, ConversionRecord,
+  AdjustmentRecord, UserSummary,
 } from './domain';
 
 function toISODate(d: Date | null): string | null {
@@ -35,7 +36,10 @@ function batchToSummary(
     supplier: string | null;
     trackingNumber: string | null; description: string | null;
     shippingPriceUsd: unknown; shippingPriceUyu: unknown; weight: unknown;
-    supplierPaidBy: string | null; shippingPaidBy: string | null;
+    supplierPaidByUserId: string | null;
+    supplierPaidByUser: { alias: string } | null;
+    shippingPaidByUserId: string | null;
+    shippingPaidByUser: { alias: string } | null;
   },
   items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; product: Parameters<typeof productMeta>[0] }>
 ): BatchSummary {
@@ -51,8 +55,10 @@ function batchToSummary(
     shippingPriceUyu: b.shippingPriceUyu ? Number(b.shippingPriceUyu) : null,
     weight: b.weight ? Number(b.weight) : null,
     status: (b.arrivalDate ? 'arrived' : 'transit') as PurchaseStatus,
-    supplierPaidBy: b.supplierPaidBy,
-    shippingPaidBy: b.shippingPaidBy,
+    supplierPaidByUserId: b.supplierPaidByUserId,
+    supplierPaidByAlias: b.supplierPaidByUser?.alias ?? null,
+    shippingPaidByUserId: b.shippingPaidByUserId,
+    shippingPaidByAlias: b.shippingPaidByUser?.alias ?? null,
     items: items.map((i) => ({
       id: i.id,
       catalogProductId: i.catalogProductId,
@@ -61,6 +67,11 @@ function batchToSummary(
       product: productMeta(i.product),
     })),
   };
+}
+
+export async function getUsers(): Promise<UserSummary[]> {
+  const rows = await prisma.user.findMany({ select: { id: true, alias: true }, orderBy: { alias: 'asc' } });
+  return rows.map((u) => ({ id: u.id, alias: u.alias }));
 }
 
 export async function getTeams(): Promise<{ id: string; name: string }[]> {
@@ -96,11 +107,18 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       team: true,
       items: {
         include: {
-          batch: true,
+          batch: {
+            include: {
+              supplierPaidByUser: true,
+              shippingPaidByUser: true,
+            },
+          },
           sale: {
             select: {
               id: true, price: true, date: true, method: true,
-              description: true, userId: true, collectedBy: true,
+              description: true, userId: true,
+              collectedByUserId: true,
+              collectedByUser: { select: { alias: true } },
             },
           },
         },
@@ -141,12 +159,12 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     );
   }
 
-  // Group sales by (date, collectedBy) so each collector gets their own event per day
+  // Group sales by (date, collectedByUserId) so each collector gets their own event per day
   const saleByKey = new Map<string, { price: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
   for (const item of soldItems) {
     const s = item.sale!;
     const dateKey = toISODate(s.date)!;
-    const key = `${dateKey}::${s.collectedBy ?? ''}`;
+    const key = `${dateKey}::${s.collectedByUserId ?? ''}`;
     const existing = saleByKey.get(key);
     if (existing) {
       existing.price += Number(s.price);
@@ -165,7 +183,8 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       date: dateKey,
       method: s!.method,
       description: s!.description,
-      collectedBy: s!.collectedBy,
+      collectedByUserId: s!.collectedByUserId,
+      collectedByAlias: s!.collectedByUser?.alias ?? null,
     };
     events.push({ type: 'sale', date: dateKey, data: saleData, qty });
   }
@@ -184,7 +203,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
 export async function getPurchases(): Promise<BatchSummary[]> {
   const batches = await prisma.batch.findMany({
-    include: { items: { include: { product: { include: { team: true } } } } },
+    include: {
+      items: { include: { product: { include: { team: true } } } },
+      supplierPaidByUser: true,
+      shippingPaidByUser: true,
+    },
     orderBy: { purchaseDate: 'desc' },
   });
 
@@ -196,7 +219,11 @@ export async function getPurchases(): Promise<BatchSummary[]> {
 export async function getBatchById(id: string): Promise<BatchSummary | null> {
   const b = await prisma.batch.findUnique({
     where: { id },
-    include: { items: { include: { product: { include: { team: true } } } } },
+    include: {
+      items: { include: { product: { include: { team: true } } } },
+      supplierPaidByUser: true,
+      shippingPaidByUser: true,
+    },
   });
   if (!b) return null;
 
@@ -230,33 +257,90 @@ export async function getTransitCount(): Promise<number> {
   return prisma.batch.count({ where: { arrivalDate: null } });
 }
 
-export async function getExpenses(): Promise<ExpenseRecord[]> {
-  const rows = await prisma.expense.findMany({ orderBy: { date: 'desc' } });
-  return rows.map((e) => ({
+function toExpenseRecord(e: { id: string; title: string; amount: unknown; currency: string; paidByUserId: string; paidByUser: { alias: string }; date: Date }): ExpenseRecord {
+  return {
     id: e.id,
     title: e.title,
     amount: Number(e.amount),
     currency: e.currency as 'UYU' | 'USD',
-    paidBy: e.paidBy,
+    paidByUserId: e.paidByUserId,
+    paidByAlias: e.paidByUser.alias,
     date: toISODate(e.date)!,
-  }));
+  };
+}
+
+function toConversionRecord(c: { id: string; date: Date; fromUserId: string; fromUser: { alias: string }; fromCur: string; toUserId: string; toUser: { alias: string }; toCur: string; fromAmount: unknown; rate: unknown; toAmount: unknown }): ConversionRecord {
+  return {
+    id: c.id,
+    date: toISODate(c.date)!,
+    fromUserId: c.fromUserId,
+    fromUserAlias: c.fromUser.alias,
+    fromCur: c.fromCur as 'UYU' | 'USD',
+    toUserId: c.toUserId,
+    toUserAlias: c.toUser.alias,
+    toCur: c.toCur as 'UYU' | 'USD',
+    fromAmount: Number(c.fromAmount),
+    rate: Number(c.rate),
+    toAmount: Number(c.toAmount),
+  };
+}
+
+function toAdjustmentRecord(a: { id: string; userId: string; user: { alias: string }; amountUyu: unknown; amountUsd: unknown; date: Date; note: string | null }): AdjustmentRecord {
+  return {
+    id: a.id,
+    userId: a.userId,
+    userAlias: a.user.alias,
+    amountUyu: Number(a.amountUyu),
+    amountUsd: Number(a.amountUsd),
+    date: toISODate(a.date)!,
+    note: a.note,
+  };
+}
+
+export async function getExpenses(): Promise<ExpenseRecord[]> {
+  const rows = await prisma.expense.findMany({
+    orderBy: { date: 'desc' },
+    include: { paidByUser: true },
+  });
+  return rows.map(toExpenseRecord);
 }
 
 export async function getSaldosData() {
-  const [batches, soldItems, expenses] = await Promise.all([
+  const [batches, soldItems, expenses, convRows, adjRows] = await Promise.all([
     prisma.batch.findMany({
-      include: { items: { include: { product: { include: { team: true } } } } },
+      include: {
+        items: { include: { product: { include: { team: true } } } },
+        supplierPaidByUser: true,
+        shippingPaidByUser: true,
+      },
       orderBy: { purchaseDate: 'desc' },
     }),
     prisma.inventoryItem.findMany({
       where: { status: 'sold' },
       include: {
         product: { include: { team: true } },
-        sale: { select: { id: true, price: true, date: true, collectedBy: true } },
+        sale: {
+          select: {
+            id: true, price: true, date: true,
+            collectedByUserId: true,
+            collectedByUser: { select: { alias: true } },
+          },
+        },
         batch: { select: { arrivalDate: true } },
       },
     }),
-    prisma.expense.findMany({ orderBy: { date: 'desc' } }),
+    prisma.expense.findMany({
+      orderBy: { date: 'desc' },
+      include: { paidByUser: true },
+    }),
+    prisma.conversion.findMany({
+      orderBy: { date: 'desc' },
+      include: { fromUser: true, toUser: true },
+    }),
+    prisma.adjustment.findMany({
+      orderBy: { date: 'desc' },
+      include: { user: true },
+    }),
   ]);
 
   const purchases: BatchSummary[] = batches.map((b) =>
@@ -269,19 +353,17 @@ export async function getSaldosData() {
       id: i.sale!.id,
       date: toISODate(i.sale!.date)!,
       price: Number(i.sale!.price),
-      collectedBy: i.sale!.collectedBy,
+      collectedByUserId: i.sale!.collectedByUserId,
+      collectedByAlias: i.sale!.collectedByUser?.alias ?? null,
       quantity: 1,
       model: i.product.team.name,
     }));
 
-  const expenseList: ExpenseRecord[] = expenses.map((e) => ({
-    id: e.id,
-    title: e.title,
-    amount: Number(e.amount),
-    currency: e.currency as 'UYU' | 'USD',
-    paidBy: e.paidBy,
-    date: toISODate(e.date)!,
-  }));
-
-  return { purchases, sales, expenses: expenseList };
+  return {
+    purchases,
+    sales,
+    expenses: expenses.map(toExpenseRecord),
+    conversions: convRows.map(toConversionRecord),
+    adjustments: adjRows.map(toAdjustmentRecord),
+  };
 }

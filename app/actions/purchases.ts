@@ -3,8 +3,22 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
-import { USD_RATE } from '@/app/lib/domain';
-import { arrivalSchema } from '@/app/lib/schemas';
+import { z } from 'zod';
+import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
+import { getExchangeRate } from '@/app/lib/exchange-rate';
+
+const createPurchaseSchema = z.object({
+  purchaseDate: z.string().min(1),
+  supplier: z.string().optional(),
+  trackingNumber: z.string().optional(),
+  description: z.string().optional(),
+  supplierPaidByUserId: z.string().uuid().optional(),
+  items: z.array(z.object({
+    modelId: z.string().min(1),
+    size: z.string().min(1),
+    basePriceUsd: z.number().finite().min(0),
+  })).min(1),
+});
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
 
@@ -13,11 +27,12 @@ export async function createPurchase(data: {
   supplier?: string;
   trackingNumber?: string;
   description?: string;
-  supplierPaidBy?: string;
+  supplierPaidByUserId?: string;
   items: PurchaseItem[];
 }) {
-  if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
-  if (data.items.some((it) => !it.modelId || !it.size)) throw new Error('Invalid item data');
+  parseOrThrow(createPurchaseSchema, data);
+
+  const exchangeRate = await getExchangeRate();
 
   await prisma.batch.create({
     data: {
@@ -26,13 +41,13 @@ export async function createPurchase(data: {
       trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
       description: data.description?.trim().toLowerCase() || null,
       quantity: data.items.length,
-      supplierPaidBy: data.supplierPaidBy?.trim().toLowerCase() || null,
+      supplierPaidByUserId: data.supplierPaidByUserId || null,
       items: {
         create: data.items.map((it) => ({
           catalogProductId: it.modelId,
           size: it.size.trim().toLowerCase(),
           basePriceUsd: it.basePriceUsd,
-          basePriceUyu: it.basePriceUsd * USD_RATE,
+          basePriceUyu: it.basePriceUsd * exchangeRate,
           status: 'available',
         })),
       },
@@ -52,7 +67,7 @@ export async function markArrived(
     shippingPriceUsd?: string;
     shippingPriceUyu?: string;
     weight?: string;
-    shippingPaidBy?: string;
+    shippingPaidByUserId?: string;
   }
 ) {
   if (!arrivalSchema.safeParse(data).success) throw new Error('Invalid arrival data');
@@ -64,7 +79,7 @@ export async function markArrived(
       shippingPriceUsd: data.shippingPriceUsd ? parseFloat(data.shippingPriceUsd) : null,
       shippingPriceUyu: data.shippingPriceUyu ? parseFloat(data.shippingPriceUyu) : null,
       weight: data.weight ? parseFloat(data.weight) : null,
-      shippingPaidBy: data.shippingPaidBy?.trim().toLowerCase() || null,
+      shippingPaidByUserId: data.shippingPaidByUserId || null,
     },
   });
 

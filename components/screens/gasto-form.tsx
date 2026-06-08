@@ -7,11 +7,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, MoneyInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
-import { PEOPLE, todayISO, uyu, usd } from '@/app/lib/domain';
+import { todayISO, uyu, usd } from '@/app/lib/domain';
+import type { UserSummary } from '@/app/lib/domain';
 import { createExpense } from '@/app/actions/expenses';
 import { gastoSchema, type GastoFormValues } from '@/app/lib/schemas';
 
-export function GastoForm() {
+export function GastoForm({ users }: { users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const {
@@ -25,14 +26,15 @@ export function GastoForm() {
       title: '',
       amount: '',
       currency: 'UYU',
-      paidBy: '',
+      paidByUserId: '',
       date: todayISO(),
     },
   });
 
   const currency = useWatch({ control, name: 'currency' });
   const amount = parseFloat(useWatch({ control, name: 'amount' })) || 0;
-  const paidBy = useWatch({ control, name: 'paidBy' });
+  const paidByUserId = useWatch({ control, name: 'paidByUserId' });
+  const paidByAlias = users.find((u) => u.id === paidByUserId)?.alias ?? '';
   const previewMoney = currency === 'UYU' ? uyu(amount) : usd(amount);
 
   function onSubmit(data: GastoFormValues) {
@@ -41,7 +43,7 @@ export function GastoForm() {
         title: data.title,
         amount: data.amount,
         currency: data.currency,
-        paidBy: data.paidBy,
+        paidByUserId: data.paidByUserId,
         date: data.date,
       });
     });
@@ -103,12 +105,17 @@ export function GastoForm() {
           </Field>
 
           <div className="section-label">Pago</div>
-          <Field label="¿Quién lo pagó?" error={errors.paidBy?.message}>
+          <Field label="¿Quién lo pagó?" error={errors.paidByUserId?.message}>
             <Controller
-              name="paidBy"
+              name="paidByUserId"
               control={control}
               render={({ field }) => (
-                <Segmented options={PEOPLE} value={field.value} onChange={field.onChange} full />
+                <Segmented
+                  options={users.map((u) => u.alias)}
+                  value={users.find((u) => u.id === field.value)?.alias ?? ''}
+                  onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
+                  full
+                />
               )}
             />
           </Field>
@@ -116,10 +123,10 @@ export function GastoForm() {
             Se descuenta del saldo de quien lo pagó, en {currency === 'UYU' ? 'pesos' : 'dólares'}.
           </div>
 
-          {paidBy && amount > 0 && (
+          {paidByAlias && amount > 0 && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
               <span className="mov-chip neg" style={{ fontSize: 14 }}>
-                {paidBy} paga − {previewMoney}
+                {paidByAlias} paga − {previewMoney}
               </span>
             </div>
           )}

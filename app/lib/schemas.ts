@@ -1,12 +1,18 @@
 import { z } from 'zod';
 
+export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
+  const result = schema.safeParse(data);
+  if (!result.success) throw new Error(result.error.issues[0]?.message ?? 'Datos inválidos');
+  return result.data;
+}
+
 const saleFields = {
   price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
   quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
   date: z.string().min(1, 'Requerido'),
   method: z.string().optional(),
   description: z.string().optional(),
-  collectedBy: z.string().min(1, '¿Quién cobró?'),
+  collectedByUserId: z.string().uuid('¿Quién cobró?'),
 };
 
 export const saleSchema = z.object(saleFields);
@@ -26,7 +32,7 @@ export const gastoSchema = z.object({
   title: z.string().min(1, 'Requerido'),
   amount: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un monto válido'),
   currency: z.enum(['UYU', 'USD']),
-  paidBy: z.string().min(1, '¿Quién pagó?'),
+  paidByUserId: z.string().uuid('¿Quién pagó?'),
   date: z.string().min(1, 'Requerido'),
 });
 
@@ -38,23 +44,74 @@ export const arrivalSchema = z
     shippingPriceUsd: z.string().optional(),
     shippingPriceUyu: z.string().optional(),
     weight: z.string().optional(),
-    shippingPaidBy: z.string().optional(),
+    shippingPaidByUserId: z.string().uuid().optional(),
   })
   .refine(
     (data) => {
       const hasShipping =
         (parseFloat(data.shippingPriceUsd ?? '') || 0) > 0 ||
         (parseFloat(data.shippingPriceUyu ?? '') || 0) > 0;
-      return !hasShipping || !!data.shippingPaidBy;
+      return !hasShipping || !!data.shippingPaidByUserId;
     },
-    { message: '¿Quién pagó el envío?', path: ['shippingPaidBy'] }
+    { message: '¿Quién pagó el envío?', path: ['shippingPaidByUserId'] }
   );
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
+export const conversionSchema = z
+  .object({
+    fromUserId: z.string().uuid('Seleccioná el origen'),
+    fromCur: z.enum(['UYU', 'USD']),
+    toUserId: z.string().uuid('Seleccioná el destino'),
+    toCur: z.enum(['UYU', 'USD']),
+    fromAmount: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un monto válido'),
+    rate: z.string().optional(),
+    date: z.string().min(1, 'Requerido'),
+  })
+  .refine(
+    (data) => !(data.fromUserId === data.toUserId && data.fromCur === data.toCur),
+    { message: 'El origen y el destino no pueden ser la misma cuenta', path: ['toUserId'] }
+  )
+  .refine(
+    (data) => {
+      if (data.fromCur === data.toCur) return true;
+      return (parseFloat(data.rate ?? '') || 0) > 0;
+    },
+    { message: 'Ingresá el tipo de cambio', path: ['rate'] }
+  );
+
+export type ConversionFormValues = z.infer<typeof conversionSchema>;
+
+const numericOptional = z
+  .string()
+  .optional()
+  .refine((v) => v === undefined || v === '' || !isNaN(parseFloat(v)), 'Monto inválido');
+
+export const ajusteSchema = z
+  .object({
+    userId: z.string().uuid('Seleccioná el socio'),
+    amountUyu: numericOptional,
+    amountUsd: numericOptional,
+    date: z.string().min(1, 'Requerido'),
+    note: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      const uyu = parseFloat(data.amountUyu ?? '') || 0;
+      const usd = parseFloat(data.amountUsd ?? '') || 0;
+      return uyu !== 0 || usd !== 0;
+    },
+    { message: 'Ingresá al menos un monto', path: ['amountUyu'] }
+  );
+
+export type AjusteFormValues = z.infer<typeof ajusteSchema>;
+
 export const modelSchema = z.object({
   teamId: z.string().min(1, 'Requerido'),
-  season: z.string().min(1, 'Requerido'),
+  season: z
+    .string()
+    .min(1, 'Requerido')
+    .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
   version: z.string(),
   type: z.string(),
   sleeve: z.string(),
@@ -79,7 +136,7 @@ export const purchaseSchema = z
     supplier: z.string().optional(),
     trackingNumber: z.string().optional(),
     description: z.string().optional(),
-    supplierPaidBy: z.string().optional(),
+    supplierPaidByUserId: z.string().uuid().optional(),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   })
   .refine(
@@ -88,9 +145,9 @@ export const purchaseSchema = z
         (s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0),
         0
       );
-      return totalUsd === 0 || !!data.supplierPaidBy;
+      return totalUsd === 0 || !!data.supplierPaidByUserId;
     },
-    { message: '¿Quién pagó al proveedor?', path: ['supplierPaidBy'] }
+    { message: '¿Quién pagó al proveedor?', path: ['supplierPaidByUserId'] }
   );
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;

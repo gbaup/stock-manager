@@ -7,36 +7,53 @@ generator client {
 }
 
 model User {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String   @db.VarChar(100)
-  lastName     String   @map("last_name") @db.VarChar(100)
-  email        String   @unique @db.VarChar(100)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  sales        Sale[]
-  
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alias        String  @unique @db.VarChar(50)
+  name         String  @db.VarChar(100)
+  lastName     String  @map("last_name") @db.VarChar(100)
+  email        String  @unique @db.VarChar(100)
+  passwordHash String  @map("password_hash") @db.VarChar(255)
+
+  salesLogged         Sale[]       @relation("SaleLogger")
+  salesCollected      Sale[]       @relation("SaleCollector")
+  expensesLogged      Expense[]    @relation("ExpenseLogger")
+  expensesPaid        Expense[]    @relation("ExpensePayer")
+  conversionsLogged   Conversion[] @relation("ConversionLogger")
+  conversionsSent     Conversion[] @relation("ConversionSender")
+  conversionsReceived Conversion[] @relation("ConversionReceiver")
+  batchesSupplierPaid Batch[]      @relation("BatchSupplierPayer")
+  batchesShippingPaid Batch[]      @relation("BatchShippingPayer")
+  adjustments         Adjustment[] @relation("AdjustmentUser")
+  adjustmentsLogged   Adjustment[] @relation("AdjustmentLogger")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Batch {
-  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  purchaseDate     DateTime        @default(now()) @map("purchase_date") @db.Date
-  arrivalDate      DateTime?       @map("arrival_date") @db.Date
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  purchaseDate     DateTime @default(now()) @map("purchase_date") @db.Date
+  arrivalDate      DateTime? @map("arrival_date") @db.Date
   quantity         Int
-  trackingNumber   String?         @map("tracking_number") @db.VarChar(100)
-  description      String?         @db.Text
-  shippingPriceUsd Decimal?        @map("shipping_price_usd") @db.Decimal(10, 2)
-  shippingPriceUyu Decimal?        @map("shipping_price_uyu") @db.Decimal(10, 2)
-  weight           Decimal?        @db.Decimal(10, 2)
-  supplier         String?         @db.VarChar(200)
-  supplierPaidBy   String?         @map("supplier_paid_by") @db.VarChar(50)
-  shippingPaidBy   String?         @map("shipping_paid_by") @db.VarChar(50)
-  items            InventoryItem[]
+  trackingNumber   String?  @map("tracking_number") @db.VarChar(100)
+  description      String?  @db.Text
+  shippingPriceUsd Decimal? @map("shipping_price_usd") @db.Decimal(10, 2)
+  shippingPriceUyu Decimal? @map("shipping_price_uyu") @db.Decimal(10, 2)
+  weight           Decimal? @db.Decimal(10, 2)
+  supplier         String?  @db.VarChar(200)
 
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at")
+  supplierPaidByUserId String? @map("supplier_paid_by_user_id") @db.Uuid
+  supplierPaidByUser   User?   @relation("BatchSupplierPayer", fields: [supplierPaidByUserId], references: [id])
+
+  shippingPaidByUserId String? @map("shipping_paid_by_user_id") @db.Uuid
+  shippingPaidByUser   User?   @relation("BatchShippingPayer", fields: [shippingPaidByUserId], references: [id])
+
+  items InventoryItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("batches")
 }
@@ -46,84 +63,136 @@ model Team {
   name      String           @unique @db.VarChar(100)
   products  CatalogProduct[]
 
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("teams")
 }
 
 model CatalogProduct {
-  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  teamId      String          @map("team_id") @db.Uuid
-  team        Team            @relation(fields: [teamId], references: [id])
-  season      String          @db.VarChar(20)
-  version     String?         @db.VarChar(50)
-  color       String          @db.VarChar(50)
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId      String  @map("team_id") @db.Uuid
+  team        Team    @relation(fields: [teamId], references: [id])
+  season      String  @db.VarChar(20)
+  version     String? @db.VarChar(50)
+  color       String  @db.VarChar(50)
   number      Int?
-  player      String?         @db.VarChar(100)
-  description String?         @db.Text
-  type        String?         @db.VarChar(20)
-  sleeve      String?         @db.VarChar(10)
-  photos      Json            @default("[]")
+  player      String? @db.VarChar(100)
+  description String? @db.Text
+  type        String? @db.VarChar(20)
+  sleeve      String? @db.VarChar(10)
+  photos      Json    @default("[]")
   items       InventoryItem[]
 
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@unique([teamId, season, version, color, number, sleeve, type])
   @@map("catalog_products")
 }
 
 model InventoryItem {
-  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  catalogProductId String         @map("catalog_product_id") @db.Uuid
-  batchId          String         @map("batch_id") @db.Uuid
-  size             String         @db.VarChar(10)
-  basePriceUsd     Decimal        @map("base_price_usd") @db.Decimal(10, 2)
-  basePriceUyu     Decimal        @map("base_price_uyu") @db.Decimal(10, 2)
-  finalPriceUsd    Decimal?       @map("final_price_usd") @db.Decimal(10, 2)
-  finalPriceUyu    Decimal?       @map("final_price_uyu") @db.Decimal(10, 2)
-  status           String         @default("available") @db.VarChar(20)
-  
-  product          CatalogProduct @relation(fields: [catalogProductId], references: [id])
-  batch            Batch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sale             Sale?
-  
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at")
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogProductId String   @map("catalog_product_id") @db.Uuid
+  batchId          String   @map("batch_id") @db.Uuid
+  size             String   @db.VarChar(10)
+  basePriceUsd     Decimal  @map("base_price_usd") @db.Decimal(10, 2)
+  basePriceUyu     Decimal  @map("base_price_uyu") @db.Decimal(10, 2)
+  finalPriceUsd    Decimal? @map("final_price_usd") @db.Decimal(10, 2)
+  finalPriceUyu    Decimal? @map("final_price_uyu") @db.Decimal(10, 2)
+  status           String   @default("available") @db.VarChar(20)
+
+  product CatalogProduct @relation(fields: [catalogProductId], references: [id])
+  batch   Batch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sale    Sale?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("inventory_items")
 }
 
 model Sale {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  inventoryItemId String        @unique @map("inventory_item_id") @db.Uuid
-  userId          String        @map("user_id") @db.Uuid
-  price           Decimal       @db.Decimal(10, 2)
-  date            DateTime      @default(now())
-  method          String?       @db.VarChar(150)
-  description     String?       @db.Text
-  collectedBy     String?       @map("collected_by") @db.VarChar(50)
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventoryItemId String  @unique @map("inventory_item_id") @db.Uuid
+  userId          String  @map("user_id") @db.Uuid
+  loggedBy        User    @relation("SaleLogger", fields: [userId], references: [id])
 
-  item            InventoryItem @relation(fields: [inventoryItemId], references: [id])
-  user            User          @relation(fields: [userId], references: [id])
+  collectedByUserId String? @map("collected_by_user_id") @db.Uuid
+  collectedByUser   User?   @relation("SaleCollector", fields: [collectedByUserId], references: [id])
 
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+  price       Decimal  @db.Decimal(10, 2)
+  date        DateTime @default(now())
+  method      String?  @db.VarChar(150)
+  description String?  @db.Text
+
+  item InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("sales")
 }
 
 model Expense {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title     String   @db.VarChar(200)
-  amount    Decimal  @db.Decimal(10, 2)
-  currency  String   @db.VarChar(5)
-  paidBy    String   @map("paid_by") @db.VarChar(50)
-  date      DateTime @default(now()) @db.Date
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title    String   @db.VarChar(200)
+  amount   Decimal  @db.Decimal(10, 2)
+  currency String   @db.VarChar(5)
+  date     DateTime @default(now()) @db.Date
+
+  paidByUserId String @map("paid_by_user_id") @db.Uuid
+  paidByUser   User   @relation("ExpensePayer", fields: [paidByUserId], references: [id])
+
+  userId   String? @map("user_id") @db.Uuid
+  loggedBy User?   @relation("ExpenseLogger", fields: [userId], references: [id])
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("expenses")
+}
+
+model Conversion {
+  id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date DateTime @db.Date
+
+  fromUserId String @map("from_user_id") @db.Uuid
+  fromUser   User   @relation("ConversionSender", fields: [fromUserId], references: [id])
+
+  fromCur String @map("from_cur") @db.VarChar(5)
+
+  toUserId String @map("to_user_id") @db.Uuid
+  toUser   User   @relation("ConversionReceiver", fields: [toUserId], references: [id])
+
+  toCur      String  @map("to_cur") @db.VarChar(5)
+  fromAmount Decimal @map("from_amount") @db.Decimal(12, 2)
+  rate       Decimal @db.Decimal(10, 4)
+  toAmount   Decimal @map("to_amount") @db.Decimal(12, 2)
+
+  userId   String? @map("user_id") @db.Uuid
+  loggedBy User?   @relation("ConversionLogger", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("conversions")
+}
+
+model Adjustment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation("AdjustmentUser", fields: [userId], references: [id])
+  amountUyu Decimal  @default(0) @map("amount_uyu") @db.Decimal(12, 2)
+  amountUsd Decimal  @default(0) @map("amount_usd") @db.Decimal(12, 2)
+  date      DateTime @db.Date
+  note      String?  @db.VarChar(200)
+
+  loggedByUserId String? @map("logged_by_user_id") @db.Uuid
+  loggedBy       User?   @relation("AdjustmentLogger", fields: [loggedByUserId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("adjustments")
 }

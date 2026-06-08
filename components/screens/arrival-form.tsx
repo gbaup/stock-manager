@@ -9,13 +9,13 @@ import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, MoneyInput, WeightInput } from '@/components/ui/field';
-import { PEOPLE, usd, todayISO } from '@/app/lib/domain';
-import type { BatchSummary } from '@/app/lib/domain';
+import { usd, todayISO } from '@/app/lib/domain';
+import type { BatchSummary, UserSummary } from '@/app/lib/domain';
 import { markArrived } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
 import { arrivalSchema, type ArrivalFormValues } from '@/app/lib/schemas';
 
-export function ArrivalForm({ batch }: { batch: BatchSummary }) {
+export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const {
@@ -30,7 +30,7 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
       shippingPriceUsd: '',
       shippingPriceUyu: '',
       weight: '',
-      shippingPaidBy: '',
+      shippingPaidByUserId: '',
     },
   });
 
@@ -48,7 +48,7 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
         shippingPriceUsd: data.shippingPriceUsd,
         shippingPriceUyu: data.shippingPriceUyu,
         weight: data.weight,
-        shippingPaidBy: data.shippingPaidBy,
+        shippingPaidByUserId: data.shippingPaidByUserId,
       });
     });
   }
@@ -121,15 +121,15 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
 
           {hasShipping && (
             <div style={{ marginTop: 4, marginBottom: 4 }}>
-              <Field label="¿Quién pagó el envío?" error={errors.shippingPaidBy?.message}>
+              <Field label="¿Quién pagó el envío?" error={errors.shippingPaidByUserId?.message}>
                 <Controller
-                  name="shippingPaidBy"
+                  name="shippingPaidByUserId"
                   control={control}
                   render={({ field }) => (
                     <Segmented
-                      options={PEOPLE}
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
+                      options={users.map((u) => u.alias)}
+                      value={users.find((u) => u.id === field.value)?.alias ?? ''}
+                      onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
                       full
                     />
                   )}
