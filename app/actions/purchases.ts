@@ -3,8 +3,22 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
-import { arrivalSchema } from '@/app/lib/schemas';
+import { z } from 'zod';
+import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { getExchangeRate } from '@/app/lib/exchange-rate';
+
+const createPurchaseSchema = z.object({
+  purchaseDate: z.string().min(1),
+  supplier: z.string().optional(),
+  trackingNumber: z.string().optional(),
+  description: z.string().optional(),
+  supplierPaidByUserId: z.string().uuid().optional(),
+  items: z.array(z.object({
+    modelId: z.string().min(1),
+    size: z.string().min(1),
+    basePriceUsd: z.number().finite().min(0),
+  })).min(1),
+});
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
 
@@ -16,8 +30,7 @@ export async function createPurchase(data: {
   supplierPaidByUserId?: string;
   items: PurchaseItem[];
 }) {
-  if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
-  if (data.items.some((it) => !it.modelId || !it.size)) throw new Error('Invalid item data');
+  parseOrThrow(createPurchaseSchema, data);
 
   const exchangeRate = await getExchangeRate();
 

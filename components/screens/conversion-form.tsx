@@ -46,6 +46,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [f, setF] = useState<FormState>({
     fromUserId: '',
@@ -81,17 +82,22 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
 
   function handleSubmit() {
     if (!canSave) return;
+    setError(null);
     startTransition(async () => {
-      await createConversion({
-        fromUserId: f.fromUserId,
-        fromCur: f.fromCur,
-        toUserId: f.toUserId,
-        toCur: f.toCur,
-        fromAmount: amount,
-        rate: sameCur ? 1 : rate,
-        toAmount: result,
-        date: todayISO(),
-      });
+      try {
+        await createConversion({
+          fromUserId: f.fromUserId,
+          fromCur: f.fromCur,
+          toUserId: f.toUserId,
+          toCur: f.toCur,
+          fromAmount: amount,
+          rate: sameCur ? 1 : rate,
+          toAmount: result,
+          date: todayISO(),
+        });
+      } catch {
+        setError('No se pudo registrar. Intentá de nuevo.');
+      }
     });
   }
 
@@ -225,6 +231,10 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
                 <strong className="pos">+ {money(f.toCur, result)}</strong>
               </div>
             </div>
+          )}
+
+          {error && (
+            <p style={{ color: 'var(--danger)', fontSize: 13, textAlign: 'center', margin: '10px 0 0' }}>{error}</p>
           )}
 
           <button
