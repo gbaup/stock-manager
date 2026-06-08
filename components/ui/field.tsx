@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { JERSEY_COLORS } from '@/app/lib/domain';
 import { Icon } from './icon';
 import { Modal } from './modal';
@@ -187,6 +187,7 @@ export function TeamCombobox({
   const [pending, setPending] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuId = useId();
 
   const selectedTeam = teams.find((t) => t.id === value);
 
@@ -252,6 +253,7 @@ export function TeamCombobox({
           autoComplete="off"
           role="combobox"
           aria-expanded={open}
+          aria-controls={menuId}
           onChange={(e) => { setQuery(e.target.value); openMenu(); setHi(-1); }}
           onFocus={() => { setQuery(selectedTeam?.name ?? ''); openMenu(); }}
           onBlur={deferClose}
@@ -269,7 +271,7 @@ export function TeamCombobox({
           </button>
         )}
         {open && (matches.length > 0 || showCreate) && (
-          <div className="combo-menu" onMouseDown={(e) => e.preventDefault()}>
+          <div id={menuId} className="combo-menu" onMouseDown={(e) => e.preventDefault()}>
             {matches.map((t, i) => {
               const isExact = t.name.toLowerCase() === ql;
               return (
