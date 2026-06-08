@@ -441,7 +441,7 @@ function MovCard({ m }: { m: Movement }) {
         <Icon name={iconName} size={17} strokeWidth={1.8} />
       </div>
       <div className="mov-main">
-        <div className="mov-title">{m.title}</div>
+        <div className="mov-title capitalize">{m.title}</div>
         <div className="mov-sub">
           {fmtDate(m.date)} ·{' '}
           {isConv && convFlow ? (
