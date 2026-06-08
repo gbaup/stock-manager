@@ -14,7 +14,7 @@ import { createSale } from '@/app/actions/sales';
 import { coverOf } from '@/components/ui/swatch';
 import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
 
-export function SaleForm({ model, stock }: { model: ModelWithStats; stock: number }) {
+export function SaleForm({ model, stock, usdRate }: { model: ModelWithStats; stock: number; usdRate: number }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const {
@@ -75,7 +75,7 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
           </Field>
           {price > 0 && (
             <div style={{ fontSize: 12.5, color: 'var(--text-faint)', margin: '-6px 2px 12px', fontFamily: 'var(--font-mono)' }}>
-              ≈ {usd(toUsd(price))} · total {uyu(price * qty)}
+              ≈ {usd(toUsd(price, usdRate))} · total {uyu(price * qty)}
             </div>
           )}
 

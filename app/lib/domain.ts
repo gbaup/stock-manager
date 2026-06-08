@@ -51,8 +51,8 @@ export function usd(n: number): string {
   return `US$ ${new Intl.NumberFormat('es-UY').format(Math.round(n))}`;
 }
 
-export function toUsd(uyuAmount: number): number {
-  return uyuAmount / USD_RATE;
+export function toUsd(uyuAmount: number, rate: number): number {
+  return uyuAmount / rate;
 }
 
 export function signedUyu(n: number): string {

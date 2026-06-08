@@ -51,7 +51,7 @@ export function PurchaseForm({
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
   const cap = (s: string) => s.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
-  const modelLabel = (m: ModelWithStats) => `${cap(m.team)} · ${cap(m.version)} · ${m.season}`;
+  const modelLabel = (m: ModelWithStats) => `${cap(m.team)} · ${cap(m.version ?? '')} · ${m.season}`;
   const modelByLabel: Record<string, string> = {};
   models.forEach((m) => { modelByLabel[modelLabel(m)] = m.id; });
 

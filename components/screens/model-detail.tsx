@@ -12,9 +12,11 @@ import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 export function ModelDetailScreen({
   model,
   transitCount,
+  usdRate,
 }: {
   model: ModelDetail;
   transitCount: number;
+  usdRate: number;
 }) {
   const router = useRouter();
   const cover = coverOf(model);
@@ -77,7 +79,7 @@ export function ModelDetailScreen({
             <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
               Ingresos:{' '}
               <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
-              <span className="money-sec"> · {usd(toUsd(model.revenue))}</span>
+              <span className="money-sec"> · {usd(toUsd(model.revenue, usdRate))}</span>
             </div>
           )}
 
@@ -100,7 +102,7 @@ export function ModelDetailScreen({
           ) : (
             <div className="timeline">
               {model.events.map((ev, i) => (
-                <EventRow key={i} ev={ev} onArrive={(id) => router.push(`/purchases/${id}/arrival`)} />
+                <EventRow key={i} ev={ev} usdRate={usdRate} onArrive={(id) => router.push(`/purchases/${id}/arrival`)} />
               ))}
             </div>
           )}
@@ -111,7 +113,7 @@ export function ModelDetailScreen({
   );
 }
 
-function EventRow({ ev, onArrive }: { ev: TimelineEvent; onArrive: (id: string) => void }) {
+function EventRow({ ev, usdRate, onArrive }: { ev: TimelineEvent; usdRate: number; onArrive: (id: string) => void }) {
   if (ev.type === 'sale') {
     const s = ev.data;
     return (
@@ -128,7 +130,7 @@ function EventRow({ ev, onArrive }: { ev: TimelineEvent; onArrive: (id: string) 
         </div>
         <div className="event-amt">
           +{uyu(s.price * s.quantity)}
-          <span className="sec">{usd(toUsd(s.price * s.quantity))}</span>
+          <span className="sec">{usd(toUsd(s.price * s.quantity, usdRate))}</span>
         </div>
       </div>
     );
