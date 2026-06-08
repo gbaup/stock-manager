@@ -37,3 +37,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: secure_url });
 }
+
+export async function DELETE(req: NextRequest) {
+    const { publicId } = await req.json();
+    await cloudinary.uploader.destroy(publicId);
+    return NextResponse.json({ success: true });
+}
