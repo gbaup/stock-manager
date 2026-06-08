@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { getCurrentUserId } from '@/app/lib/auth';
@@ -63,8 +63,7 @@ export async function createSale(
     }
   });
 
-  revalidatePath('/inventory');
-  revalidatePath(`/inventory/${modelId}`);
-  revalidatePath('/saldos');
+  updateTag('models');
+  updateTag('saldos');
   redirect(`/inventory/${modelId}`);
 }

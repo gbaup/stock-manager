@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import { getModelById, getTeams } from '@/app/lib/queries';
 import { ModelForm } from '@/components/screens/model-form';

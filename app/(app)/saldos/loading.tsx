@@ -1,4 +1,4 @@
-import { TopBar, BottomNav } from '@/components/ui/chrome';
+import { TopBar, BottomNavShell } from '@/components/ui/chrome';
 
 export default function SaldosLoading() {
   return (
@@ -13,7 +13,7 @@ export default function SaldosLoading() {
           ))}
         </div>
       </div>
-      <BottomNav />
+      <BottomNavShell active="saldos" />
     </div>
   );
 }

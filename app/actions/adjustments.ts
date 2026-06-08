@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { ajusteSchema, parseOrThrow } from '@/app/lib/schemas';
@@ -29,6 +29,6 @@ export async function createAdjustment(data: {
     },
   });
 
-  revalidatePath('/saldos');
+  updateTag('saldos');
   redirect('/saldos');
 }

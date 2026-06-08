@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { parseOrThrow } from '@/app/lib/schemas';
@@ -47,6 +47,6 @@ export async function createConversion(data: {
     },
   });
 
-  revalidatePath('/saldos');
+  updateTag('saldos');
   redirect('/saldos');
 }

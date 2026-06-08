@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
@@ -54,9 +54,9 @@ export async function createPurchase(data: {
     },
   });
 
-  revalidatePath('/purchases');
-  revalidatePath('/inventory');
-  revalidatePath('/saldos');
+  updateTag('purchases');
+  updateTag('models');
+  updateTag('saldos');
   redirect('/purchases');
 }
 
@@ -83,8 +83,8 @@ export async function markArrived(
     },
   });
 
-  revalidatePath('/purchases');
-  revalidatePath('/inventory');
-  revalidatePath('/saldos');
+  updateTag('purchases');
+  updateTag('models');
+  updateTag('saldos');
   redirect('/purchases');
 }

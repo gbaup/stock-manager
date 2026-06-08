@@ -1,4 +1,4 @@
-import { TopBar, BottomNav } from '@/components/ui/chrome';
+import { TopBar, BottomNavShell } from '@/components/ui/chrome';
 
 export default function PurchasesLoading() {
   return (
@@ -12,7 +12,7 @@ export default function PurchasesLoading() {
           ))}
         </div>
       </div>
-      <BottomNav />
+      <BottomNavShell active="purchases" />
     </div>
   );
 }

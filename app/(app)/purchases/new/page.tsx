@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { getModels, getUsers } from '@/app/lib/queries';
 import { PurchaseForm } from '@/components/screens/purchase-form';
 

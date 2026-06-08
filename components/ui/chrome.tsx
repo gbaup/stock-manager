@@ -32,6 +32,26 @@ export function TopBar({
   );
 }
 
+const NAV_ITEMS = [
+  { id: 'inventory', label: 'Inventario', icon: 'box' as const, href: '/inventory' },
+  { id: 'purchases', label: 'Compras', icon: 'truck' as const, href: '/purchases' },
+  { id: 'saldos', label: 'Saldos', icon: 'wallet' as const, href: '/saldos' },
+  { id: 'public', label: 'Pública', icon: 'eye' as const, href: '/public' },
+];
+
+export function BottomNavShell({ active = '' }: { active?: string }) {
+  return (
+    <nav className="bottomnav">
+      {NAV_ITEMS.map((it) => (
+        <button key={it.id} className={`navbtn ${active === it.id ? 'is-active' : ''}`}>
+          <Icon name={it.icon} size={23} strokeWidth={active === it.id ? 2 : 1.7} />
+          {it.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -44,12 +64,9 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
         ? 'public'
         : 'inventory';
 
-  const items = [
-    { id: 'inventory', label: 'Inventario', icon: 'box' as const, href: '/inventory' },
-    { id: 'purchases', label: 'Compras', icon: 'truck' as const, href: '/purchases', badge: transitCount },
-    { id: 'saldos', label: 'Saldos', icon: 'wallet' as const, href: '/saldos' },
-    { id: 'public', label: 'Pública', icon: 'eye' as const, href: '/public' },
-  ];
+  const items = NAV_ITEMS.map((it) =>
+    it.id === 'purchases' ? { ...it, badge: transitCount } : { ...it, badge: undefined }
+  );
 
   return (
     <nav className="bottomnav">
