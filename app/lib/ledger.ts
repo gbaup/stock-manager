@@ -1,7 +1,7 @@
-import type { BatchSummary, ExpenseRecord } from './domain';
-import { PEOPLE } from './domain';
+import type { BatchSummary, ExpenseRecord, ConversionRecord } from './domain';
+import { PEOPLE, fmtRate } from './domain';
 
-export type MovementKind = 'cobro' | 'pago-prov' | 'pago-envio' | 'gasto';
+export type MovementKind = 'cobro' | 'pago-prov' | 'pago-envio' | 'gasto' | 'cambio';
 
 export type Movement = {
   id: string;
@@ -12,6 +12,7 @@ export type Movement = {
   sub: string;
   uyu: number;
   usd: number;
+  conv?: ConversionRecord;
 };
 
 export type PersonBalance = {
@@ -27,10 +28,12 @@ export function buildMovements({
   sales,
   purchases,
   expenses,
+  conversions = [],
 }: {
   sales: Array<{ id: string; date: string; price: number; collectedBy: string | null; quantity: number; model: string }>;
   purchases: BatchSummary[];
   expenses: ExpenseRecord[];
+  conversions?: ConversionRecord[];
 }): Movement[] {
   const movements: Movement[] = [];
 
@@ -92,11 +95,33 @@ export function buildMovements({
     });
   }
 
+  for (const c of conversions) {
+    const sameCur = c.fromCur === c.toCur;
+    movements.push({
+      id: `cambio-${c.id}`,
+      kind: 'cambio',
+      date: c.date,
+      person: c.fromPerson,
+      title: sameCur
+        ? 'Transferencia entre socios'
+        : c.fromCur === 'UYU'
+          ? 'Cambio · Pesos → Dólares'
+          : 'Cambio · Dólares → Pesos',
+      sub: sameCur ? '' : `TC ${fmtRate(c.rate)}`,
+      uyu: 0,
+      usd: 0,
+      conv: c,
+    });
+  }
+
   movements.sort((a, b) => b.date.localeCompare(a.date));
   return movements;
 }
 
-export function balancesByPerson(movements: Movement[]): Record<string, PersonBalance> {
+export function balancesByPerson(
+  movements: Movement[],
+  conversions: ConversionRecord[] = [],
+): Record<string, PersonBalance> {
   const result: Record<string, PersonBalance> = {};
 
   for (const person of PEOPLE) {
@@ -104,6 +129,7 @@ export function balancesByPerson(movements: Movement[]): Record<string, PersonBa
   }
 
   for (const m of movements) {
+    if (m.kind === 'cambio') continue;
     const b = result[m.person];
     if (!b) continue;
     b.uyu += m.uyu;
@@ -112,6 +138,21 @@ export function balancesByPerson(movements: Movement[]): Record<string, PersonBa
     if (m.uyu < 0) b.outUyu += Math.abs(m.uyu);
     if (m.usd > 0) b.inUsd += m.usd;
     if (m.usd < 0) b.outUsd += Math.abs(m.usd);
+  }
+
+  for (const c of conversions) {
+    const fAmt = c.fromAmount;
+    const tAmt = c.toAmount;
+    const fb = result[c.fromPerson];
+    const tb = result[c.toPerson];
+    if (fb) {
+      if (c.fromCur === 'USD') { fb.usd -= fAmt; fb.outUsd += fAmt; }
+      else { fb.uyu -= fAmt; fb.outUyu += fAmt; }
+    }
+    if (tb) {
+      if (c.toCur === 'USD') { tb.usd += tAmt; tb.inUsd += tAmt; }
+      else { tb.uyu += tAmt; tb.inUyu += tAmt; }
+    }
   }
 
   return result;

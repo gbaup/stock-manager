@@ -52,6 +52,30 @@ export const arrivalSchema = z
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
+export const conversionSchema = z
+  .object({
+    fromPerson: z.enum(['Caja', 'Bauer']),
+    fromCur: z.enum(['UYU', 'USD']),
+    toPerson: z.enum(['Caja', 'Bauer']),
+    toCur: z.enum(['UYU', 'USD']),
+    fromAmount: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un monto válido'),
+    rate: z.string().optional(),
+    date: z.string().min(1, 'Requerido'),
+  })
+  .refine(
+    (data) => !(data.fromPerson === data.toPerson && data.fromCur === data.toCur),
+    { message: 'El origen y el destino no pueden ser la misma cuenta', path: ['toPerson'] }
+  )
+  .refine(
+    (data) => {
+      if (data.fromCur === data.toCur) return true;
+      return (parseFloat(data.rate ?? '') || 0) > 0;
+    },
+    { message: 'Ingresá el tipo de cambio', path: ['rate'] }
+  );
+
+export type ConversionFormValues = z.infer<typeof conversionSchema>;
+
 export const modelSchema = z.object({
   teamId: z.string().min(1, 'Requerido'),
   season: z.string().min(1, 'Requerido'),

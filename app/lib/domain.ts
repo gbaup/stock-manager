@@ -147,3 +147,32 @@ export type ExpenseRecord = {
   date: string;
 };
 
+export type ConversionRecord = {
+  id: string;
+  date: string;
+  fromPerson: string;
+  fromCur: 'UYU' | 'USD';
+  toPerson: string;
+  toCur: 'UYU' | 'USD';
+  fromAmount: number;
+  rate: number;
+  toAmount: number;
+};
+
+export function fmtRate(n: number): string {
+  return new Intl.NumberFormat('es-UY', { maximumFractionDigits: 2 }).format(n);
+}
+
+export function convertAmount(
+  fromAmount: number,
+  fromCur: 'UYU' | 'USD',
+  toCur: 'UYU' | 'USD',
+  rate: number,
+): number {
+  if (!fromAmount) return 0;
+  if (fromCur === toCur) return fromAmount;
+  if (fromCur === 'UYU' && toCur === 'USD') return rate ? Math.round((fromAmount / rate) * 100) / 100 : 0;
+  if (fromCur === 'USD' && toCur === 'UYU') return Math.round(fromAmount * rate);
+  return fromAmount;
+}
+
