@@ -3,10 +3,18 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
-import { USD_RATE } from '@/app/lib/domain';
 import { arrivalSchema } from '@/app/lib/schemas';
+import { ExchangeRateResponse } from '../api/exchange-rate/route';
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
+
+async function getExchangeRate(date: Date): Promise<number> {
+  const res = await fetch(`/api/exchange-rate?fecha=${date.toISOString().split('T')[0]}`);
+  const data = await res.json() as ExchangeRateResponse;
+
+  // data = compra -> BCU devuelve dolar interbancario.
+  return data.compra;
+}
 
 export async function createPurchase(data: {
   purchaseDate: string;
@@ -18,6 +26,8 @@ export async function createPurchase(data: {
 }) {
   if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
   if (data.items.some((it) => !it.modelId || !it.size)) throw new Error('Invalid item data');
+
+  const exchangeRate = await getExchangeRate(new Date(data.purchaseDate));
 
   await prisma.batch.create({
     data: {
@@ -32,7 +42,7 @@ export async function createPurchase(data: {
           catalogProductId: it.modelId,
           size: it.size.trim().toLowerCase(),
           basePriceUsd: it.basePriceUsd,
-          basePriceUyu: it.basePriceUsd * USD_RATE,
+          basePriceUyu: it.basePriceUsd * exchangeRate,
           status: 'available',
         })),
       },

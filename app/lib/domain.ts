@@ -1,5 +1,3 @@
-export const USD_RATE = 40.5;
-
 export const PEOPLE = ['Caja', 'Bauer'] as const;
 export type Person = typeof PEOPLE[number];
 

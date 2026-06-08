@@ -2,6 +2,13 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 
+export type ExchangeRateResponse = {
+    fecha: string;
+    compra: number;
+    venta: number;
+    nombre: string;
+};
+
 export async function GET() {
     try {
         // Paso 1: último cierre
@@ -42,11 +49,13 @@ export async function GET() {
             { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' } }
         );
 
-        return NextResponse.json({
+        return NextResponse.json<ExchangeRateResponse>({
             fecha,
-            compra: parseFloat(xmlCotiz.match(/<Compra>(.*?)<\/Compra>/)?.[1] ?? "0"),
-            venta: parseFloat(xmlCotiz.match(/<Venta>(.*?)<\/Venta>/)?.[1] ?? "0"),
+            nombre: xmlCotiz.match(/<Nombre>(.*?)<\/Nombre>/)?.[1] ?? "",
+            compra: parseFloat(xmlCotiz.match(/<TCC>(.*?)<\/TCC>/)?.[1] ?? "0"),
+            venta: parseFloat(xmlCotiz.match(/<TCV>(.*?)<\/TCV>/)?.[1] ?? "0"),
         });
+
     } catch (error) {
         return NextResponse.json(
             { error: "No se pudo obtener la cotización" },
