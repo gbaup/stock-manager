@@ -1,28 +1,16 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from './icon';
 import { Swatch } from './swatch';
 
-function resizeImageFile(file: File, maxEdge: number): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new window.Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
-      };
-      img.src = e.target!.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
+async function uploadFile(file: File): Promise<string> {
+  const body = new FormData();
+  body.append('file', file);
+  const res = await fetch('/api/upload', { method: 'POST', body });
+  if (!res.ok) throw new Error('Upload failed');
+  const { url } = await res.json();
+  return url as string;
 }
 
 export function PhotoGallery({
@@ -37,13 +25,17 @@ export function PhotoGallery({
   onChange: (photos: string[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const resized = await Promise.all(
-      Array.from(files).map((f) => resizeImageFile(f, 1000))
-    );
-    onChange([...photos, ...resized]);
+    setUploading(true);
+    try {
+      const urls = await Promise.all(Array.from(files).map(uploadFile));
+      onChange([...photos, ...urls]);
+    } finally {
+      setUploading(false);
+    }
   }
 
   function remove(idx: number) {
@@ -61,11 +53,11 @@ export function PhotoGallery({
   return (
     <div className="photo-gallery">
       {photos.length === 0 ? (
-        <button type="button" className="pg-empty" onClick={() => inputRef.current?.click()}>
+        <button type="button" className="pg-empty" onClick={() => inputRef.current?.click()} disabled={uploading}>
           <Swatch color={color} number={number} style={{ width: 84, height: 96, borderRadius: 'var(--r-sm)' }} />
           <span className="pg-empty-cta">
-            <Icon name="image" size={17} />
-            Agregar fotos
+            <Icon name={uploading ? 'loader' : 'image'} size={17} />
+            {uploading ? 'Subiendo…' : 'Agregar fotos'}
           </span>
         </button>
       ) : (
@@ -89,9 +81,9 @@ export function PhotoGallery({
               </button>
             </div>
           ))}
-          <button type="button" className="pg-add" onClick={() => inputRef.current?.click()} aria-label="Agregar más fotos">
-            <Icon name="plus" size={24} strokeWidth={2} />
-            <span>Más</span>
+          <button type="button" className="pg-add" onClick={() => inputRef.current?.click()} disabled={uploading} aria-label="Agregar más fotos">
+            {uploading ? <Icon name="loader" size={20} strokeWidth={2} /> : <Icon name="plus" size={24} strokeWidth={2} />}
+            <span>{uploading ? 'Subiendo…' : 'Más'}</span>
           </button>
         </div>
       )}
