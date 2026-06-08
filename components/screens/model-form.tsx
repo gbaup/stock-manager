@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
@@ -26,7 +26,6 @@ export function ModelForm({
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<ModelFormValues>({
     resolver: zodResolver(modelSchema),
@@ -44,8 +43,8 @@ export function ModelForm({
     },
   });
 
-  const color = watch('color');
-  const number = watch('number');
+  const color = useWatch({ control, name: 'color' });
+  const number = useWatch({ control, name: 'number' });
 
   function onSubmit(data: ModelFormValues) {
     const fd = new FormData();

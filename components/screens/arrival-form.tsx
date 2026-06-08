@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
@@ -22,7 +22,6 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
     control,
     handleSubmit,
     register,
-    watch,
     formState: { errors },
   } = useForm<ArrivalFormValues>({
     resolver: zodResolver(arrivalSchema),
@@ -35,8 +34,8 @@ export function ArrivalForm({ batch }: { batch: BatchSummary }) {
     },
   });
 
-  const shippingPriceUsd = watch('shippingPriceUsd');
-  const shippingPriceUyu = watch('shippingPriceUyu');
+  const shippingPriceUsd = useWatch({ control, name: 'shippingPriceUsd' });
+  const shippingPriceUyu = useWatch({ control, name: 'shippingPriceUyu' });
   const hasShipping =
     (parseFloat(shippingPriceUsd ?? '') || 0) > 0 ||
     (parseFloat(shippingPriceUyu ?? '') || 0) > 0;

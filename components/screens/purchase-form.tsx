@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Stepper } from '@/components/ui/stepper';
@@ -32,7 +32,6 @@ export function PurchaseForm({
     control,
     handleSubmit,
     register,
-    watch,
     trigger,
     formState: { errors },
   } = useForm<PurchaseFormValues>({
@@ -55,7 +54,7 @@ export function PurchaseForm({
   const modelByLabel: Record<string, string> = {};
   models.forEach((m) => { modelByLabel[modelLabel(m)] = m.id; });
 
-  const watchedItems = watch('items');
+  const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
   const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0), 0);
   const needsSupplierPayer = totalUsd > 0;
@@ -157,7 +156,7 @@ export function PurchaseForm({
               )}
               <div className="item-list">
                 {fields.map((field, index) => {
-                  const modelId = watch(`items.${index}.modelId`);
+                  const modelId = watchedItems[index]?.modelId;
                   const m = models.find((x) => x.id === modelId);
                   return (
                     <div key={field.id} className="item-card">

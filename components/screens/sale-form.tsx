@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
@@ -21,7 +21,6 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
     control,
     handleSubmit,
     register,
-    watch,
     formState: { errors },
   } = useForm<SaleFormValues>({
     resolver: zodResolver(makeSaleSchema(stock)),
@@ -31,9 +30,9 @@ export function SaleForm({ model, stock }: { model: ModelWithStats; stock: numbe
     },
   });
 
-  const price = parseFloat(watch('price')) || 0;
-  const qty = parseInt(watch('quantity'), 10) || 0;
-  const collectedBy = watch('collectedBy');
+  const price = parseFloat(useWatch({ control, name: 'price' })) || 0;
+  const qty = parseInt(useWatch({ control, name: 'quantity' }), 10) || 0;
+  const collectedBy = useWatch({ control, name: 'collectedBy' });
 
   function onSubmit(data: SaleFormValues) {
     startTransition(async () => {

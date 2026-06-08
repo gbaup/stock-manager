@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, MoneyInput } from '@/components/ui/field';
@@ -18,7 +18,6 @@ export function GastoForm() {
     control,
     handleSubmit,
     register,
-    watch,
     formState: { errors },
   } = useForm<GastoFormValues>({
     resolver: zodResolver(gastoSchema),
@@ -31,9 +30,9 @@ export function GastoForm() {
     },
   });
 
-  const currency = watch('currency');
-  const amount = parseFloat(watch('amount')) || 0;
-  const paidBy = watch('paidBy');
+  const currency = useWatch({ control, name: 'currency' });
+  const amount = parseFloat(useWatch({ control, name: 'amount' })) || 0;
+  const paidBy = useWatch({ control, name: 'paidBy' });
   const previewMoney = currency === 'UYU' ? uyu(amount) : usd(amount);
 
   function onSubmit(data: GastoFormValues) {
