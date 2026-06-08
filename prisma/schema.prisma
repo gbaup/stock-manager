@@ -30,6 +30,7 @@ model Batch {
   shippingPriceUsd Decimal?        @map("shipping_price_usd") @db.Decimal(10, 2)
   shippingPriceUyu Decimal?        @map("shipping_price_uyu") @db.Decimal(10, 2)
   weight           Decimal?        @db.Decimal(10, 2)
+  supplier         String?         @db.VarChar(200)
   supplierPaidBy   String?         @map("supplier_paid_by") @db.VarChar(50)
   shippingPaidBy   String?         @map("shipping_paid_by") @db.VarChar(50)
   items            InventoryItem[]

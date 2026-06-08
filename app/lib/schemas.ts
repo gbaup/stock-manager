@@ -1,16 +1,23 @@
 import { z } from 'zod';
 
+const saleFields = {
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+  quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
+  date: z.string().min(1, 'Requerido'),
+  method: z.string().optional(),
+  description: z.string().optional(),
+  collectedBy: z.string().min(1, '¿Quién cobró?'),
+};
+
+export const saleSchema = z.object(saleFields);
+
 export const makeSaleSchema = (stock: number) =>
   z.object({
-    price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+    ...saleFields,
     quantity: z
       .string()
       .refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0')
       .refine((v) => parseInt(v, 10) <= stock, `Solo hay ${stock} en stock`),
-    date: z.string().min(1, 'Requerido'),
-    method: z.string().optional(),
-    description: z.string().optional(),
-    collectedBy: z.string().min(1, '¿Quién cobró?'),
   });
 
 export type SaleFormValues = z.infer<ReturnType<typeof makeSaleSchema>>;

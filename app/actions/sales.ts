@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { getCurrentUserId } from '@/app/lib/auth';
+import { saleSchema } from '@/app/lib/schemas';
 
 export async function createSale(
   modelId: string,
@@ -18,6 +19,8 @@ export async function createSale(
 ) {
   const userId = await getCurrentUserId();
   if (!userId) redirect('/login');
+
+  if (!saleSchema.safeParse(data).success) throw new Error('Invalid sale data');
 
   const qty = parseInt(data.quantity, 10) || 1;
   const price = parseFloat(data.price);

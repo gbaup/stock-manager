@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { USD_RATE } from '@/app/lib/domain';
+import { arrivalSchema } from '@/app/lib/schemas';
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
 
@@ -15,9 +16,12 @@ export async function createPurchase(data: {
   supplierPaidBy?: string;
   items: PurchaseItem[];
 }) {
+  if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
+
   await prisma.batch.create({
     data: {
       purchaseDate: new Date(data.purchaseDate),
+      supplier: data.supplier?.trim().toLowerCase() || null,
       trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
       description: data.description?.trim().toLowerCase() || null,
       quantity: data.items.length,
@@ -50,6 +54,8 @@ export async function markArrived(
     shippingPaidBy?: string;
   }
 ) {
+  if (!arrivalSchema.safeParse(data).success) throw new Error('Invalid arrival data');
+
   await prisma.batch.update({
     where: { id: batchId },
     data: {

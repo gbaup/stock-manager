@@ -32,6 +32,7 @@ function productMeta(p: {
 function batchToSummary(
   b: {
     id: string; purchaseDate: Date; arrivalDate: Date | null;
+    supplier: string | null;
     trackingNumber: string | null; description: string | null;
     shippingPriceUsd: unknown; shippingPriceUyu: unknown; weight: unknown;
     supplierPaidBy: string | null; shippingPaidBy: string | null;
@@ -40,7 +41,7 @@ function batchToSummary(
 ): BatchSummary {
   return {
     id: b.id,
-    supplier: null,
+    supplier: b.supplier,
     purchaseDate: toISODate(b.purchaseDate)!,
     arrivalDate: toISODate(b.arrivalDate),
     quantity: items.length,

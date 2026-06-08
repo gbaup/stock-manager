@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
+import { gastoSchema } from '@/app/lib/schemas';
 
 export async function createExpense(data: {
   title: string;
@@ -11,6 +12,8 @@ export async function createExpense(data: {
   paidBy: string;
   date: string;
 }) {
+  if (!gastoSchema.safeParse(data).success) throw new Error('Invalid expense data');
+
   await prisma.expense.create({
     data: {
       title: data.title.trim().toLowerCase(),

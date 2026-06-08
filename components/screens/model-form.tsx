@@ -47,22 +47,11 @@ export function ModelForm({
   const number = useWatch({ control, name: 'number' });
 
   function onSubmit(data: ModelFormValues) {
-    const fd = new FormData();
-    fd.set('teamId', data.teamId);
-    fd.set('season', data.season);
-    fd.set('version', data.version);
-    fd.set('type', data.type);
-    fd.set('sleeve', data.sleeve);
-    fd.set('color', data.color);
-    fd.set('number', data.number ?? '');
-    fd.set('player', data.player ?? '');
-    fd.set('description', data.description ?? '');
-    fd.set('photos', JSON.stringify(data.photos));
     startTransition(async () => {
       if (initial?.id) {
-        await updateModel(initial.id, undefined, fd);
+        await updateModel(initial.id, data);
       } else {
-        await createModel(undefined, fd);
+        await createModel(data);
       }
     });
   }

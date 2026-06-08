@@ -7,10 +7,11 @@ import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import {
-  uyu, usd, fmtDate, signedUyu, signedUsd,
-  personInitial, buildMovements, balancesByPerson, PEOPLE,
+  uyu, usd, fmtDate, signedUyu, signedUsd, personInitial, PEOPLE,
 } from '@/app/lib/domain';
-import type { Movement, PersonBalance, BatchSummary, ExpenseRecord } from '@/app/lib/domain';
+import { buildMovements, balancesByPerson } from '@/app/lib/ledger';
+import type { Movement, PersonBalance } from '@/app/lib/ledger';
+import type { BatchSummary, ExpenseRecord } from '@/app/lib/domain';
 
 type SaleRow = { id: string; date: string; price: number; collectedBy: string | null; quantity: number; model: string };
 type Layout = 'resumen' | 'saldar' | 'planilla';
