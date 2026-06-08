@@ -103,7 +103,10 @@ export type AjusteFormValues = z.infer<typeof ajusteSchema>;
 
 export const modelSchema = z.object({
   teamId: z.string().min(1, 'Requerido'),
-  season: z.string().min(1, 'Requerido'),
+  season: z
+    .string()
+    .min(1, 'Requerido')
+    .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
   version: z.string(),
   type: z.string(),
   sleeve: z.string(),
