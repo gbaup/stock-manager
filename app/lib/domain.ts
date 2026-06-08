@@ -1,5 +1,4 @@
-export const PEOPLE = ['Caja', 'Bauer'] as const;
-export type Person = typeof PEOPLE[number];
+export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
 export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero', 'Retro'] as const;
@@ -111,8 +110,10 @@ export type BatchSummary = {
   shippingPriceUyu: number | null;
   weight: number | null;
   status: PurchaseStatus;
-  supplierPaidBy: string | null;
-  shippingPaidBy: string | null;
+  supplierPaidByUserId: string | null;
+  supplierPaidByAlias: string | null;
+  shippingPaidByUserId: string | null;
+  shippingPaidByAlias: string | null;
   items: ItemInBatch[];
 };
 
@@ -124,7 +125,8 @@ export type SaleRecord = {
   date: string;
   method: string | null;
   description: string | null;
-  collectedBy: string | null;
+  collectedByUserId: string | null;
+  collectedByAlias: string | null;
 };
 
 export type TimelineEvent =
@@ -143,16 +145,19 @@ export type ExpenseRecord = {
   title: string;
   amount: number;
   currency: 'UYU' | 'USD';
-  paidBy: string;
+  paidByUserId: string;
+  paidByAlias: string;
   date: string;
 };
 
 export type ConversionRecord = {
   id: string;
   date: string;
-  fromPerson: string;
+  fromUserId: string;
+  fromUserAlias: string;
   fromCur: 'UYU' | 'USD';
-  toPerson: string;
+  toUserId: string;
+  toUserAlias: string;
   toCur: 'UYU' | 'USD';
   fromAmount: number;
   rate: number;

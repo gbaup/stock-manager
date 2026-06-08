@@ -14,7 +14,7 @@ export async function createSale(
     date: string;
     method?: string;
     description?: string;
-    collectedBy?: string;
+    collectedByUserId?: string;
   }
 ) {
   const userId = await getCurrentUserId();
@@ -57,7 +57,7 @@ export async function createSale(
           date: saleDate,
           method: data.method?.trim().toLowerCase() || null,
           description: data.description?.trim().toLowerCase() || null,
-          collectedBy: data.collectedBy?.trim().toLowerCase() || null,
+          collectedByUserId: data.collectedByUserId || null,
         },
       });
     }

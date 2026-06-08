@@ -1,5 +1,5 @@
-import type { BatchSummary, ExpenseRecord, ConversionRecord } from './domain';
-import { PEOPLE, fmtRate } from './domain';
+import type { BatchSummary, ExpenseRecord, ConversionRecord, UserSummary } from './domain';
+import { fmtRate } from './domain';
 
 export type MovementKind = 'cobro' | 'pago-prov' | 'pago-envio' | 'gasto' | 'cambio';
 
@@ -30,7 +30,7 @@ export function buildMovements({
   expenses,
   conversions = [],
 }: {
-  sales: Array<{ id: string; date: string; price: number; collectedBy: string | null; quantity: number; model: string }>;
+  sales: Array<{ id: string; date: string; price: number; collectedByUserId: string | null; collectedByAlias: string | null; quantity: number; model: string }>;
   purchases: BatchSummary[];
   expenses: ExpenseRecord[];
   conversions?: ConversionRecord[];
@@ -38,12 +38,12 @@ export function buildMovements({
   const movements: Movement[] = [];
 
   for (const sale of sales) {
-    if (!sale.collectedBy) continue;
+    if (!sale.collectedByUserId) continue;
     movements.push({
       id: `cobro-${sale.id}`,
       kind: 'cobro',
       date: sale.date,
-      person: sale.collectedBy,
+      person: sale.collectedByAlias ?? '',
       title: `Venta ×${sale.quantity}`,
       sub: sale.model,
       uyu: sale.price,
@@ -53,12 +53,12 @@ export function buildMovements({
 
   for (const batch of purchases) {
     const baseUsd = batch.items.reduce((s, it) => s + it.basePriceUsd, 0);
-    if (baseUsd > 0 && batch.supplierPaidBy) {
+    if (baseUsd > 0 && batch.supplierPaidByUserId) {
       movements.push({
         id: `pago-prov-${batch.id}`,
         kind: 'pago-prov',
         date: batch.purchaseDate,
-        person: batch.supplierPaidBy,
+        person: batch.supplierPaidByAlias ?? '',
         title: batch.supplier ?? 'Proveedor',
         sub: `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`,
         uyu: 0,
@@ -68,12 +68,12 @@ export function buildMovements({
 
     const shippingUyu = batch.shippingPriceUyu ?? 0;
     const shippingUsd = batch.shippingPriceUsd ?? 0;
-    if ((shippingUyu > 0 || shippingUsd > 0) && batch.shippingPaidBy && batch.arrivalDate) {
+    if ((shippingUyu > 0 || shippingUsd > 0) && batch.shippingPaidByUserId && batch.arrivalDate) {
       movements.push({
         id: `pago-envio-${batch.id}`,
         kind: 'pago-envio',
         date: batch.arrivalDate,
-        person: batch.shippingPaidBy,
+        person: batch.shippingPaidByAlias ?? '',
         title: 'Envío',
         sub: batch.supplier ?? `${batch.quantity} items`,
         uyu: shippingUyu > 0 ? -shippingUyu : 0,
@@ -87,7 +87,7 @@ export function buildMovements({
       id: `gasto-${expense.id}`,
       kind: 'gasto',
       date: expense.date,
-      person: expense.paidBy,
+      person: expense.paidByAlias,
       title: expense.title,
       sub: expense.currency,
       uyu: expense.currency === 'UYU' ? -expense.amount : 0,
@@ -101,7 +101,7 @@ export function buildMovements({
       id: `cambio-${c.id}`,
       kind: 'cambio',
       date: c.date,
-      person: c.fromPerson,
+      person: c.fromUserAlias,
       title: sameCur
         ? 'Transferencia entre socios'
         : c.fromCur === 'UYU'
@@ -120,12 +120,13 @@ export function buildMovements({
 
 export function balancesByPerson(
   movements: Movement[],
-  conversions: ConversionRecord[] = [],
+  conversions: ConversionRecord[],
+  users: UserSummary[],
 ): Record<string, PersonBalance> {
   const result: Record<string, PersonBalance> = {};
 
-  for (const person of PEOPLE) {
-    result[person] = { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
+  for (const u of users) {
+    result[u.alias] = { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
   }
 
   for (const m of movements) {
@@ -143,8 +144,8 @@ export function balancesByPerson(
   for (const c of conversions) {
     const fAmt = c.fromAmount;
     const tAmt = c.toAmount;
-    const fb = result[c.fromPerson];
-    const tb = result[c.toPerson];
+    const fb = result[c.fromUserAlias];
+    const tb = result[c.toUserAlias];
     if (fb) {
       if (c.fromCur === 'USD') { fb.usd -= fAmt; fb.outUsd += fAmt; }
       else { fb.uyu -= fAmt; fb.outUyu += fAmt; }

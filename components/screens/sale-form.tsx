@@ -8,13 +8,13 @@ import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, SelectInput, TextAreaInput, MoneyInput } from '@/components/ui/field';
-import { METHODS, PEOPLE, usd, uyu, toUsd, todayISO } from '@/app/lib/domain';
-import type { ModelWithStats } from '@/app/lib/domain';
+import { METHODS, usd, uyu, toUsd, todayISO } from '@/app/lib/domain';
+import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSale } from '@/app/actions/sales';
 import { coverOf } from '@/components/ui/swatch';
 import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
 
-export function SaleForm({ model, stock, usdRate }: { model: ModelWithStats; stock: number; usdRate: number }) {
+export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const {
@@ -26,13 +26,14 @@ export function SaleForm({ model, stock, usdRate }: { model: ModelWithStats; sto
     resolver: zodResolver(makeSaleSchema(stock)),
     defaultValues: {
       price: '', quantity: '1', date: todayISO(),
-      method: '', description: '', collectedBy: '',
+      method: '', description: '', collectedByUserId: '',
     },
   });
 
   const price = parseFloat(useWatch({ control, name: 'price' })) || 0;
   const qty = parseInt(useWatch({ control, name: 'quantity' }), 10) || 0;
-  const collectedBy = useWatch({ control, name: 'collectedBy' });
+  const collectedByUserId = useWatch({ control, name: 'collectedByUserId' });
+  const collectedByAlias = users.find((u) => u.id === collectedByUserId)?.alias ?? '';
 
   function onSubmit(data: SaleFormValues) {
     startTransition(async () => {
@@ -110,12 +111,17 @@ export function SaleForm({ model, stock, usdRate }: { model: ModelWithStats; sto
           </Field>
 
           <div className="section-label">Cobro</div>
-          <Field label="¿Quién cobró?" error={errors.collectedBy?.message}>
+          <Field label="¿Quién cobró?" error={errors.collectedByUserId?.message}>
             <Controller
-              name="collectedBy"
+              name="collectedByUserId"
               control={control}
               render={({ field }) => (
-                <Segmented options={PEOPLE} value={field.value} onChange={field.onChange} full />
+                <Segmented
+                  options={users.map((u) => u.alias)}
+                  value={users.find((u) => u.id === field.value)?.alias ?? ''}
+                  onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
+                  full
+                />
               )}
             />
           </Field>
@@ -123,10 +129,10 @@ export function SaleForm({ model, stock, usdRate }: { model: ModelWithStats; sto
             Suma al saldo en mano de quien recibe la plata.
           </div>
 
-          {collectedBy && price > 0 && (
+          {collectedByAlias && price > 0 && (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
               <span className="mov-chip pos" style={{ fontSize: 14 }}>
-                {collectedBy} cobra {uyu(price * qty)}
+                {collectedByAlias} cobra {uyu(price * qty)}
               </span>
             </div>
           )}

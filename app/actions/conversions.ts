@@ -6,9 +6,9 @@ import { prisma } from '@/app/lib/prisma';
 import { getCurrentUserId } from '@/app/lib/auth';
 
 export async function createConversion(data: {
-  fromPerson: string;
+  fromUserId: string;
   fromCur: 'UYU' | 'USD';
-  toPerson: string;
+  toUserId: string;
   toCur: 'UYU' | 'USD';
   fromAmount: number;
   rate: number;
@@ -21,9 +21,9 @@ export async function createConversion(data: {
   await prisma.conversion.create({
     data: {
       date: new Date(data.date),
-      fromPerson: data.fromPerson,
+      fromUserId: data.fromUserId,
       fromCur: data.fromCur,
-      toPerson: data.toPerson,
+      toUserId: data.toUserId,
       toCur: data.toCur,
       fromAmount: data.fromAmount,
       rate: data.rate,

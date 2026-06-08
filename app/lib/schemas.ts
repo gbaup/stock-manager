@@ -6,7 +6,7 @@ const saleFields = {
   date: z.string().min(1, 'Requerido'),
   method: z.string().optional(),
   description: z.string().optional(),
-  collectedBy: z.string().min(1, '¿Quién cobró?'),
+  collectedByUserId: z.string().uuid('¿Quién cobró?'),
 };
 
 export const saleSchema = z.object(saleFields);
@@ -26,7 +26,7 @@ export const gastoSchema = z.object({
   title: z.string().min(1, 'Requerido'),
   amount: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un monto válido'),
   currency: z.enum(['UYU', 'USD']),
-  paidBy: z.string().min(1, '¿Quién pagó?'),
+  paidByUserId: z.string().uuid('¿Quién pagó?'),
   date: z.string().min(1, 'Requerido'),
 });
 
@@ -38,33 +38,33 @@ export const arrivalSchema = z
     shippingPriceUsd: z.string().optional(),
     shippingPriceUyu: z.string().optional(),
     weight: z.string().optional(),
-    shippingPaidBy: z.string().optional(),
+    shippingPaidByUserId: z.string().uuid().optional(),
   })
   .refine(
     (data) => {
       const hasShipping =
         (parseFloat(data.shippingPriceUsd ?? '') || 0) > 0 ||
         (parseFloat(data.shippingPriceUyu ?? '') || 0) > 0;
-      return !hasShipping || !!data.shippingPaidBy;
+      return !hasShipping || !!data.shippingPaidByUserId;
     },
-    { message: '¿Quién pagó el envío?', path: ['shippingPaidBy'] }
+    { message: '¿Quién pagó el envío?', path: ['shippingPaidByUserId'] }
   );
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
 export const conversionSchema = z
   .object({
-    fromPerson: z.enum(['Caja', 'Bauer']),
+    fromUserId: z.string().uuid('Seleccioná el origen'),
     fromCur: z.enum(['UYU', 'USD']),
-    toPerson: z.enum(['Caja', 'Bauer']),
+    toUserId: z.string().uuid('Seleccioná el destino'),
     toCur: z.enum(['UYU', 'USD']),
     fromAmount: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un monto válido'),
     rate: z.string().optional(),
     date: z.string().min(1, 'Requerido'),
   })
   .refine(
-    (data) => !(data.fromPerson === data.toPerson && data.fromCur === data.toCur),
-    { message: 'El origen y el destino no pueden ser la misma cuenta', path: ['toPerson'] }
+    (data) => !(data.fromUserId === data.toUserId && data.fromCur === data.toCur),
+    { message: 'El origen y el destino no pueden ser la misma cuenta', path: ['toUserId'] }
   )
   .refine(
     (data) => {
@@ -103,7 +103,7 @@ export const purchaseSchema = z
     supplier: z.string().optional(),
     trackingNumber: z.string().optional(),
     description: z.string().optional(),
-    supplierPaidBy: z.string().optional(),
+    supplierPaidByUserId: z.string().uuid().optional(),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   })
   .refine(
@@ -112,9 +112,9 @@ export const purchaseSchema = z
         (s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0),
         0
       );
-      return totalUsd === 0 || !!data.supplierPaidBy;
+      return totalUsd === 0 || !!data.supplierPaidByUserId;
     },
-    { message: '¿Quién pagó al proveedor?', path: ['supplierPaidBy'] }
+    { message: '¿Quién pagó al proveedor?', path: ['supplierPaidByUserId'] }
   );
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;

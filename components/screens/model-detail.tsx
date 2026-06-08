@@ -124,7 +124,7 @@ function EventRow({ ev, usdRate, onArrive }: { ev: TimelineEvent; usdRate: numbe
           <div className="event-sub">
             {fmtDate(s.date)}
             {s.method ? ` · ${s.method}` : ''}
-            {s.collectedBy ? ` · cobró ${s.collectedBy}` : ''}
+            {s.collectedByAlias ? ` · cobró ${s.collectedByAlias}` : ''}
             {s.description ? ` · ${s.description}` : ''}
           </div>
         </div>

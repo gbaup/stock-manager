@@ -7,13 +7,14 @@ import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import {
-  uyu, usd, fmtDate, personInitial, PEOPLE,
+  uyu, usd, fmtDate, personInitial,
 } from '@/app/lib/domain';
+import type { UserSummary } from '@/app/lib/domain';
 import { buildMovements, balancesByPerson } from '@/app/lib/ledger';
 import type { Movement, PersonBalance } from '@/app/lib/ledger';
 import type { BatchSummary, ExpenseRecord, ConversionRecord } from '@/app/lib/domain';
 
-type SaleRow = { id: string; date: string; price: number; collectedBy: string | null; quantity: number; model: string };
+type SaleRow = { id: string; date: string; price: number; collectedByUserId: string | null; collectedByAlias: string | null; quantity: number; model: string };
 type Layout = 'resumen' | 'saldar' | 'planilla';
 
 function signClass(n: number) {
@@ -39,21 +40,23 @@ export function SaldosScreen({
   expenses,
   conversions,
   transitCount,
+  users,
 }: {
   purchases: BatchSummary[];
   sales: SaleRow[];
   expenses: ExpenseRecord[];
   conversions: ConversionRecord[];
   transitCount: number;
+  users: UserSummary[];
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState<Layout>('resumen');
 
   const movements = buildMovements({ sales, purchases, expenses, conversions });
-  const balances = balancesByPerson(movements, conversions);
+  const balances = balancesByPerson(movements, conversions, users);
 
-  const totalUyu = PEOPLE.reduce((s, p) => s + (balances[p]?.uyu ?? 0), 0);
-  const totalUsd = PEOPLE.reduce((s, p) => s + (balances[p]?.usd ?? 0), 0);
+  const totalUyu = users.reduce((s, u) => s + (balances[u.alias]?.uyu ?? 0), 0);
+  const totalUsd = users.reduce((s, u) => s + (balances[u.alias]?.usd ?? 0), 0);
 
   return (
     <div className="screen">
@@ -74,13 +77,13 @@ export function SaldosScreen({
           </div>
 
           {layout === 'resumen' && (
-            <CardsHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} />
+            <CardsHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} />
           )}
           {layout === 'saldar' && (
-            <SettleHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} />
+            <SettleHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} />
           )}
           {layout === 'planilla' && (
-            <LedgerLayout balances={balances} movements={movements} />
+            <LedgerLayout balances={balances} movements={movements} users={users} />
           )}
 
           {layout !== 'planilla' && (
@@ -116,13 +119,17 @@ export function SaldosScreen({
 }
 
 function CardsHeader({
-  balances, totalUyu, totalUsd,
+  balances, totalUyu, totalUsd, users,
 }: {
   balances: Record<string, PersonBalance>;
   totalUyu: number;
   totalUsd: number;
+  users: UserSummary[];
 }) {
-  const hasUsd = PEOPLE.some((p) => (balances[p]?.inUsd ?? 0) > 0 || (balances[p]?.outUsd ?? 0) > 0 || (balances[p]?.usd ?? 0) !== 0);
+  const hasUsd = users.some((u) => {
+    const b = balances[u.alias];
+    return b && ((b.inUsd ?? 0) > 0 || (b.outUsd ?? 0) > 0 || b.usd !== 0);
+  });
 
   return (
     <>
@@ -137,15 +144,15 @@ function CardsHeader({
       </div>
 
       <div className="bal-cards">
-        {PEOPLE.map((person) => {
-          const b = balances[person];
-          const showUsd = (b.inUsd > 0 || b.outUsd > 0 || b.usd !== 0);
+        {users.map((user) => {
+          const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
+          const showUsd = b.inUsd > 0 || b.outUsd > 0 || b.usd !== 0;
           return (
-            <div key={person} className="bal-card">
+            <div key={user.id} className="bal-card">
               <div className="bal-head">
-                <Avatar name={person} />
+                <Avatar name={user.alias} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="bal-name">{person}</div>
+                  <div className="bal-name">{user.alias}</div>
                   <div className="bal-sub">plata en mano</div>
                 </div>
               </div>
@@ -178,25 +185,29 @@ function CardsHeader({
 }
 
 function SettleHeader({
-  balances, totalUyu, totalUsd,
+  balances, totalUyu, totalUsd, users,
 }: {
   balances: Record<string, PersonBalance>;
   totalUyu: number;
   totalUsd: number;
+  users: UserSummary[];
 }) {
-  const [p1, p2] = PEOPLE;
-  const b1 = balances[p1];
-  const b2 = balances[p2];
-  const hasUsd = PEOPLE.some((p) => (balances[p]?.inUsd ?? 0) > 0 || (balances[p]?.outUsd ?? 0) > 0);
+  const [u1, u2] = users;
+  const b1 = balances[u1?.alias ?? ''] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
+  const b2 = balances[u2?.alias ?? ''] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
+  const hasUsd = users.some((u) => {
+    const b = balances[u.alias];
+    return b && ((b.inUsd ?? 0) > 0 || (b.outUsd ?? 0) > 0);
+  });
 
   const diffUyu = b1.uyu - b2.uyu;
   const diffUsd = b1.usd - b2.usd;
   const halfUyu = Math.abs(diffUyu) / 2;
   const halfUsd = Math.abs(diffUsd) / 2;
-  const fromUyu = diffUyu > 0 ? p1 : p2;
-  const toUyu = diffUyu > 0 ? p2 : p1;
-  const fromUsd = diffUsd > 0 ? p1 : p2;
-  const toUsd = diffUsd > 0 ? p2 : p1;
+  const fromUyu = diffUyu > 0 ? u1?.alias : u2?.alias;
+  const toUyu = diffUyu > 0 ? u2?.alias : u1?.alias;
+  const fromUsd = diffUsd > 0 ? u1?.alias : u2?.alias;
+  const toUsd = diffUsd > 0 ? u2?.alias : u1?.alias;
   const evenUyu = Math.abs(diffUyu) < 1;
   const evenUsd = Math.abs(diffUsd) < 0.01;
 
@@ -249,13 +260,13 @@ function SettleHeader({
       </div>
 
       <div className="bal-mini-list">
-        {PEOPLE.map((person) => {
-          const b = balances[person];
+        {users.map((user) => {
+          const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
           const showUsd = b.inUsd > 0 || b.outUsd > 0 || b.usd !== 0;
           return (
-            <div key={person} className="bal-mini">
-              <Avatar name={person} size={34} />
-              <div className="bal-mini-name">{person}</div>
+            <div key={user.id} className="bal-mini">
+              <Avatar name={user.alias} size={34} />
+              <div className="bal-mini-name">{user.alias}</div>
               <div className="bal-mini-figs">
                 <span className={`amt ${signClass(b.uyu)}`}>{fmtSigned(uyu, b.uyu)}</span>
                 {showUsd && (
@@ -285,21 +296,25 @@ function ConvActionButton() {
 }
 
 function LedgerLayout({
-  balances, movements,
+  balances, movements, users,
 }: {
   balances: Record<string, PersonBalance>;
   movements: Movement[];
+  users: UserSummary[];
 }) {
-  const hasUsd = PEOPLE.some((p) => (balances[p]?.inUsd ?? 0) > 0 || (balances[p]?.usd ?? 0) !== 0);
+  const hasUsd = users.some((u) => {
+    const b = balances[u.alias];
+    return b && ((b.inUsd ?? 0) > 0 || b.usd !== 0);
+  });
 
   return (
     <>
       <div className="ledger-head">
-        {PEOPLE.map((person) => {
-          const b = balances[person];
+        {users.map((user) => {
+          const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
           return (
-            <div key={person} className="lh-col">
-              <div className="lh-name"><Avatar name={person} size={26} />{person}</div>
+            <div key={user.id} className="lh-col">
+              <div className="lh-name"><Avatar name={user.alias} size={26} />{user.alias}</div>
               <div className={`lh-amt ${signClass(b.uyu)}`}>{fmtSigned(uyu, b.uyu)}</div>
               {hasUsd && (
                 <div className={`lh-amt sec ${signClass(b.usd)}`}>{fmtSigned(usd, b.usd)}</div>
@@ -352,9 +367,9 @@ function LedgerRow({ m }: { m: Movement }) {
       : [];
 
   const convFlow = isConv && m.conv
-    ? m.conv.fromPerson !== m.conv.toPerson
-      ? `${m.conv.fromPerson} → ${m.conv.toPerson}`
-      : m.conv.fromPerson
+    ? m.conv.fromUserAlias !== m.conv.toUserAlias
+      ? `${m.conv.fromUserAlias} → ${m.conv.toUserAlias}`
+      : m.conv.fromUserAlias
     : null;
 
   return (
@@ -413,9 +428,9 @@ function MovCard({ m }: { m: Movement }) {
     ];
 
   const convFlow = isConv && m.conv
-    ? m.conv.fromPerson !== m.conv.toPerson
-      ? `${m.conv.fromPerson} → ${m.conv.toPerson}`
-      : m.conv.fromPerson
+    ? m.conv.fromUserAlias !== m.conv.toUserAlias
+      ? `${m.conv.fromUserAlias} → ${m.conv.toUserAlias}`
+      : m.conv.fromUserAlias
     : null;
 
   return (

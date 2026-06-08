@@ -1,10 +1,11 @@
-import { getSaldosData, getTransitCount } from '@/app/lib/queries';
+import { getSaldosData, getTransitCount, getUsers } from '@/app/lib/queries';
 import { SaldosScreen } from '@/components/screens/saldos-screen';
 
 export default async function SaldosPage() {
-  const [{ purchases, sales, expenses, conversions }, transitCount] = await Promise.all([
+  const [{ purchases, sales, expenses, conversions }, transitCount, users] = await Promise.all([
     getSaldosData(),
     getTransitCount(),
+    getUsers(),
   ]);
 
   return (
@@ -14,6 +15,7 @@ export default async function SaldosPage() {
       expenses={expenses}
       conversions={conversions}
       transitCount={transitCount}
+      users={users}
     />
   );
 }

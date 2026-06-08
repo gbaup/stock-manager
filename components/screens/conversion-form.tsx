@@ -8,8 +8,9 @@ import { Segmented } from '@/components/ui/segmented';
 import { Modal } from '@/components/ui/modal';
 import { Icon } from '@/components/ui/icon';
 import {
-  PEOPLE, todayISO, uyu, usd, fmtRate, convertAmount, personInitial,
+  uyu, usd, fmtRate, convertAmount, personInitial, todayISO,
 } from '@/app/lib/domain';
+import type { UserSummary } from '@/app/lib/domain';
 import { createConversion } from '@/app/actions/conversions';
 
 type Cur = 'UYU' | 'USD';
@@ -33,23 +34,23 @@ function Avatar({ name, size = 26 }: { name: string; size?: number }) {
 }
 
 type FormState = {
-  fromPerson: string;
+  fromUserId: string;
   fromCur: Cur;
-  toPerson: string;
+  toUserId: string;
   toCur: Cur;
   amount: string;
   rate: string;
 };
 
-export function ConversionForm() {
+export function ConversionForm({ users }: { users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState(false);
 
   const [f, setF] = useState<FormState>({
-    fromPerson: '',
+    fromUserId: '',
     fromCur: 'UYU',
-    toPerson: '',
+    toUserId: '',
     toCur: 'USD',
     amount: '',
     rate: '',
@@ -61,27 +62,30 @@ export function ConversionForm() {
   const flip = () =>
     setF((s) => ({
       ...s,
-      fromPerson: s.toPerson,
-      toPerson: s.fromPerson,
+      fromUserId: s.toUserId,
+      toUserId: s.fromUserId,
       fromCur: s.toCur,
       toCur: s.fromCur,
     }));
 
+  const fromAlias = users.find((u) => u.id === f.fromUserId)?.alias ?? '';
+  const toAlias = users.find((u) => u.id === f.toUserId)?.alias ?? '';
+
   const sameCur = f.fromCur === f.toCur;
-  const sameAccount = !!f.fromPerson && f.fromPerson === f.toPerson && sameCur;
+  const sameAccount = !!f.fromUserId && f.fromUserId === f.toUserId && sameCur;
   const amount = Number(f.amount) || 0;
   const rate = Number(f.rate) || 0;
   const result = convertAmount(amount, f.fromCur, f.toCur, sameCur ? 1 : rate);
-  const canSave = amount > 0 && !!f.fromPerson && !!f.toPerson && !sameAccount && (sameCur || rate > 0);
-  const crossPerson = f.fromPerson && f.toPerson && f.fromPerson !== f.toPerson;
+  const canSave = amount > 0 && !!f.fromUserId && !!f.toUserId && !sameAccount && (sameCur || rate > 0);
+  const crossPerson = f.fromUserId && f.toUserId && f.fromUserId !== f.toUserId;
 
   function handleSubmit() {
     if (!canSave) return;
     startTransition(async () => {
       await createConversion({
-        fromPerson: f.fromPerson,
+        fromUserId: f.fromUserId,
         fromCur: f.fromCur,
-        toPerson: f.toPerson,
+        toUserId: f.toUserId,
         toCur: f.toCur,
         fromAmount: amount,
         rate: sameCur ? 1 : rate,
@@ -107,9 +111,9 @@ export function ConversionForm() {
           <div className="field-row">
             <Field label="Socio">
               <Segmented
-                options={PEOPLE}
-                value={f.fromPerson as typeof PEOPLE[number]}
-                onChange={(v) => set('fromPerson', v)}
+                options={users.map((u) => u.alias)}
+                value={fromAlias}
+                onChange={(alias) => set('fromUserId', users.find((u) => u.alias === alias)?.id ?? '')}
                 full
               />
             </Field>
@@ -133,9 +137,9 @@ export function ConversionForm() {
           <div className="field-row">
             <Field label="Socio">
               <Segmented
-                options={PEOPLE}
-                value={f.toPerson as typeof PEOPLE[number]}
-                onChange={(v) => set('toPerson', v)}
+                options={users.map((u) => u.alias)}
+                value={toAlias}
+                onChange={(alias) => set('toUserId', users.find((u) => u.alias === alias)?.id ?? '')}
                 full
               />
             </Field>
@@ -205,8 +209,8 @@ export function ConversionForm() {
             <div className="conv-summary">
               <div className="cs-row">
                 <span className="cs-acct">
-                  <Avatar name={f.fromPerson} />
-                  {f.fromPerson} · {curLabel(f.fromCur)}
+                  <Avatar name={fromAlias} />
+                  {fromAlias} · {curLabel(f.fromCur)}
                 </span>
                 <strong className="neg">− {money(f.fromCur, amount)}</strong>
               </div>
@@ -215,8 +219,8 @@ export function ConversionForm() {
               </div>
               <div className="cs-row">
                 <span className="cs-acct">
-                  <Avatar name={f.toPerson} />
-                  {f.toPerson} · {curLabel(f.toCur)}
+                  <Avatar name={toAlias} />
+                  {toAlias} · {curLabel(f.toCur)}
                 </span>
                 <strong className="pos">+ {money(f.toCur, result)}</strong>
               </div>
@@ -243,15 +247,15 @@ export function ConversionForm() {
           onConfirm={() => { setConfirm(false); handleSubmit(); }}
           onCancel={() => setConfirm(false)}
         >
-          <span className="modal-strong">{f.fromPerson}</span>{' '}
+          <span className="modal-strong">{fromAlias}</span>{' '}
           {sameCur ? 'transfiere' : 'cambia'}{' '}
           <span className="modal-strong">{money(f.fromCur, amount)}</span>
           {sameCur ? (
-            <> a <span className="modal-strong">{f.toPerson}</span>.</>
+            <> a <span className="modal-strong">{toAlias}</span>.</>
           ) : (
             <>
               {' '}→ <span className="modal-strong">{money(f.toCur, result)}</span>
-              {crossPerson && <> para <span className="modal-strong">{f.toPerson}</span></>}
+              {crossPerson && <> para <span className="modal-strong">{toAlias}</span></>}
               {' '}(TC <span className="modal-strong">{fmtRate(rate)}</span>).
             </>
           )}{' '}

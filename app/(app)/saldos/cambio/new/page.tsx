@@ -1,5 +1,7 @@
+import { getUsers } from '@/app/lib/queries';
 import { ConversionForm } from '@/components/screens/conversion-form';
 
-export default function ConversionNewPage() {
-  return <ConversionForm />;
+export default async function ConversionNewPage() {
+  const users = await getUsers();
+  return <ConversionForm users={users} />;
 }

@@ -11,8 +11,8 @@ import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { SIZES, PEOPLE, usd, todayISO } from '@/app/lib/domain';
-import type { ModelWithStats } from '@/app/lib/domain';
+import { SIZES, usd, todayISO } from '@/app/lib/domain';
+import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createPurchase } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
@@ -20,9 +20,11 @@ import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 export function PurchaseForm({
   models,
   presetModelId,
+  users,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
+  users: UserSummary[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -41,7 +43,7 @@ export function PurchaseForm({
       supplier: '',
       trackingNumber: '',
       description: '',
-      supplierPaidBy: '',
+      supplierPaidByUserId: '',
       items: presetModelId
         ? [{ modelId: presetModelId, size: '', basePriceUsd: '' }]
         : [],
@@ -72,7 +74,7 @@ export function PurchaseForm({
         supplier: data.supplier || undefined,
         trackingNumber: data.trackingNumber || undefined,
         description: data.description || undefined,
-        supplierPaidBy: data.supplierPaidBy || undefined,
+        supplierPaidByUserId: data.supplierPaidByUserId || undefined,
         items: data.items
           .filter((it) => it.modelId)
           .map((it) => ({
@@ -250,15 +252,15 @@ export function PurchaseForm({
                   <div className="section-label" style={{ margin: '0 0 8px' }}>
                     Pago al proveedor
                   </div>
-                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} error={errors.supplierPaidBy?.message}>
+                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} error={errors.supplierPaidByUserId?.message}>
                     <Controller
-                      name="supplierPaidBy"
+                      name="supplierPaidByUserId"
                       control={control}
                       render={({ field: f }) => (
                         <Segmented
-                          options={PEOPLE}
-                          value={f.value ?? ''}
-                          onChange={f.onChange}
+                          options={users.map((u) => u.alias)}
+                          value={users.find((u) => u.id === f.value)?.alias ?? ''}
+                          onChange={(alias) => f.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
                           full
                         />
                       )}

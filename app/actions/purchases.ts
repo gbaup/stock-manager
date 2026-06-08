@@ -18,7 +18,7 @@ export async function createPurchase(data: {
   supplier?: string;
   trackingNumber?: string;
   description?: string;
-  supplierPaidBy?: string;
+  supplierPaidByUserId?: string;
   items: PurchaseItem[];
 }) {
   if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
@@ -33,7 +33,7 @@ export async function createPurchase(data: {
       trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
       description: data.description?.trim().toLowerCase() || null,
       quantity: data.items.length,
-      supplierPaidBy: data.supplierPaidBy?.trim().toLowerCase() || null,
+      supplierPaidByUserId: data.supplierPaidByUserId || null,
       items: {
         create: data.items.map((it) => ({
           catalogProductId: it.modelId,
@@ -59,7 +59,7 @@ export async function markArrived(
     shippingPriceUsd?: string;
     shippingPriceUyu?: string;
     weight?: string;
-    shippingPaidBy?: string;
+    shippingPaidByUserId?: string;
   }
 ) {
   if (!arrivalSchema.safeParse(data).success) throw new Error('Invalid arrival data');
@@ -71,7 +71,7 @@ export async function markArrived(
       shippingPriceUsd: data.shippingPriceUsd ? parseFloat(data.shippingPriceUsd) : null,
       shippingPriceUyu: data.shippingPriceUyu ? parseFloat(data.shippingPriceUyu) : null,
       weight: data.weight ? parseFloat(data.weight) : null,
-      shippingPaidBy: data.shippingPaidBy?.trim().toLowerCase() || null,
+      shippingPaidByUserId: data.shippingPaidByUserId || null,
     },
   });
 
