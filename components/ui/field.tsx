@@ -181,6 +181,7 @@ export function TeamCombobox({
   teams: TeamOption[];
   onCreateTeam: (name: string) => Promise<TeamOption>;
 }) {
+  const [localTeams, setLocalTeams] = useState<TeamOption[]>(teams);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(-1);
@@ -189,7 +190,7 @@ export function TeamCombobox({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuId = useId();
 
-  const selectedTeam = teams.find((t) => t.id === value);
+  const selectedTeam = localTeams.find((t) => t.id === value);
 
   useEffect(() => {
     if (!open) setQuery(selectedTeam?.name ?? '');
@@ -197,10 +198,10 @@ export function TeamCombobox({
 
   const q = normTeam(query);
   const ql = q.toLowerCase();
-  const matches = teams
+  const matches = localTeams
     .filter((t) => !ql || t.name.toLowerCase().includes(ql))
     .sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  const exact = teams.some((t) => t.name.toLowerCase() === ql);
+  const exact = localTeams.some((t) => t.name.toLowerCase() === ql);
   const showCreate = q.length > 0 && !exact;
   const rows = matches.length + (showCreate ? 1 : 0);
 
@@ -217,6 +218,7 @@ export function TeamCombobox({
     setCreating(true);
     try {
       const team = await onCreateTeam(pending);
+      setLocalTeams((prev) => [...prev, team]);
       onChange(team.id);
       setQuery(team.name);
     } finally {
