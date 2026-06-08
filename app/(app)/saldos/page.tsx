@@ -1,5 +1,3 @@
-export const dynamic = 'force-dynamic';
-
 import { getSaldosData, getTransitCount } from '@/app/lib/queries';
 import { SaldosScreen } from '@/components/screens/saldos-screen';
 
