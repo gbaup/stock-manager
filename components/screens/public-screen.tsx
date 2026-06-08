@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
@@ -75,7 +75,10 @@ export function PublicScreen({ models }: { models: PublicModel[] }) {
     setFilterVersions([]);
   }
 
-  const today = fmtDate(new Date().toISOString().split('T')[0]);
+  const [today, setToday] = useState('');
+  useEffect(() => {
+    setToday(fmtDate(new Date().toISOString().split('T')[0]));
+  }, []);
 
   return (
     <div className="screen" style={{ background: 'var(--bg)' }}>
