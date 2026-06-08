@@ -4,15 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { arrivalSchema } from '@/app/lib/schemas';
-import { ExchangeRateResponse } from '../api/exchange-rate/route';
+import { fetchExchangeRate } from '@/app/lib/exchange-rate';
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
 
-async function getExchangeRate(date: Date): Promise<number> {
-  const res = await fetch(`/api/exchange-rate?fecha=${date.toISOString().split('T')[0]}`);
-  const data = await res.json() as ExchangeRateResponse;
-
-  // data = compra -> BCU devuelve dolar interbancario.
+async function getExchangeRate(): Promise<number> {
+  const data = await fetchExchangeRate();
   return data.compra;
 }
 
@@ -27,7 +24,7 @@ export async function createPurchase(data: {
   if (!data.purchaseDate || !data.items.length) throw new Error('Invalid purchase data');
   if (data.items.some((it) => !it.modelId || !it.size)) throw new Error('Invalid item data');
 
-  const exchangeRate = await getExchangeRate(new Date(data.purchaseDate));
+  const exchangeRate = await getExchangeRate();
 
   await prisma.batch.create({
     data: {

@@ -1,62 +1,13 @@
-// app/api/exchange-rate/route.ts
 import { NextResponse } from "next/server";
-import axios from "axios";
+import { fetchExchangeRate, type ExchangeRateData } from "@/app/lib/exchange-rate";
 
-export type ExchangeRateResponse = {
-    fecha: string;
-    compra: number;
-    venta: number;
-    nombre: string;
-};
+export type ExchangeRateResponse = ExchangeRateData;
 
 export async function GET() {
     try {
-        // Paso 1: último cierre
-        const { data: xmlCierre } = await axios.post(
-            "https://cotizaciones.bcu.gub.uy/wscotizaciones/servlet/awsultimocierre",
-            `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cot="ultimocierre">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <cot:wsbcuultimocierre.Execute>
-      <cot:Entrada><cot:Grupo>2</cot:Grupo></cot:Entrada>
-    </cot:wsbcuultimocierre.Execute>
-  </soapenv:Body>
-</soapenv:Envelope>`,
-            { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' } }
-        );
-
-        const fecha = xmlCierre.match(/<Fecha>(.*?)<\/Fecha>/)?.[1];
-        if (!fecha) throw new Error("No se pudo obtener la fecha de cierre");
-
-        // Paso 2: cotización del dólar
-        const { data: xmlCotiz } = await axios.post(
-            "https://cotizaciones.bcu.gub.uy/wscotizaciones/servlet/awsbcucotizaciones",
-            `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cot="Cotiza">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <cot:wsbcucotizaciones.Execute>
-      <cot:Entrada>
-        <cot:Moneda><cot:item>2225</cot:item></cot:Moneda>
-        <cot:FechaDesde>${fecha}</cot:FechaDesde>
-        <cot:FechaHasta>${fecha}</cot:FechaHasta>
-        <cot:Grupo>2</cot:Grupo>
-      </cot:Entrada>
-    </cot:wsbcucotizaciones.Execute>
-  </soapenv:Body>
-</soapenv:Envelope>`,
-            { headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: '""' } }
-        );
-
-        return NextResponse.json<ExchangeRateResponse>({
-            fecha,
-            nombre: xmlCotiz.match(/<Nombre>(.*?)<\/Nombre>/)?.[1] ?? "",
-            compra: parseFloat(xmlCotiz.match(/<TCC>(.*?)<\/TCC>/)?.[1] ?? "0"),
-            venta: parseFloat(xmlCotiz.match(/<TCV>(.*?)<\/TCV>/)?.[1] ?? "0"),
-        });
-
-    } catch (error) {
+        const data = await fetchExchangeRate();
+        return NextResponse.json<ExchangeRateResponse>(data);
+    } catch {
         return NextResponse.json(
             { error: "No se pudo obtener la cotización" },
             { status: 500 }
