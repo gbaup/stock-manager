@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { colorByName, fmtDate, SIZES } from '@/app/lib/domain';
+import { colorByName, SIZES } from '@/app/lib/domain';
 import type { ModelMeta } from '@/app/lib/domain';
 
 type PublicModel = ModelMeta & { stock: number };
@@ -21,7 +21,7 @@ function SizeChips({ sizes }: { sizes: string[] }) {
   );
 }
 
-export function PublicScreen({ models }: { models: PublicModel[] }) {
+export function PublicScreen({ models, today }: { models: PublicModel[]; today: string }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'team' | 'newest'>('team');
@@ -75,10 +75,6 @@ export function PublicScreen({ models }: { models: PublicModel[] }) {
     setFilterVersions([]);
   }
 
-  const [today, setToday] = useState('');
-  useEffect(() => {
-    setToday(fmtDate(new Date().toISOString().split('T')[0]));
-  }, []);
 
   return (
     <div className="screen" style={{ background: 'var(--bg)' }}>

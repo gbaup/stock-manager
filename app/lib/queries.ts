@@ -1,5 +1,6 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
+import { fmtDate } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord, ConversionRecord,
@@ -261,7 +262,7 @@ export async function getPublicModels() {
     orderBy: { team: { name: 'asc' } },
   });
 
-  return products
+  const models = products
     .map((p) => {
       const availableItems = p.items.filter(
         (i) => i.batch.arrivalDate !== null && i.status === 'available'
@@ -273,6 +274,8 @@ export async function getPublicModels() {
       };
     })
     .filter((p) => p.stock > 0);
+
+  return { models, today: fmtDate(new Date().toISOString().split('T')[0]) };
 }
 
 export async function getTransitCount(): Promise<number> {

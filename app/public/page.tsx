@@ -2,10 +2,10 @@ import { getPublicModels } from '@/app/lib/queries';
 import { PublicScreen } from '@/components/screens/public-screen';
 
 export default async function PublicPage() {
-  const models = await getPublicModels();
+  const { models, today } = await getPublicModels();
   return (
     <div className="app-shell">
-      <PublicScreen models={models} />
+      <PublicScreen models={models} today={today} />
     </div>
   );
 }
