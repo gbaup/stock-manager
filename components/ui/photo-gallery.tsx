@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Icon } from './icon';
 import { Swatch } from './swatch';
 import { uploadFile, deleteFile } from '@/app/lib/image-client';
+import type { Photo } from '@/app/lib/photo';
 
 export function PhotoGallery({
   photos,
@@ -11,10 +12,10 @@ export function PhotoGallery({
   number,
   onChange,
 }: {
-  photos: string[];
+  photos: Photo[];
   color: string;
   number?: string;
-  onChange: (photos: string[]) => void;
+  onChange: (photos: Photo[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -23,18 +24,18 @@ export function PhotoGallery({
     if (!files || files.length === 0) return;
     setUploading(true);
     try {
-      const urls = await Promise.all(Array.from(files).map(uploadFile));
-      onChange([...photos, ...urls]);
+      const newPhotos = await Promise.all(Array.from(files).map(uploadFile));
+      onChange([...photos, ...newPhotos]);
     } finally {
       setUploading(false);
     }
   }
 
   async function remove(idx: number) {
-    const url = photos[idx];
-    if (url.startsWith('https://')) {
+    const photo = photos[idx];
+    if (photo.publicId) {
       try {
-        await deleteFile(url);
+        await deleteFile(photo.publicId);
       } catch {
         return;
       }
@@ -62,14 +63,14 @@ export function PhotoGallery({
         </button>
       ) : (
         <div className="pg-grid">
-          {photos.map((src, i) => (
+          {photos.map((p, i) => (
             <div
               key={i}
               className={`pg-thumb${i === 0 ? ' is-cover' : ''}`}
               onClick={() => promote(i)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" />
+              <img src={p.url} alt="" />
               {i === 0 && <span className="pg-cover-badge">Portada</span>}
               <button
                 type="button"

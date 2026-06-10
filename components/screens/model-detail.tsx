@@ -6,7 +6,8 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { fmtDate, uyu, usd, toUsd } from '@/app/lib/domain';
+import { fmtDate, uyu, usd } from '@/app/lib/domain';
+import { money } from '@/app/lib/money';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
 export function ModelDetailScreen({
@@ -62,9 +63,9 @@ export function ModelDetailScreen({
 
           {model.photos.length > 1 && (
             <div className="detail-gallery">
-              {model.photos.map((src, i) => (
+              {model.photos.map((p, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={src} alt="" />
+                <img key={i} src={p.url} alt="" />
               ))}
             </div>
           )}
@@ -79,7 +80,7 @@ export function ModelDetailScreen({
             <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
               Ingresos:{' '}
               <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
-              <span className="money-sec"> · {usd(toUsd(model.revenue, usdRate))}</span>
+              <span className="money-sec"> · {usd(money.toUsd(model.revenue, usdRate))}</span>
             </div>
           )}
 
@@ -130,7 +131,7 @@ function EventRow({ ev, usdRate, onArrive }: { ev: TimelineEvent; usdRate: numbe
         </div>
         <div className="event-amt">
           +{uyu(s.price * s.quantity)}
-          <span className="sec">{usd(toUsd(s.price * s.quantity, usdRate))}</span>
+          <span className="sec">{usd(money.toUsd(s.price * s.quantity, usdRate))}</span>
         </div>
       </div>
     );
