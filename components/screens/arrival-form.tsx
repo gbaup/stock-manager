@@ -121,7 +121,7 @@ export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: User
 
           {hasShipping && (
             <div style={{ marginTop: 4, marginBottom: 4 }}>
-              <Field label="¿Quién pagó el envío?" error={errors.shippingPaidByUserId?.message}>
+              <Field label="¿Quién pagó el envío?" optional error={errors.shippingPaidByUserId?.message}>
                 <Controller
                   name="shippingPaidByUserId"
                   control={control}

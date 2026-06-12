@@ -273,7 +273,7 @@ export function PurchaseForm({
                   <div className="section-label" style={{ margin: '0 0 8px' }}>
                     Pago al proveedor
                   </div>
-                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} error={errors.supplierPaidByUserId?.message}>
+                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} optional error={errors.supplierPaidByUserId?.message}>
                     <Controller
                       name="supplierPaidByUserId"
                       control={control}
