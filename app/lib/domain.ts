@@ -3,7 +3,7 @@ import type { Photo } from './photo';
 export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
-export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero', 'Retro'] as const;
+export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero'] as const;
 export const SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
 export const SHIRT_TYPES = ['Fan', 'Player', 'Retro'] as const;
 export const SLEEVES = ['Corta', 'Larga'] as const;
