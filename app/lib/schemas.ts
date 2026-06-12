@@ -119,7 +119,10 @@ export const modelSchema = z.object({
   number: z.string().optional(),
   player: z.string().optional(),
   description: z.string().optional(),
-  photos: z.array(z.string()),
+  photos: z.array(z.object({
+    url: z.string().min(1),
+    publicId: z.string(),
+  })),
 });
 
 export type ModelFormValues = z.infer<typeof modelSchema>;

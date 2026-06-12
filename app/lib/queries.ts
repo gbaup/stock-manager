@@ -1,6 +1,8 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import { fmtDate } from './domain';
+import { stockByModel, countStock } from './inventory';
+import { parsePhotos } from './photo';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord, ConversionRecord,
@@ -26,7 +28,7 @@ function productMeta(p: {
     player: p.player,
     type: p.type,
     sleeve: p.sleeve,
-    photos: Array.isArray(p.photos) ? (p.photos as string[]) : [],
+    photos: parsePhotos(p.photos),
     sizes,
     description: p.description ?? null,
   };
@@ -91,22 +93,20 @@ export async function getModels(): Promise<ModelWithStats[]> {
   'use cache';
   cacheLife('hours');
   cacheTag('models');
-  const products = await prisma.catalogProduct.findMany({
-    include: {
-      team: true,
-      items: { select: { status: true, batch: { select: { arrivalDate: true } } } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [products, counts] = await Promise.all([
+    prisma.catalogProduct.findMany({
+      include: { team: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    stockByModel(),
+  ]);
 
   return products.map((p) => {
-    const arrivedItems = p.items.filter((i) => i.batch.arrivalDate !== null);
-    const stock = arrivedItems.filter((i) => i.status === 'available').length;
-    const inTransit = p.items.filter((i) => i.batch.arrivalDate === null).length;
+    const c = counts.get(p.id);
     return {
       ...productMeta(p),
-      stock,
-      inTransit,
+      stock: c?.available ?? 0,
+      inTransit: c?.inTransit ?? 0,
     };
   });
 }
@@ -142,9 +142,9 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   });
   if (!p) return null;
 
-  const arrivedItems = p.items.filter((i) => i.batch.arrivalDate !== null);
-  const stock = arrivedItems.filter((i) => i.status === 'available').length;
-  const inTransit = p.items.filter((i) => i.batch.arrivalDate === null).length;
+  const counts = countStock(p.items);
+  const stock = counts.available;
+  const inTransit = counts.inTransit;
   const soldItems = p.items.filter((i) => i.sale !== null);
   const sold = soldItems.length;
   const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);

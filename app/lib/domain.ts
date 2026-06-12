@@ -1,3 +1,5 @@
+import type { Photo } from './photo';
+
 export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
@@ -51,10 +53,6 @@ export function usd(n: number): string {
   return `US$ ${new Intl.NumberFormat('es-UY').format(Math.round(n))}`;
 }
 
-export function toUsd(uyuAmount: number, rate: number): number {
-  return uyuAmount / rate;
-}
-
 export function signedUyu(n: number): string {
   if (n === 0) return '$U 0';
   const abs = uyu(Math.abs(n));
@@ -79,7 +77,7 @@ export type ModelMeta = {
   player: string | null;
   type: string | null;
   sleeve: string | null;
-  photos: string[];
+  photos: Photo[];
   sizes: string[];  // derived from in-stock InventoryItem.size values
   description: string | null;
 };
@@ -177,18 +175,5 @@ export type ConversionRecord = {
 
 export function fmtRate(n: number): string {
   return new Intl.NumberFormat('es-UY', { maximumFractionDigits: 2 }).format(n);
-}
-
-export function convertAmount(
-  fromAmount: number,
-  fromCur: 'UYU' | 'USD',
-  toCur: 'UYU' | 'USD',
-  rate: number,
-): number {
-  if (!fromAmount) return 0;
-  if (fromCur === toCur) return fromAmount;
-  if (fromCur === 'UYU' && toCur === 'USD') return rate ? Math.round((fromAmount / rate) * 100) / 100 : 0;
-  if (fromCur === 'USD' && toCur === 'UYU') return Math.round(fromAmount * rate);
-  return fromAmount;
 }
 

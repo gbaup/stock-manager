@@ -6,6 +6,7 @@ import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { getExchangeRate } from '@/app/lib/exchange-rate';
+import { addBatchItems } from '@/app/lib/inventory';
 
 const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
@@ -34,24 +35,29 @@ export async function createPurchase(data: {
 
   const exchangeRate = await getExchangeRate();
 
-  await prisma.batch.create({
-    data: {
-      purchaseDate: new Date(data.purchaseDate),
-      supplier: data.supplier?.trim().toLowerCase() || null,
-      trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
-      description: data.description?.trim().toLowerCase() || null,
-      quantity: data.items.length,
-      supplierPaidByUserId: data.supplierPaidByUserId || null,
-      items: {
-        create: data.items.map((it) => ({
-          catalogProductId: it.modelId,
-          size: it.size.trim().toLowerCase(),
-          basePriceUsd: it.basePriceUsd,
-          basePriceUyu: it.basePriceUsd * exchangeRate,
-          status: 'available',
-        })),
+  await prisma.$transaction(async (tx) => {
+    const batch = await tx.batch.create({
+      data: {
+        purchaseDate: new Date(data.purchaseDate),
+        supplier: data.supplier?.trim().toLowerCase() || null,
+        trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
+        description: data.description?.trim().toLowerCase() || null,
+        quantity: data.items.length,
+        supplierPaidByUserId: data.supplierPaidByUserId || null,
       },
-    },
+      select: { id: true },
+    });
+
+    await addBatchItems(
+      batch.id,
+      data.items.map((it) => ({
+        modelId: it.modelId,
+        size: it.size.trim().toLowerCase(),
+        basePriceUsd: it.basePriceUsd,
+      })),
+      exchangeRate,
+      tx,
+    );
   });
 
   updateTag('purchases');

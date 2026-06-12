@@ -8,7 +8,8 @@ import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, SelectInput, TextAreaInput, MoneyInput } from '@/components/ui/field';
-import { METHODS, usd, uyu, toUsd, todayISO } from '@/app/lib/domain';
+import { METHODS, usd, uyu, todayISO } from '@/app/lib/domain';
+import { money } from '@/app/lib/money';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSale } from '@/app/actions/sales';
 import { coverOf } from '@/components/ui/swatch';
@@ -76,7 +77,7 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
           </Field>
           {price > 0 && (
             <div style={{ fontSize: 12.5, color: 'var(--text-faint)', margin: '-6px 2px 12px', fontFamily: 'var(--font-mono)' }}>
-              ≈ {usd(toUsd(price, usdRate))} · total {uyu(price * qty)}
+              ≈ {usd(money.toUsd(price, usdRate))} · total {uyu(price * qty)}
             </div>
           )}
 

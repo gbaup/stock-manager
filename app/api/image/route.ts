@@ -23,20 +23,20 @@ export async function POST(req: NextRequest) {
   const buffer = Buffer.from(bytes);
 
   try {
-    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+    const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
       cloudinary.uploader
         .upload_stream(
           { folder: "jerseys", transformation: [{ width: 800, crop: "limit" }] },
           (error, result) => {
             if (error) reject(error);
             else if (!result?.secure_url) reject(new Error("Upload returned no URL"));
-            else resolve(result as { secure_url: string });
+            else resolve(result as { secure_url: string; public_id: string });
           }
         )
         .end(buffer);
     });
 
-    return NextResponse.json({ url: result.secure_url });
+    return NextResponse.json({ url: result.secure_url, publicId: result.public_id });
   } catch {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }

@@ -1,8 +1,9 @@
 import { colorByName } from '@/app/lib/domain';
+import type { Photo } from '@/app/lib/photo';
 import { Icon } from './icon';
 
-export function coverOf(model: { photos?: string[] }): string | null {
-  return model.photos?.[0] ?? null;
+export function coverOf(model: { photos?: Photo[] }): string | null {
+  return model.photos?.[0]?.url ?? null;
 }
 
 export function Swatch({
