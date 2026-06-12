@@ -41,18 +41,14 @@ export type GastoFormValues = z.infer<typeof gastoSchema>;
 export const arrivalSchema = z
   .object({
     arrivalDate: z.string().min(1, 'Requerido'),
-    shippingPriceUsd: z.string().optional(),
-    shippingPriceUyu: z.string().optional(),
-    weight: z.string().optional(),
+    shippingRateUsd: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+    weight: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un peso válido'),
     shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
   })
   .refine(
     (data) => {
       if (process.env.NEXT_PUBLIC_ALLOW_ANONYMOUS_PURCHASES === 'true') return true;
-      const hasShipping =
-        (parseFloat(data.shippingPriceUsd ?? '') || 0) > 0 ||
-        (parseFloat(data.shippingPriceUyu ?? '') || 0) > 0;
-      return !hasShipping || !!data.shippingPaidByUserId;
+      return !!data.shippingPaidByUserId;
     },
     { message: '¿Quién pagó el envío?', path: ['shippingPaidByUserId'] }
   );

@@ -70,21 +70,23 @@ export async function markArrived(
   batchId: string,
   data: {
     arrivalDate: string;
-    shippingPriceUsd?: string;
-    shippingPriceUyu?: string;
-    weight?: string;
+    shippingRateUsd: string;
+    weight: string;
     shippingPaidByUserId?: string;
   }
 ) {
   if (!arrivalSchema.safeParse(data).success) throw new Error('Invalid arrival data');
 
+  const weight = parseFloat(data.weight);
+  const shippingPriceUsd = parseFloat(data.shippingRateUsd) * weight;
+
   await prisma.batch.update({
     where: { id: batchId },
     data: {
       arrivalDate: new Date(data.arrivalDate),
-      shippingPriceUsd: data.shippingPriceUsd ? parseFloat(data.shippingPriceUsd) : null,
-      shippingPriceUyu: data.shippingPriceUyu ? parseFloat(data.shippingPriceUyu) : null,
-      weight: data.weight ? parseFloat(data.weight) : null,
+      shippingPriceUsd,
+      shippingPriceUyu: null,
+      weight,
       shippingPaidByUserId: data.shippingPaidByUserId || null,
     },
   });
