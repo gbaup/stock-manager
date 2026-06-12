@@ -131,7 +131,7 @@ const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
   size: z.string().min(1, 'Elegí un talle'),
   basePriceUsd: z.string().optional(),
-  quantity: z.coerce.number().int().min(1).default(1),
+  quantity: z.number().int().min(1),
 });
 
 export const purchaseSchema = z
