@@ -38,6 +38,11 @@ export function InventoryScreen({
   else if (filter === 'out') list = list.filter((m) => m.stock === 0);
   else if (filter === 'transit') list = list.filter((m) => m.inTransit > 0);
 
+  list = [...list].sort((a, b) => {
+    if (a.stock > 0 !== b.stock > 0) return a.stock > 0 ? -1 : 1;
+    return a.team.localeCompare(b.team);
+  });
+
   const counts = {
     all: models.length,
     instock: models.filter((m) => m.stock > 0).length,
