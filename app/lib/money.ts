@@ -7,7 +7,7 @@ export const money = {
   },
 
   toUyu(usdAmount: number, rate: number): number {
-    if (!usdAmount) return 0;
+    if (!usdAmount || !rate) return 0;
     return Math.round(usdAmount * rate);
   },
 

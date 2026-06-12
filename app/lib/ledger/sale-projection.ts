@@ -5,7 +5,10 @@ import type { Movement, SaleRow } from './types';
 // out of the saldos view — this skip becomes unreachable once
 // Sale.collectedByUserId is migrated to NOT NULL.
 export function projectSale(sale: SaleRow): Movement[] {
-  if (!sale.collectedByUserId) return [];
+  if (!sale.collectedByUserId) {
+    console.warn(`[ledger] sale ${sale.id} skipped — no collectedByUserId. Run backfill-sale-collectors.ts.`);
+    return [];
+  }
   return [{
     id: `cobro-${sale.id}`,
     kind: 'cobro',
