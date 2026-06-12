@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { getExchangeRate } from '@/app/lib/exchange-rate';
 import { addBatchItems } from '@/app/lib/inventory';
+import { money } from '@/app/lib/money';
 
 const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
@@ -79,13 +80,14 @@ export async function markArrived(
 
   const weight = parseFloat(data.weight);
   const shippingPriceUsd = parseFloat(data.shippingRateUsd) * weight;
+  const exchangeRate = await getExchangeRate();
 
   await prisma.batch.update({
     where: { id: batchId },
     data: {
       arrivalDate: new Date(data.arrivalDate),
       shippingPriceUsd,
-      shippingPriceUyu: null,
+      shippingPriceUyu: money.toUyu(shippingPriceUsd, exchangeRate),
       weight,
       shippingPaidByUserId: data.shippingPaidByUserId || null,
     },
