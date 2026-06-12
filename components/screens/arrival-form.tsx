@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,10 +14,13 @@ import type { BatchSummary, UserSummary } from '@/app/lib/domain';
 import { markArrived } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
 import { arrivalSchema, type ArrivalFormValues } from '@/app/lib/schemas';
+import { Modal } from '@/components/ui/modal';
 
 export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingData, setPendingData] = useState<ArrivalFormValues | null>(null);
   const {
     control,
     handleSubmit,
@@ -41,7 +44,7 @@ export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: User
     (parseFloat(shippingPriceUyu ?? '') || 0) > 0;
   const qty = batch.items.length;
 
-  function onSubmit(data: ArrivalFormValues) {
+  function doSubmit(data: ArrivalFormValues) {
     startTransition(async () => {
       await markArrived(batch.id, {
         arrivalDate: data.arrivalDate,
@@ -51,6 +54,15 @@ export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: User
         shippingPaidByUserId: data.shippingPaidByUserId,
       });
     });
+  }
+
+  function onSubmit(data: ArrivalFormValues) {
+    if (hasShipping && !data.shippingPaidByUserId) {
+      setPendingData(data);
+      setShowConfirm(true);
+      return;
+    }
+    doSubmit(data);
   }
 
   return (
@@ -151,6 +163,21 @@ export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: User
           </button>
         </div>
       </div>
+      {showConfirm && (
+        <Modal
+          icon={null}
+          title="Sin responsable de envío"
+          confirmLabel={pending ? 'Guardando…' : 'Confirmar igual'}
+          cancelLabel="Volver"
+          onConfirm={() => {
+            setShowConfirm(false);
+            if (pendingData) doSubmit(pendingData);
+          }}
+          onCancel={() => { setShowConfirm(false); setPendingData(null); }}
+        >
+          El costo del envío no se va a descontar del saldo de nadie.
+        </Modal>
+      )}
     </div>
   );
 }

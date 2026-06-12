@@ -16,6 +16,7 @@ import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createPurchase } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
+import { Modal } from '@/components/ui/modal';
 
 export function PurchaseForm({
   models,
@@ -29,6 +30,8 @@ export function PurchaseForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingData, setPendingData] = useState<PurchaseFormValues | null>(null);
 
   const {
     control,
@@ -69,7 +72,7 @@ export function PurchaseForm({
     if (valid) setStep(2);
   }
 
-  function onSubmit(data: PurchaseFormValues) {
+  function doSubmit(data: PurchaseFormValues) {
     startTransition(async () => {
       await createPurchase({
         purchaseDate: data.purchaseDate,
@@ -88,6 +91,15 @@ export function PurchaseForm({
           ),
       });
     });
+  }
+
+  function onSubmit(data: PurchaseFormValues) {
+    if (needsSupplierPayer && !data.supplierPaidByUserId) {
+      setPendingData(data);
+      setShowConfirm(true);
+      return;
+    }
+    doSubmit(data);
   }
 
   return (
@@ -305,6 +317,21 @@ export function PurchaseForm({
           )}
         </div>
       </div>
+      {showConfirm && (
+        <Modal
+          icon={null}
+          title="Sin responsable de pago"
+          confirmLabel={pending ? 'Registrando…' : 'Registrar igual'}
+          cancelLabel="Volver"
+          onConfirm={() => {
+            setShowConfirm(false);
+            if (pendingData) doSubmit(pendingData);
+          }}
+          onCancel={() => { setShowConfirm(false); setPendingData(null); }}
+        >
+          El costo no se va a descontar del saldo de nadie. Útil para stock inicial con precios de referencia.
+        </Modal>
+      )}
     </div>
   );
 }
