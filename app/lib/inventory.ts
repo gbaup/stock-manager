@@ -122,8 +122,6 @@ export async function addBatchItems(
 //
 // FIFO by Batch.arrivalDate then InventoryItem.createdAt.
 export async function recordSale(intent: SaleIntent, loggedByUserId: string): Promise<{ saleId: string }> {
-  const finalPriceUsd = money.toUsd(intent.priceUyu, intent.exchangeRate);
-
   const saleId = await prisma.$transaction(async (tx) => {
     const candidate = await tx.inventoryItem.findFirst({
       where: {
@@ -141,11 +139,7 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
     // concurrent sales on the same item fail atomically rather than oversell.
     const { count } = await tx.inventoryItem.updateMany({
       where: { id: candidate.id, status: 'available' },
-      data: {
-        status: 'sold',
-        finalPriceUyu: intent.priceUyu,
-        finalPriceUsd,
-      },
+      data: { status: 'sold' },
     });
     if (count === 0) throw new NotEnoughStockError();
 
