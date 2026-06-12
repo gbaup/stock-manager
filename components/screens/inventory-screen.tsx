@@ -174,8 +174,8 @@ function DenseRows({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: stri
         <div key={m.id} className="row" onClick={() => onOpen(m.id)}>
           <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 30, height: 30, fontSize: 12 }} />
           <div className="row-main">
-            <div className="row-team">{m.team} · {m.version}</div>
-            <div className="row-meta">{m.season}{m.player ? ` · ${m.player}` : ''} · {m.color}</div>
+            <div className="row-team capitalize">{m.team} · {m.version}</div>
+            <div className="row-meta capitalize">{m.season}{m.player ? ` · ${m.player}` : ''} · {m.color}</div>
           </div>
           <div className="row-transit">{m.inTransit > 0 ? `+${m.inTransit}` : ''}</div>
           <div className="row-stock" style={{ color: m.stock === 0 ? 'var(--text-faint)' : 'var(--text)' }}>
@@ -214,7 +214,7 @@ function VisualGrid({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: str
               )}
             </div>
             <div className="tile-body">
-              <div className="tile-team">{m.team}</div>
+              <div className="tile-team capitalize">{m.team}</div>
               <div className="tile-meta">{m.season} · {m.version}</div>
               {m.inTransit > 0 && (
                 <div style={{ marginTop: 8 }}>
