@@ -26,7 +26,7 @@ type GroupedItem = {
 function groupItems(items: BatchSummary['items']): GroupedItem[] {
   const map = new Map<string, GroupedItem>();
   for (const it of items) {
-    const key = `${it.catalogProductId}|${it.size ?? ''}`;
+    const key = `${it.catalogProductId}|${it.size ?? ''}|${it.basePriceUsd}`;
     const existing = map.get(key);
     if (existing) {
       existing.qty += 1;
