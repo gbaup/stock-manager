@@ -1,28 +1,36 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { decrypt } from '@/app/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify } from 'jose';
 
-const protectedPrefixes = ['/inventory', '/purchases', '/dashboard'];
+const PUBLIC_PATHS = new Set(['/login', '/public']);
+
+const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? '');
 
 export async function proxy(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const isProtected = protectedPrefixes.some((p) => path.startsWith(p));
+  const { pathname } = request.nextUrl;
 
-  if (isProtected) {
-    const session = await decrypt(request.cookies.get('session')?.value);
-    if (!session?.userId) {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
+  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
+
+  const session = request.cookies.get('session')?.value;
+  let valid = false;
+  if (session) {
+    try {
+      await jwtVerify(session, secret, { algorithms: ['HS256'] });
+      valid = true;
+    } catch {}
   }
 
-  // Redirect root to inventory
-  if (path === '/') {
-    return NextResponse.redirect(new URL('/inventory', request.url));
+  if (!valid) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|public).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
