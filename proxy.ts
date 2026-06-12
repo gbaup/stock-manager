@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const PUBLIC_PATHS = new Set(['/login', '/public']);
-
-const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? '');
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) throw new Error('SESSION_SECRET is not set');
+const secret = new TextEncoder().encode(sessionSecret);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
+  if (pathname === '/login' || pathname.startsWith('/public')) return NextResponse.next();
 
   const session = request.cookies.get('session')?.value;
   let valid = false;

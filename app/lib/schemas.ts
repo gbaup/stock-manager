@@ -44,14 +44,7 @@ export const arrivalSchema = z
     shippingRateUsd: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
     weight: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un peso válido'),
     shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
-  })
-  .refine(
-    (data) => {
-      if (process.env.NEXT_PUBLIC_ALLOW_ANONYMOUS_PURCHASES === 'true') return true;
-      return !!data.shippingPaidByUserId;
-    },
-    { message: '¿Quién pagó el envío?', path: ['shippingPaidByUserId'] }
-  );
+  });
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
@@ -139,17 +132,6 @@ export const purchaseSchema = z
     description: z.string().optional(),
     supplierPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
-  })
-  .refine(
-    (data) => {
-      if (process.env.NEXT_PUBLIC_ALLOW_ANONYMOUS_PURCHASES === 'true') return true;
-      const totalUsd = data.items.reduce(
-        (s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0),
-        0
-      );
-      return totalUsd === 0 || !!data.supplierPaidByUserId;
-    },
-    { message: '¿Quién pagó al proveedor?', path: ['supplierPaidByUserId'] }
-  );
+  });
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
