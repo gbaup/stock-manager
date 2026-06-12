@@ -34,11 +34,7 @@ export function PhotoGallery({
   async function remove(idx: number) {
     const photo = photos[idx];
     if (photo.publicId) {
-      try {
-        await deleteFile(photo.publicId);
-      } catch {
-        return;
-      }
+      await deleteFile(photo.publicId);
     }
     onChange(photos.filter((_, i) => i !== idx));
   }
