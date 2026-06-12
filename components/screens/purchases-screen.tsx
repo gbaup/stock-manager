@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { Modal } from '@/components/ui/modal';
-import { fmtDate, uyu, todayISO } from '@/app/lib/domain';
-import { markArrived } from '@/app/actions/purchases';
+import { fmtDate, uyu } from '@/app/lib/domain';
 import type { BatchSummary } from '@/app/lib/domain';
 
 export function PurchasesScreen({
@@ -21,9 +19,6 @@ export function PurchasesScreen({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<'pending' | 'arrived'>('pending');
-  const [arrivingId, setArrivingId] = useState<string | null>(null);
-  const [arrivalDate, setArrivalDate] = useState('');
-  const [pending, startTransition] = useTransition();
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   const list = tab === 'pending' ? sorted.filter((b) => b.status === 'transit') : sorted.filter((b) => b.status === 'arrived');
@@ -59,35 +54,13 @@ export function PurchasesScreen({
                 <PurchaseCard
                   key={b.id}
                   batch={b}
-                  onArrive={(id) => { setArrivingId(id); setArrivalDate(todayISO()); }}
+                  onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
                 />
               ))
             )}
           </div>
         </div>
       </div>
-      {arrivingId && (
-        <Modal
-          icon="check"
-          title="¿Marcar como recibida?"
-          confirmLabel={pending ? 'Guardando…' : 'Confirmar'}
-          cancelLabel="Cancelar"
-          onConfirm={() => {
-            startTransition(async () => {
-              await markArrived(arrivingId, { arrivalDate });
-            });
-          }}
-          onCancel={() => setArrivingId(null)}
-        >
-          <div style={{ marginBottom: 8 }}>Fecha de llegada</div>
-          <input
-            className="input mono"
-            type="date"
-            value={arrivalDate}
-            onChange={(e) => setArrivalDate(e.target.value)}
-          />
-        </Modal>
-      )}
       <button className="fab" onClick={() => router.push('/purchases/new')} aria-label="Registrar compra">
         <Icon name="plus" size={26} strokeWidth={2.2} />
       </button>
