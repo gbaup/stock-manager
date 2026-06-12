@@ -44,7 +44,7 @@ export const arrivalSchema = z
     shippingPriceUsd: z.string().optional(),
     shippingPriceUyu: z.string().optional(),
     weight: z.string().optional(),
-    shippingPaidByUserId: z.string().uuid().optional(),
+    shippingPaidByUserId: z.preprocess((v) => v || undefined, z.string().uuid().optional()),
   })
   .refine(
     (data) => {
@@ -141,7 +141,7 @@ export const purchaseSchema = z
     supplier: z.string().optional(),
     trackingNumber: z.string().optional(),
     description: z.string().optional(),
-    supplierPaidByUserId: z.string().uuid().optional(),
+    supplierPaidByUserId: z.preprocess((v) => v || undefined, z.string().uuid().optional()),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   })
   .refine(
