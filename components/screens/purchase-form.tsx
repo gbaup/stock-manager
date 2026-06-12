@@ -45,7 +45,7 @@ export function PurchaseForm({
       description: '',
       supplierPaidByUserId: '',
       items: presetModelId
-        ? [{ modelId: presetModelId, size: '', basePriceUsd: '' }]
+        ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }]
         : [],
     },
   });
@@ -56,10 +56,12 @@ export function PurchaseForm({
   const modelLabel = (m: ModelWithStats) => `${cap(m.team)} · ${cap(m.version ?? '')} · ${m.season}`;
   const modelByLabel: Record<string, string> = {};
   models.forEach((m) => { modelByLabel[modelLabel(m)] = m.id; });
+  const sortedModels = [...models].sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
-  const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0), 0);
+  const totalQty = validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
+  const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0) * (it.quantity ?? 1), 0);
   const needsSupplierPayer = totalUsd > 0;
 
   async function handleNextStep() {
@@ -77,11 +79,13 @@ export function PurchaseForm({
         supplierPaidByUserId: data.supplierPaidByUserId || undefined,
         items: data.items
           .filter((it) => it.modelId)
-          .map((it) => ({
-            modelId: it.modelId,
-            size: it.size,
-            basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
-          })),
+          .flatMap((it) =>
+            Array.from({ length: it.quantity ?? 1 }, () => ({
+              modelId: it.modelId,
+              size: it.size,
+              basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
+            }))
+          ),
       });
     });
   }
@@ -107,7 +111,7 @@ export function PurchaseForm({
               </Field>
               <Field label="Cantidad">
                 <div className="calc-field">
-                  <span className="calc-val">{fields.length}</span>
+                  <span className="calc-val">{totalQty}</span>
                   <span className="calc-hint">se calcula de los items</span>
                 </div>
               </Field>
@@ -185,7 +189,7 @@ export function PurchaseForm({
                               onChange={(e) => f.onChange(modelByLabel[e.target.value] || '')}
                             >
                               <option value="">Elegí un producto…</option>
-                              {models.map((mm) => (
+                              {sortedModels.map((mm) => (
                                 <option key={mm.id} value={modelLabel(mm)}>{modelLabel(mm)}</option>
                               ))}
                             </select>
@@ -210,6 +214,23 @@ export function PurchaseForm({
                             )}
                           />
                         </Field>
+                        <Field label="Cantidad">
+                          <Controller
+                            name={`items.${index}.quantity`}
+                            control={control}
+                            render={({ field: f }) => (
+                              <input
+                                className="input mono"
+                                type="number"
+                                min={1}
+                                value={f.value ?? 1}
+                                onChange={(e) => f.onChange(parseInt(e.target.value, 10) || 1)}
+                              />
+                            )}
+                          />
+                        </Field>
+                      </div>
+                      <div className="field-row" style={{ marginTop: 6 }}>
                         <Field label="Precio base">
                           <Controller
                             name={`items.${index}.basePriceUsd`}
@@ -229,7 +250,7 @@ export function PurchaseForm({
                 className="btn btn-secondary"
                 style={{ marginTop: 12 }}
                 type="button"
-                onClick={() => append({ modelId: '', size: '', basePriceUsd: '' })}
+                onClick={() => append({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
               >
                 <Icon name="plus" size={19} />Agregar item
               </button>
@@ -238,7 +259,7 @@ export function PurchaseForm({
                 <div className="batch-summary">
                   <div className="bs-row">
                     <span>Cantidad</span>
-                    <strong>{validItems.length} {validItems.length === 1 ? 'item' : 'items'}</strong>
+                    <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
                   </div>
                   <div className="bs-row">
                     <span>Costo base total</span>
