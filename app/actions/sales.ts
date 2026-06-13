@@ -5,6 +5,7 @@ import { getCurrentUserId } from '@/app/lib/auth';
 import { saleSchema, parseOrThrow } from '@/app/lib/schemas';
 import { recordSale, NotEnoughStockError } from '@/app/lib/inventory';
 import { getExchangeRate } from '@/app/lib/exchange-rate';
+import { prisma } from '@/app/lib/prisma';
 
 export async function createSaleFromHome(
   modelId: string,
@@ -14,7 +15,7 @@ export async function createSaleFromHome(
     date: string;
     method?: string;
     description?: string;
-    collectedByUserId?: string;
+    collectedByUserId: string;
   },
 ) {
   const userId = await getCurrentUserId();
@@ -22,10 +23,15 @@ export async function createSaleFromHome(
 
   parseOrThrow(saleSchema, data);
 
-  const qty = parseInt(data.quantity, 10) || 1;
+  const qty = parseInt(data.quantity, 10);
   const priceUyu = parseFloat(data.price);
   const exchangeRate = await getExchangeRate();
   const saleDate = new Date(data.date);
+
+  const available = await prisma.inventoryItem.count({
+    where: { catalogProductId: modelId, status: 'available', batch: { arrivalDate: { not: null } } },
+  });
+  if (available < qty) throw new Error('Stock insuficiente');
 
   for (let i = 0; i < qty; i++) {
     try {
@@ -67,10 +73,15 @@ export async function createSale(
 
   parseOrThrow(saleSchema, data);
 
-  const qty = parseInt(data.quantity, 10) || 1;
+  const qty = parseInt(data.quantity, 10);
   const priceUyu = parseFloat(data.price);
   const exchangeRate = await getExchangeRate();
   const saleDate = new Date(data.date);
+
+  const available = await prisma.inventoryItem.count({
+    where: { catalogProductId: modelId, status: 'available', batch: { arrivalDate: { not: null } } },
+  });
+  if (available < qty) throw new Error('Stock insuficiente');
 
   for (let i = 0; i < qty; i++) {
     try {

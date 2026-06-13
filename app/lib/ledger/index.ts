@@ -72,7 +72,7 @@ export function settleBalances(
   balances: Record<string, PersonBalance>,
   users: UserSummary[],
 ): SettleTransfer[] {
-  if (users.length !== 2) throw new Error(`settleBalances requires exactly 2 users, got ${users.length}`);
+  if (users.length !== 2) return [];
   const [u1, u2] = users;
 
   const b1 = balances[u1.alias] ?? emptyBalance();

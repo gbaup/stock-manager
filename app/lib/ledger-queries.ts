@@ -1,7 +1,7 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import { CACHE_TAGS } from './cache-tags';
-import { getPurchases, getUsers } from './queries';
+import { batchToSummary } from './queries';
 import type { ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from './domain';
 import {
   buildMovements,
@@ -85,8 +85,15 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
   cacheTag(CACHE_TAGS.purchases);
   cacheTag(CACHE_TAGS.users);
 
-  const [purchases, soldItems, expenses, convRows, adjRows, users] = await Promise.all([
-    getPurchases(),
+  const [batchRows, soldItems, expenses, convRows, adjRows, userRows] = await Promise.all([
+    prisma.batch.findMany({
+      include: {
+        items: { include: { product: { include: { team: true } } } },
+        supplierPaidByUser: true,
+        shippingPaidByUser: true,
+      },
+      orderBy: { purchaseDate: 'desc' },
+    }),
     prisma.inventoryItem.findMany({
       where: { status: 'sold' },
       include: {
@@ -103,8 +110,13 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
     prisma.expense.findMany({ orderBy: { date: 'desc' }, include: { paidByUser: true } }),
     prisma.conversion.findMany({ orderBy: { date: 'desc' }, include: { fromUser: true, toUser: true } }),
     prisma.adjustment.findMany({ orderBy: { date: 'desc' }, include: { user: true } }),
-    getUsers(),
+    prisma.user.findMany({ select: { id: true, alias: true }, orderBy: { alias: 'asc' } }),
   ]);
+
+  const purchases = batchRows.map((b) =>
+    batchToSummary(b, b.items.map((i) => ({ ...i, product: i.product })))
+  );
+  const users: UserSummary[] = userRows.map((u) => ({ id: u.id, alias: u.alias }));
 
   const sales = soldItems
     .filter((i) => i.sale !== null)

@@ -49,7 +49,7 @@ function productMeta(p: {
   };
 }
 
-function batchToSummary(
+export function batchToSummary(
   b: {
     id: string; purchaseDate: Date; arrivalDate: Date | null;
     supplier: string | null;

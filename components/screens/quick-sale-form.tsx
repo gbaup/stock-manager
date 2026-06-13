@@ -36,6 +36,7 @@ export function QuickSaleForm({
   const [method, setMethod] = useState('');
   const [description, setDescription] = useState('');
   const [collectedByUserId, setCollectedByUserId] = useState(sessionUserId);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDate(new Date().toISOString().split('T')[0]); }, []);
@@ -62,15 +63,20 @@ export function QuickSaleForm({
 
   function handleSave() {
     if (!canSave || !model) return;
+    setSaveError(null);
     startTransition(async () => {
-      await createSaleFromHome(model.id, {
-        price,
-        quantity,
-        date,
-        method: method || undefined,
-        description: description || undefined,
-        collectedByUserId,
-      });
+      try {
+        await createSaleFromHome(model.id, {
+          price,
+          quantity,
+          date,
+          method: method || undefined,
+          description: description || undefined,
+          collectedByUserId,
+        });
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : 'Error al registrar la venta');
+      }
     });
   }
 
@@ -246,6 +252,11 @@ export function QuickSaleForm({
                 />
               </Field>
 
+              {saveError && (
+                <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
+                  {saveError}
+                </div>
+              )}
               <button
                 className="btn btn-primary"
                 style={{ marginTop: 14 }}

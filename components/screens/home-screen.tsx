@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
@@ -60,13 +60,6 @@ export function HomeScreen({
   sessionUserId: string;
 }) {
   const router = useRouter();
-  const [hydrated, setHydrated] = useState(false);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setHydrated(true); }, []);
-
-  if (!hydrated) return null;
-
   const currentUser = users.find((u) => u.id === sessionUserId) ?? users[0];
 
   return (
