@@ -1,7 +1,9 @@
+import type { Photo } from './photo';
+
 export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
-export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero', 'Retro'] as const;
+export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero'] as const;
 export const SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
 export const SHIRT_TYPES = ['Fan', 'Player', 'Retro'] as const;
 export const SLEEVES = ['Corta', 'Larga'] as const;
@@ -23,50 +25,6 @@ export const JERSEY_COLORS = [
 
 export type JerseyColor = typeof JERSEY_COLORS[number];
 
-export function colorByName(name: string): JerseyColor {
-  return (JERSEY_COLORS.find((c) => c.name === name) ?? JERSEY_COLORS[0]) as JerseyColor;
-}
-
-export function personInitial(name: string): string {
-  return name.charAt(0).toUpperCase();
-}
-
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
-
-export function fmtDate(date: Date | string | null | undefined): string {
-  if (!date) return '—';
-  const d = typeof date === 'string' ? new Date(date + 'T12:00:00Z') : date;
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
-}
-
-export function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-export function uyu(n: number): string {
-  return `$U ${new Intl.NumberFormat('es-UY').format(Math.round(n))}`;
-}
-
-export function usd(n: number): string {
-  return `US$ ${new Intl.NumberFormat('es-UY').format(Math.round(n))}`;
-}
-
-export function toUsd(uyuAmount: number, rate: number): number {
-  return uyuAmount / rate;
-}
-
-export function signedUyu(n: number): string {
-  if (n === 0) return '$U 0';
-  const abs = uyu(Math.abs(n));
-  return n > 0 ? `+ ${abs}` : `− ${abs}`;
-}
-
-export function signedUsd(n: number): string {
-  if (n === 0) return 'US$ 0';
-  const abs = usd(Math.abs(n));
-  return n > 0 ? `+ ${abs}` : `− ${abs}`;
-}
-
 // ---- Domain types (serialization-safe: no Prisma Decimal, no Date objects) ----
 
 export type ModelMeta = {
@@ -79,7 +37,7 @@ export type ModelMeta = {
   player: string | null;
   type: string | null;
   sleeve: string | null;
-  photos: string[];
+  photos: Photo[];
   sizes: string[];  // derived from in-stock InventoryItem.size values
   description: string | null;
 };
@@ -175,20 +133,4 @@ export type ConversionRecord = {
   toAmount: number;
 };
 
-export function fmtRate(n: number): string {
-  return new Intl.NumberFormat('es-UY', { maximumFractionDigits: 2 }).format(n);
-}
-
-export function convertAmount(
-  fromAmount: number,
-  fromCur: 'UYU' | 'USD',
-  toCur: 'UYU' | 'USD',
-  rate: number,
-): number {
-  if (!fromAmount) return 0;
-  if (fromCur === toCur) return fromAmount;
-  if (fromCur === 'UYU' && toCur === 'USD') return rate ? Math.round((fromAmount / rate) * 100) / 100 : 0;
-  if (fromCur === 'USD' && toCur === 'UYU') return Math.round(fromAmount * rate);
-  return fromAmount;
-}
 

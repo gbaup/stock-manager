@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { colorByName, SIZES } from '@/app/lib/domain';
+import { SIZES } from '@/app/lib/domain';
+import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
 type PublicModel = ModelMeta & { stock: number };
@@ -15,7 +16,7 @@ const VIEW_KEY = 'sc_pub_view';
 function SizeChips({ sizes }: { sizes: string[] }) {
   if (!sizes.length) return null;
   return (
-    <div className="size-chips">
+    <div className="size-chips capitalize">
       {sizes.map((s) => <span key={s} className="size-chip">{s}</span>)}
     </div>
   );
@@ -227,7 +228,7 @@ export function PublicScreen({ models, today }: { models: PublicModel[]; today: 
 
 function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void }) {
   const c = colorByName(model.color);
-  const cover = model.photos[0] ?? null;
+  const cover = model.photos[0]?.url ?? null;
   return (
     <div className="pub-card" onClick={onOpen}>
       <div className="pub-card-img" style={{ background: c.bg, color: c.fg }}>
@@ -247,7 +248,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
         )}
       </div>
       <div className="pub-card-body">
-        <div className="pub-card-team">{model.team}</div>
+        <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
           {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''}
         </div>
@@ -260,7 +261,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
 
 function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }) {
   const c = colorByName(model.color);
-  const cover = model.photos[0] ?? null;
+  const cover = model.photos[0]?.url ?? null;
   return (
     <div className="pub-row" onClick={onOpen}>
       <div style={{
@@ -317,7 +318,7 @@ function GalleryViewer({
       <div className="viewer-img-wrap" onClick={(e) => e.stopPropagation()}>
         {photos.length > 0 ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="viewer-img" src={photos[idx]} alt="" />
+          <img className="viewer-img" src={photos[idx].url} alt="" />
         ) : (
           <div style={{
             width: 200, height: 200, background: c.bg, color: c.fg,
@@ -340,14 +341,14 @@ function GalleryViewer({
 
       {photos.length > 1 && (
         <div className="viewer-thumbs" onClick={(e) => e.stopPropagation()}>
-          {photos.map((src, i) => (
+          {photos.map((p, i) => (
             <div
               key={i}
               className={`viewer-thumb${i === idx ? ' is-active' : ''}`}
               onClick={() => setIdx(i)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" />
+              <img src={p.url} alt="" />
             </div>
           ))}
         </div>

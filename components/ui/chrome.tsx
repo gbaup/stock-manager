@@ -33,6 +33,7 @@ export function TopBar({
 }
 
 const NAV_ITEMS = [
+  { id: 'home', label: 'Inicio', icon: 'home' as const, href: '/home' },
   { id: 'inventory', label: 'Inventario', icon: 'box' as const, href: '/inventory' },
   { id: 'purchases', label: 'Compras', icon: 'truck' as const, href: '/purchases' },
   { id: 'saldos', label: 'Saldos', icon: 'wallet' as const, href: '/saldos' },
@@ -56,13 +57,15 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const active = pathname.startsWith('/purchases')
-    ? 'purchases'
-    : pathname.startsWith('/saldos')
-      ? 'saldos'
-      : pathname.startsWith('/public')
-        ? 'public'
-        : 'inventory';
+  const active = pathname.startsWith('/home')
+    ? 'home'
+    : pathname.startsWith('/purchases')
+      ? 'purchases'
+      : pathname.startsWith('/saldos')
+        ? 'saldos'
+        : pathname.startsWith('/public')
+          ? 'public'
+          : 'inventory';
 
   const items = NAV_ITEMS.map((it) =>
     it.id === 'purchases' ? { ...it, badge: transitCount } : { ...it, badge: undefined }

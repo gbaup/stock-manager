@@ -1,19 +1,16 @@
-export async function uploadFile(file: File): Promise<string> {
+import type { Photo } from './photo';
+
+export async function uploadFile(file: File): Promise<Photo> {
   const body = new FormData();
   body.append('file', file);
   const res = await fetch('/api/image', { method: 'POST', body });
   if (!res.ok) throw new Error('Upload failed');
-  const { url } = await res.json();
-  return url as string;
+  const data = (await res.json()) as { url: string; publicId: string };
+  return { url: data.url, publicId: data.publicId };
 }
 
-export function extractPublicId(url: string): string {
-  const after = url.split('/upload/')[1] ?? '';
-  return after.replace(/^v\d+\//, '').replace(/\.[^.]+$/, '');
-}
-
-export async function deleteFile(url: string): Promise<void> {
-  const publicId = extractPublicId(url);
+export async function deleteFile(publicId: string): Promise<void> {
+  if (!publicId) return;
   const res = await fetch('/api/image', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },

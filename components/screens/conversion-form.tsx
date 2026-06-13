@@ -7,9 +7,8 @@ import { Field } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { Modal } from '@/components/ui/modal';
 import { Icon } from '@/components/ui/icon';
-import {
-  uyu, usd, fmtRate, convertAmount, personInitial, todayISO,
-} from '@/app/lib/domain';
+import { uyu, usd, fmtRate, personInitial, todayISO } from '@/app/lib/format';
+import { money } from '@/app/lib/money';
 import type { UserSummary } from '@/app/lib/domain';
 import { createConversion } from '@/app/actions/conversions';
 
@@ -20,7 +19,7 @@ const curCode = (label: string): Cur => (label === 'Dólares' ? 'USD' : 'UYU');
 const curLabel = (c: Cur) => (c === 'USD' ? 'Dólares' : 'Pesos');
 const curSym = (c: Cur) => (c === 'USD' ? 'US$' : '$U');
 const curName = (c: Cur) => (c === 'USD' ? 'dólares' : 'pesos');
-const money = (c: Cur, n: number) => (c === 'USD' ? usd(n) : uyu(n));
+const fmtCur = (c: Cur, n: number) => (c === 'USD' ? usd(n) : uyu(n));
 
 function Avatar({ name, size = 26 }: { name: string; size?: number }) {
   return (
@@ -76,7 +75,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
   const sameAccount = !!f.fromUserId && f.fromUserId === f.toUserId && sameCur;
   const amount = Number(f.amount) || 0;
   const rate = Number(f.rate) || 0;
-  const result = convertAmount(amount, f.fromCur, f.toCur, sameCur ? 1 : rate);
+  const result = money.convert(amount, f.fromCur, f.toCur, sameCur ? 1 : rate);
   const canSave = amount > 0 && !!f.fromUserId && !!f.toUserId && !sameAccount && (sameCur || rate > 0);
   const crossPerson = f.fromUserId && f.toUserId && f.fromUserId !== f.toUserId;
 
@@ -203,7 +202,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
           <Field label={sameCur ? 'Entra (mismo monto)' : 'Entra (calculado)'}>
             <div className="calc-field">
               <span className="calc-val">
-                {result > 0 ? money(f.toCur, result) : `${curSym(f.toCur)} 0`}
+                {result > 0 ? fmtCur(f.toCur, result) : `${curSym(f.toCur)} 0`}
               </span>
               <span className="calc-hint">
                 {sameCur ? 'misma moneda' : (rate > 0 ? `a TC ${fmtRate(rate)}` : 'poné el TC')}
@@ -218,7 +217,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
                   <Avatar name={fromAlias} />
                   {fromAlias} · {curLabel(f.fromCur)}
                 </span>
-                <strong className="neg">− {money(f.fromCur, amount)}</strong>
+                <strong className="neg">− {fmtCur(f.fromCur, amount)}</strong>
               </div>
               <div className="cs-arrow">
                 <Icon name="chevR" size={15} style={{ transform: 'rotate(90deg)' }} />
@@ -228,7 +227,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
                   <Avatar name={toAlias} />
                   {toAlias} · {curLabel(f.toCur)}
                 </span>
-                <strong className="pos">+ {money(f.toCur, result)}</strong>
+                <strong className="pos">+ {fmtCur(f.toCur, result)}</strong>
               </div>
             </div>
           )}
@@ -259,12 +258,12 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
         >
           <span className="modal-strong">{fromAlias}</span>{' '}
           {sameCur ? 'transfiere' : 'cambia'}{' '}
-          <span className="modal-strong">{money(f.fromCur, amount)}</span>
+          <span className="modal-strong">{fmtCur(f.fromCur, amount)}</span>
           {sameCur ? (
             <> a <span className="modal-strong">{toAlias}</span>.</>
           ) : (
             <>
-              {' '}→ <span className="modal-strong">{money(f.toCur, result)}</span>
+              {' '}→ <span className="modal-strong">{fmtCur(f.toCur, result)}</span>
               {crossPerson && <> para <span className="modal-strong">{toAlias}</span></>}
               {' '}(TC <span className="modal-strong">{fmtRate(rate)}</span>).
             </>

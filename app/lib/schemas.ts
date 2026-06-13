@@ -41,20 +41,10 @@ export type GastoFormValues = z.infer<typeof gastoSchema>;
 export const arrivalSchema = z
   .object({
     arrivalDate: z.string().min(1, 'Requerido'),
-    shippingPriceUsd: z.string().optional(),
-    shippingPriceUyu: z.string().optional(),
-    weight: z.string().optional(),
-    shippingPaidByUserId: z.string().uuid().optional(),
-  })
-  .refine(
-    (data) => {
-      const hasShipping =
-        (parseFloat(data.shippingPriceUsd ?? '') || 0) > 0 ||
-        (parseFloat(data.shippingPriceUyu ?? '') || 0) > 0;
-      return !hasShipping || !!data.shippingPaidByUserId;
-    },
-    { message: '¿Quién pagó el envío?', path: ['shippingPaidByUserId'] }
-  );
+    shippingRateUsd: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+    weight: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un peso válido'),
+    shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+  });
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
@@ -119,7 +109,10 @@ export const modelSchema = z.object({
   number: z.string().optional(),
   player: z.string().optional(),
   description: z.string().optional(),
-  photos: z.array(z.string()),
+  photos: z.array(z.object({
+    url: z.string().min(1),
+    publicId: z.string(),
+  })),
 });
 
 export type ModelFormValues = z.infer<typeof modelSchema>;
@@ -128,6 +121,7 @@ const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
   size: z.string().min(1, 'Elegí un talle'),
   basePriceUsd: z.string().optional(),
+  quantity: z.number().int().min(1),
 });
 
 export const purchaseSchema = z
@@ -136,18 +130,8 @@ export const purchaseSchema = z
     supplier: z.string().optional(),
     trackingNumber: z.string().optional(),
     description: z.string().optional(),
-    supplierPaidByUserId: z.string().uuid().optional(),
+    supplierPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
-  })
-  .refine(
-    (data) => {
-      const totalUsd = data.items.reduce(
-        (s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0),
-        0
-      );
-      return totalUsd === 0 || !!data.supplierPaidByUserId;
-    },
-    { message: '¿Quién pagó al proveedor?', path: ['supplierPaidByUserId'] }
-  );
+  });
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;

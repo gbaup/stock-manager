@@ -1,4 +1,5 @@
-import { uyu, usd, toUsd } from '@/app/lib/domain';
+import { uyu, usd } from '@/app/lib/format';
+import { money } from '@/app/lib/money';
 
 export function Money({
   uyuAmount,
@@ -14,7 +15,7 @@ export function Money({
   return (
     <span className={className}>
       {uyu(uyuAmount)}
-      {showUsd && <span className="money-sec"> · {usd(toUsd(uyuAmount, usdRate))}</span>}
+      {showUsd && <span className="money-sec"> · {usd(money.toUsd(uyuAmount, usdRate))}</span>}
     </span>
   );
 }

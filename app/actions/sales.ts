@@ -1,10 +1,61 @@
 'use server';
 
-import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/app/lib/prisma';
 import { getCurrentUserId } from '@/app/lib/auth';
 import { saleSchema, parseOrThrow } from '@/app/lib/schemas';
+import { recordSale, NotEnoughStockError } from '@/app/lib/inventory';
+import { getExchangeRate } from '@/app/lib/exchange-rate';
+import { prisma } from '@/app/lib/prisma';
+
+export async function createSaleFromHome(
+  modelId: string,
+  data: {
+    price: string;
+    quantity: string;
+    date: string;
+    method?: string;
+    description?: string;
+    collectedByUserId: string;
+  },
+) {
+  const userId = await getCurrentUserId();
+  if (!userId) redirect('/login');
+
+  parseOrThrow(saleSchema, data);
+
+  const qty = parseInt(data.quantity, 10);
+  const priceUyu = parseFloat(data.price);
+  const exchangeRate = await getExchangeRate();
+  const saleDate = new Date(data.date);
+
+  const available = await prisma.inventoryItem.count({
+    where: { catalogProductId: modelId, status: 'available', batch: { arrivalDate: { not: null } } },
+  });
+  if (available < qty) throw new Error('Stock insuficiente');
+
+  for (let i = 0; i < qty; i++) {
+    try {
+      await recordSale(
+        {
+          modelId,
+          size: null,
+          priceUyu,
+          exchangeRate,
+          date: saleDate,
+          method: data.method?.trim().toLowerCase() || null,
+          description: data.description?.trim().toLowerCase() || null,
+          collectedByUserId: data.collectedByUserId || null,
+        },
+        userId,
+      );
+    } catch (e) {
+      if (e instanceof NotEnoughStockError) throw new Error('Stock insuficiente');
+      throw e;
+    }
+  }
+
+  redirect('/home');
+}
 
 export async function createSale(
   modelId: string,
@@ -15,55 +66,43 @@ export async function createSale(
     method?: string;
     description?: string;
     collectedByUserId?: string;
-  }
+  },
 ) {
   const userId = await getCurrentUserId();
   if (!userId) redirect('/login');
 
   parseOrThrow(saleSchema, data);
 
-  const qty = parseInt(data.quantity, 10) || 1;
-  const price = parseFloat(data.price);
+  const qty = parseInt(data.quantity, 10);
+  const priceUyu = parseFloat(data.price);
+  const exchangeRate = await getExchangeRate();
   const saleDate = new Date(data.date);
 
-  const availableItems = await prisma.inventoryItem.findMany({
-    where: {
-      catalogProductId: modelId,
-      status: 'available',
-      batch: { arrivalDate: { not: null } },
-    },
-    take: qty,
-    orderBy: { createdAt: 'asc' },
+  const available = await prisma.inventoryItem.count({
+    where: { catalogProductId: modelId, status: 'available', batch: { arrivalDate: { not: null } } },
   });
+  if (available < qty) throw new Error('Stock insuficiente');
 
-  if (availableItems.length < qty) {
-    throw new Error('Stock insuficiente');
-  }
-
-  // Interactive transaction re-checks status='available' before each update,
-  // so concurrent sales on the same items fail atomically instead of overselling.
-  await prisma.$transaction(async (tx) => {
-    for (const item of availableItems) {
-      const { count } = await tx.inventoryItem.updateMany({
-        where: { id: item.id, status: 'available' },
-        data: { status: 'sold', finalPriceUyu: price },
-      });
-      if (count === 0) throw new Error('Stock insuficiente');
-      await tx.sale.create({
-        data: {
-          inventoryItemId: item.id,
-          userId,
-          price,
+  for (let i = 0; i < qty; i++) {
+    try {
+      await recordSale(
+        {
+          modelId,
+          size: null,
+          priceUyu,
+          exchangeRate,
           date: saleDate,
           method: data.method?.trim().toLowerCase() || null,
           description: data.description?.trim().toLowerCase() || null,
           collectedByUserId: data.collectedByUserId || null,
         },
-      });
+        userId,
+      );
+    } catch (e) {
+      if (e instanceof NotEnoughStockError) throw new Error('Stock insuficiente');
+      throw e;
     }
-  });
+  }
 
-  updateTag('models');
-  updateTag('saldos');
   redirect(`/inventory/${modelId}`);
 }

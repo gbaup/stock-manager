@@ -2,7 +2,7 @@ import {
   Search, Plus, Package, ShoppingCart, Tag, Truck, Eye,
   ChevronRight, ChevronLeft, Check, Pencil, X, Calendar,
   Scale, TrendingUp, Filter, Shirt, Wallet, Receipt, ArrowLeftRight,
-  Camera, Image, Trash2, LayoutGrid, List, Loader2,
+  Camera, Image, Trash2, LayoutGrid, List, Loader2, Home, User,
 } from 'lucide-react';
 
 const ICONS = {
@@ -32,6 +32,8 @@ const ICONS = {
   grid:     LayoutGrid,
   list:     List,
   loader:   Loader2,
+  home:     Home,
+  user:     User,
 } as const;
 
 type IconName = keyof typeof ICONS;

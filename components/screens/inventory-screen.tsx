@@ -7,7 +7,7 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { colorByName } from '@/app/lib/domain';
+import { colorByName } from '@/app/lib/format';
 import type { ModelWithStats } from '@/app/lib/domain';
 
 type Layout = 'cards' | 'rows' | 'grid';
@@ -37,6 +37,11 @@ export function InventoryScreen({
   if (filter === 'instock') list = list.filter((m) => m.stock > 0);
   else if (filter === 'out') list = list.filter((m) => m.stock === 0);
   else if (filter === 'transit') list = list.filter((m) => m.inTransit > 0);
+
+  list = [...list].sort((a, b) => {
+    if (a.stock > 0 !== b.stock > 0) return a.stock > 0 ? -1 : 1;
+    return a.team.localeCompare(b.team);
+  });
 
   const counts = {
     all: models.length,
@@ -169,8 +174,8 @@ function DenseRows({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: stri
         <div key={m.id} className="row" onClick={() => onOpen(m.id)}>
           <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 30, height: 30, fontSize: 12 }} />
           <div className="row-main">
-            <div className="row-team">{m.team} · {m.version}</div>
-            <div className="row-meta">{m.season}{m.player ? ` · ${m.player}` : ''} · {m.color}</div>
+            <div className="row-team capitalize">{m.team} · {m.version}</div>
+            <div className="row-meta capitalize">{m.season}{m.player ? ` · ${m.player}` : ''} · {m.color}</div>
           </div>
           <div className="row-transit">{m.inTransit > 0 ? `+${m.inTransit}` : ''}</div>
           <div className="row-stock" style={{ color: m.stock === 0 ? 'var(--text-faint)' : 'var(--text)' }}>
@@ -209,7 +214,7 @@ function VisualGrid({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: str
               )}
             </div>
             <div className="tile-body">
-              <div className="tile-team">{m.team}</div>
+              <div className="tile-team capitalize">{m.team}</div>
               <div className="tile-meta">{m.season} · {m.version}</div>
               {m.inTransit > 0 && (
                 <div style={{ marginTop: 8 }}>

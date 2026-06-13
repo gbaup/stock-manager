@@ -1,11 +1,28 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
-import { fmtDate } from './domain';
+import { fmtDate } from './format';
+import { stockByModel, countStock } from './inventory';
+import { CACHE_TAGS } from './cache-tags';
+import { parsePhotos } from './photo';
+import type { Photo } from './photo';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
-  ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord, ConversionRecord,
-  AdjustmentRecord, UserSummary,
+  ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, UserSummary,
 } from './domain';
+
+export type HomeSaleItem = {
+  id: string;
+  catalogProductId: string;
+  teamName: string;
+  color: string;
+  version: string | null;
+  number: string | null;
+  photos: Photo[];
+  price: number;
+  date: string;
+  collectedByUserId: string | null;
+  collectedByAlias: string | null;
+};
 
 function toISODate(d: Date | null): string | null {
   if (!d) return null;
@@ -26,13 +43,13 @@ function productMeta(p: {
     player: p.player,
     type: p.type,
     sleeve: p.sleeve,
-    photos: Array.isArray(p.photos) ? (p.photos as string[]) : [],
+    photos: parsePhotos(p.photos),
     sizes,
     description: p.description ?? null,
   };
 }
 
-function batchToSummary(
+export function batchToSummary(
   b: {
     id: string; purchaseDate: Date; arrivalDate: Date | null;
     supplier: string | null;
@@ -74,7 +91,7 @@ function batchToSummary(
 export async function getUsers(): Promise<UserSummary[]> {
   'use cache';
   cacheLife('days');
-  cacheTag('users');
+  cacheTag(CACHE_TAGS.users);
   const rows = await prisma.user.findMany({ select: { id: true, alias: true }, orderBy: { alias: 'asc' } });
   return rows.map((u) => ({ id: u.id, alias: u.alias }));
 }
@@ -82,7 +99,7 @@ export async function getUsers(): Promise<UserSummary[]> {
 export async function getTeams(): Promise<{ id: string; name: string }[]> {
   'use cache';
   cacheLife('days');
-  cacheTag('teams');
+  cacheTag(CACHE_TAGS.teams);
   const teams = await prisma.team.findMany({ orderBy: { name: 'asc' } });
   return teams.map((t) => ({ id: t.id, name: t.name }));
 }
@@ -90,23 +107,21 @@ export async function getTeams(): Promise<{ id: string; name: string }[]> {
 export async function getModels(): Promise<ModelWithStats[]> {
   'use cache';
   cacheLife('hours');
-  cacheTag('models');
-  const products = await prisma.catalogProduct.findMany({
-    include: {
-      team: true,
-      items: { select: { status: true, batch: { select: { arrivalDate: true } } } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  cacheTag(CACHE_TAGS.models);
+  const [products, counts] = await Promise.all([
+    prisma.catalogProduct.findMany({
+      include: { team: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    stockByModel(),
+  ]);
 
   return products.map((p) => {
-    const arrivedItems = p.items.filter((i) => i.batch.arrivalDate !== null);
-    const stock = arrivedItems.filter((i) => i.status === 'available').length;
-    const inTransit = p.items.filter((i) => i.batch.arrivalDate === null).length;
+    const c = counts.get(p.id);
     return {
       ...productMeta(p),
-      stock,
-      inTransit,
+      stock: c?.available ?? 0,
+      inTransit: c?.inTransit ?? 0,
     };
   });
 }
@@ -114,7 +129,7 @@ export async function getModels(): Promise<ModelWithStats[]> {
 export async function getModelById(id: string): Promise<ModelDetail | null> {
   'use cache';
   cacheLife('hours');
-  cacheTag('models');
+  cacheTag(CACHE_TAGS.models);
   const p = await prisma.catalogProduct.findUnique({
     where: { id },
     include: {
@@ -142,9 +157,9 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   });
   if (!p) return null;
 
-  const arrivedItems = p.items.filter((i) => i.batch.arrivalDate !== null);
-  const stock = arrivedItems.filter((i) => i.status === 'available').length;
-  const inTransit = p.items.filter((i) => i.batch.arrivalDate === null).length;
+  const counts = countStock(p.items);
+  const stock = counts.available;
+  const inTransit = counts.inTransit;
   const soldItems = p.items.filter((i) => i.sale !== null);
   const sold = soldItems.length;
   const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);
@@ -218,7 +233,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 export async function getPurchases(): Promise<BatchSummary[]> {
   'use cache';
   cacheLife('hours');
-  cacheTag('purchases');
+  cacheTag(CACHE_TAGS.purchases);
   const batches = await prisma.batch.findMany({
     include: {
       items: { include: { product: { include: { team: true } } } },
@@ -236,7 +251,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
 export async function getBatchById(id: string): Promise<BatchSummary | null> {
   'use cache';
   cacheLife('hours');
-  cacheTag('purchases');
+  cacheTag(CACHE_TAGS.purchases);
   const b = await prisma.batch.findUnique({
     where: { id },
     include: {
@@ -253,7 +268,7 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
 export async function getPublicModels() {
   'use cache';
   cacheLife('hours');
-  cacheTag('models');
+  cacheTag(CACHE_TAGS.models);
   const products = await prisma.catalogProduct.findMany({
     include: {
       team: true,
@@ -278,126 +293,47 @@ export async function getPublicModels() {
   return { models, today: fmtDate(new Date().toISOString().split('T')[0]) };
 }
 
-export async function getTransitCount(): Promise<number> {
+export async function getHomeSales(): Promise<HomeSaleItem[]> {
   'use cache';
   cacheLife('hours');
-  cacheTag('purchases');
-  return prisma.batch.count({ where: { arrivalDate: null } });
-}
-
-function toExpenseRecord(e: { id: string; title: string; amount: unknown; currency: string; paidByUserId: string; paidByUser: { alias: string }; date: Date }): ExpenseRecord {
-  return {
-    id: e.id,
-    title: e.title,
-    amount: Number(e.amount),
-    currency: e.currency as 'UYU' | 'USD',
-    paidByUserId: e.paidByUserId,
-    paidByAlias: e.paidByUser.alias,
-    date: toISODate(e.date)!,
-  };
-}
-
-function toConversionRecord(c: { id: string; date: Date; fromUserId: string; fromUser: { alias: string }; fromCur: string; toUserId: string; toUser: { alias: string }; toCur: string; fromAmount: unknown; rate: unknown; toAmount: unknown }): ConversionRecord {
-  return {
-    id: c.id,
-    date: toISODate(c.date)!,
-    fromUserId: c.fromUserId,
-    fromUserAlias: c.fromUser.alias,
-    fromCur: c.fromCur as 'UYU' | 'USD',
-    toUserId: c.toUserId,
-    toUserAlias: c.toUser.alias,
-    toCur: c.toCur as 'UYU' | 'USD',
-    fromAmount: Number(c.fromAmount),
-    rate: Number(c.rate),
-    toAmount: Number(c.toAmount),
-  };
-}
-
-function toAdjustmentRecord(a: { id: string; userId: string; user: { alias: string }; amountUyu: unknown; amountUsd: unknown; date: Date; note: string | null }): AdjustmentRecord {
-  return {
-    id: a.id,
-    userId: a.userId,
-    userAlias: a.user.alias,
-    amountUyu: Number(a.amountUyu),
-    amountUsd: Number(a.amountUsd),
-    date: toISODate(a.date)!,
-    note: a.note,
-  };
-}
-
-export async function getExpenses(): Promise<ExpenseRecord[]> {
-  'use cache';
-  cacheLife('hours');
-  cacheTag('saldos');
-  const rows = await prisma.expense.findMany({
-    orderBy: { date: 'desc' },
-    include: { paidByUser: true },
-  });
-  return rows.map(toExpenseRecord);
-}
-
-export async function getSaldosData() {
-  'use cache';
-  cacheLife('hours');
-  cacheTag('saldos');
-  const [batches, soldItems, expenses, convRows, adjRows] = await Promise.all([
-    prisma.batch.findMany({
-      include: {
-        items: { include: { product: { include: { team: true } } } },
-        supplierPaidByUser: true,
-        shippingPaidByUser: true,
-      },
-      orderBy: { purchaseDate: 'desc' },
-    }),
-    prisma.inventoryItem.findMany({
-      where: { status: 'sold' },
-      include: {
-        product: { include: { team: true } },
-        sale: {
-          select: {
-            id: true, price: true, date: true,
-            collectedByUserId: true,
-            collectedByUser: { select: { alias: true } },
-          },
+  cacheTag(CACHE_TAGS.saldos);
+  const items = await prisma.inventoryItem.findMany({
+    where: { status: 'sold' },
+    include: {
+      product: { include: { team: true } },
+      sale: {
+        select: {
+          id: true,
+          price: true,
+          date: true,
+          collectedByUserId: true,
+          collectedByUser: { select: { alias: true } },
         },
-        batch: { select: { arrivalDate: true } },
       },
-    }),
-    prisma.expense.findMany({
-      orderBy: { date: 'desc' },
-      include: { paidByUser: true },
-    }),
-    prisma.conversion.findMany({
-      orderBy: { date: 'desc' },
-      include: { fromUser: true, toUser: true },
-    }),
-    prisma.adjustment.findMany({
-      orderBy: { date: 'desc' },
-      include: { user: true },
-    }),
-  ]);
-
-  const purchases: BatchSummary[] = batches.map((b) =>
-    batchToSummary(b, b.items.map((i) => ({ ...i, product: i.product })))
-  );
-
-  const sales = soldItems
+    },
+  });
+  return items
     .filter((i) => i.sale !== null)
     .map((i) => ({
       id: i.sale!.id,
-      date: toISODate(i.sale!.date)!,
+      catalogProductId: i.catalogProductId,
+      teamName: i.product.team.name,
+      color: i.product.color,
+      version: i.product.version,
+      number: i.product.number !== null ? String(i.product.number) : null,
+      photos: parsePhotos(i.product.photos),
       price: Number(i.sale!.price),
+      date: toISODate(i.sale!.date)!,
       collectedByUserId: i.sale!.collectedByUserId,
       collectedByAlias: i.sale!.collectedByUser?.alias ?? null,
-      quantity: 1,
-      model: i.product.team.name,
-    }));
-
-  return {
-    purchases,
-    sales,
-    expenses: expenses.map(toExpenseRecord),
-    conversions: convRows.map(toConversionRecord),
-    adjustments: adjRows.map(toAdjustmentRecord),
-  };
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
+
+export async function getTransitCount(): Promise<number> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag(CACHE_TAGS.purchases);
+  return prisma.batch.count({ where: { arrivalDate: null } });
+}
+
