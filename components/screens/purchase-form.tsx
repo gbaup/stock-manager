@@ -11,8 +11,10 @@ import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { SIZES, usd, todayISO } from '@/app/lib/domain';
+import { SIZES } from '@/app/lib/domain';
+import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
+import type { RateResult } from '@/app/lib/exchange-rate';
 import { createPurchase } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
@@ -22,10 +24,12 @@ export function PurchaseForm({
   models,
   presetModelId,
   users,
+  rate,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
   users: UserSummary[];
+  rate: RateResult;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -80,15 +84,15 @@ export function PurchaseForm({
         trackingNumber: data.trackingNumber || undefined,
         description: data.description || undefined,
         supplierPaidByUserId: data.supplierPaidByUserId || undefined,
+        exchangeRate: rate.value,
         items: data.items
           .filter((it) => it.modelId)
-          .flatMap((it) =>
-            Array.from({ length: it.quantity ?? 1 }, () => ({
-              modelId: it.modelId,
-              size: it.size,
-              basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
-            }))
-          ),
+          .map((it) => ({
+            modelId: it.modelId,
+            size: it.size,
+            basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
+            quantity: it.quantity ?? 1,
+          })),
       });
     });
   }
@@ -276,6 +280,10 @@ export function PurchaseForm({
                   <div className="bs-row">
                     <span>Costo base total</span>
                     <strong>{usd(totalUsd)}</strong>
+                  </div>
+                  <div className="bs-row">
+                    <span>Tipo de cambio</span>
+                    <strong>$U {fmtRate(rate.value)}</strong>
                   </div>
                 </div>
               )}

@@ -1,4 +1,4 @@
-import { uyu, usd } from '@/app/lib/domain';
+import { uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 
 export function Money({

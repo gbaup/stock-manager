@@ -1,11 +1,11 @@
 import { updateTag } from 'next/cache';
 import { prisma } from './prisma';
 import { money } from './money';
-import type { Prisma } from '@prisma/client';
+import { CACHE_TAGS } from './cache-tags';
 
-// Either the top-level Prisma client or a transaction client passed in by a
-// caller that needs to compose Inventory writes with sibling writes.
-type Db = typeof prisma | Prisma.TransactionClient;
+// Narrow write interface: only the inventoryItem delegate is needed.
+// Both the top-level PrismaClient and a TransactionClient satisfy this.
+type InventoryWriter = Pick<typeof prisma, 'inventoryItem'>;
 
 export type StockCount = { available: number; inTransit: number; sold: number };
 
@@ -99,7 +99,7 @@ export async function addBatchItems(
   batchId: string,
   items: NewBatchItem[],
   exchangeRate: number,
-  db?: Db,
+  db?: InventoryWriter,
 ): Promise<void> {
   if (items.length === 0) return;
   const client = db ?? prisma;
@@ -113,7 +113,7 @@ export async function addBatchItems(
       status: 'available',
     })),
   });
-  if (!db) updateTag('models');
+  if (!db) updateTag(CACHE_TAGS.models);
 }
 
 // Atomic sale: picks the oldest available item in an arrived batch, flips it
@@ -158,8 +158,8 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
     return sale.id;
   });
 
-  updateTag('models');
-  updateTag('saldos');
+  updateTag(CACHE_TAGS.models);
+  updateTag(CACHE_TAGS.saldos);
   return { saleId };
 }
 

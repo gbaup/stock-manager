@@ -7,7 +7,7 @@ import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { fmtDate, uyu } from '@/app/lib/domain';
+import { fmtDate, uyu } from '@/app/lib/format';
 import type { BatchSummary } from '@/app/lib/domain';
 
 export function PurchasesScreen({

@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, MoneyInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
-import { todayISO, uyu, usd } from '@/app/lib/domain';
+import { todayISO, uyu, usd } from '@/app/lib/format';
 import type { UserSummary } from '@/app/lib/domain';
 import { createExpense } from '@/app/actions/expenses';
 import { gastoSchema, type GastoFormValues } from '@/app/lib/schemas';

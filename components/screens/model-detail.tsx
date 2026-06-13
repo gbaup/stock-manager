@@ -6,7 +6,7 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { fmtDate, uyu, usd } from '@/app/lib/domain';
+import { fmtDate, uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 

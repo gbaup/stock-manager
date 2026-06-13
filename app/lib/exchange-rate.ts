@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { cacheTag, cacheLife } from 'next/cache';
+import { CACHE_TAGS } from './cache-tags';
 
 export type ExchangeRateData = {
   fecha: string;
@@ -23,7 +24,7 @@ export const FALLBACK_RATE = 40.5;
 async function fetchFromBcu(): Promise<ExchangeRateData> {
   'use cache';
   cacheLife('hours');
-  cacheTag('exchange-rate');
+  cacheTag(CACHE_TAGS.exchangeRate);
 
   const { data: xmlCierre } = await axios.post(
     'https://cotizaciones.bcu.gub.uy/wscotizaciones/servlet/awsultimocierre',

@@ -5,9 +5,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
-import { getExchangeRate } from '@/app/lib/exchange-rate';
 import { addBatchItems } from '@/app/lib/inventory';
 import { money } from '@/app/lib/money';
+import { CACHE_TAGS } from '@/app/lib/cache-tags';
 
 const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
@@ -15,14 +15,16 @@ const createPurchaseSchema = z.object({
   trackingNumber: z.string().optional(),
   description: z.string().optional(),
   supplierPaidByUserId: z.string().uuid().optional(),
+  exchangeRate: z.number().finite().positive(),
   items: z.array(z.object({
     modelId: z.string().min(1),
     size: z.string().min(1),
     basePriceUsd: z.number().finite().min(0),
+    quantity: z.number().int().min(1).default(1),
   })).min(1),
 });
 
-type PurchaseItem = { modelId: string; size: string; basePriceUsd: number };
+type PurchaseItem = { modelId: string; size: string; basePriceUsd: number; quantity?: number };
 
 export async function createPurchase(data: {
   purchaseDate: string;
@@ -30,11 +32,18 @@ export async function createPurchase(data: {
   trackingNumber?: string;
   description?: string;
   supplierPaidByUserId?: string;
+  exchangeRate: number;
   items: PurchaseItem[];
 }) {
   parseOrThrow(createPurchaseSchema, data);
 
-  const exchangeRate = await getExchangeRate();
+  const expandedItems = data.items.flatMap((it) =>
+    Array.from({ length: it.quantity ?? 1 }, () => ({
+      modelId: it.modelId,
+      size: it.size.trim().toLowerCase(),
+      basePriceUsd: it.basePriceUsd,
+    }))
+  );
 
   await prisma.$transaction(async (tx) => {
     const batch = await tx.batch.create({
@@ -43,27 +52,18 @@ export async function createPurchase(data: {
         supplier: data.supplier?.trim().toLowerCase() || null,
         trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
         description: data.description?.trim().toLowerCase() || null,
-        quantity: data.items.length,
+        quantity: expandedItems.length,
         supplierPaidByUserId: data.supplierPaidByUserId || null,
       },
       select: { id: true },
     });
 
-    await addBatchItems(
-      batch.id,
-      data.items.map((it) => ({
-        modelId: it.modelId,
-        size: it.size.trim().toLowerCase(),
-        basePriceUsd: it.basePriceUsd,
-      })),
-      exchangeRate,
-      tx,
-    );
+    await addBatchItems(batch.id, expandedItems, data.exchangeRate, tx);
   });
 
-  updateTag('purchases');
-  updateTag('models');
-  updateTag('saldos');
+  updateTag(CACHE_TAGS.purchases);
+  updateTag(CACHE_TAGS.models);
+  updateTag(CACHE_TAGS.saldos);
   redirect('/purchases');
 }
 
@@ -74,13 +74,14 @@ export async function markArrived(
     shippingRateUsd: string;
     weight: string;
     shippingPaidByUserId?: string;
+    exchangeRate: number;
   }
 ) {
-  if (!arrivalSchema.safeParse(data).success) throw new Error('Invalid arrival data');
+  const { exchangeRate, ...rest } = data;
+  if (!arrivalSchema.safeParse(rest).success) throw new Error('Invalid arrival data');
 
   const weight = parseFloat(data.weight);
   const shippingPriceUsd = parseFloat(data.shippingRateUsd) * weight;
-  const exchangeRate = await getExchangeRate();
 
   await prisma.batch.update({
     where: { id: batchId },
@@ -93,8 +94,8 @@ export async function markArrived(
     },
   });
 
-  updateTag('purchases');
-  updateTag('models');
-  updateTag('saldos');
+  updateTag(CACHE_TAGS.purchases);
+  updateTag(CACHE_TAGS.models);
+  updateTag(CACHE_TAGS.saldos);
   redirect('/purchases');
 }

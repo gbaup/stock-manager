@@ -9,8 +9,9 @@ import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, MoneyInput, WeightInput } from '@/components/ui/field';
-import { usd, todayISO } from '@/app/lib/domain';
+import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { BatchSummary, UserSummary } from '@/app/lib/domain';
+import type { RateResult } from '@/app/lib/exchange-rate';
 import { markArrived } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
 import { arrivalSchema, type ArrivalFormValues } from '@/app/lib/schemas';
@@ -37,7 +38,7 @@ function groupItems(items: BatchSummary['items']): GroupedItem[] {
   return Array.from(map.values());
 }
 
-export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: UserSummary[] }) {
+export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users: UserSummary[]; rate: RateResult }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showConfirm, setShowConfirm] = useState(false);
@@ -67,6 +68,7 @@ export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: User
         shippingRateUsd: data.shippingRateUsd,
         weight: data.weight,
         shippingPaidByUserId: data.shippingPaidByUserId,
+        exchangeRate: rate.value,
       });
     });
   }
@@ -113,7 +115,7 @@ export function ArrivalForm({ batch, users }: { batch: BatchSummary; users: User
             ))}
           </div>
 
-          <div className="section-label">Recepción</div>
+          <div className="section-label">Recepción · Tipo de cambio: $U {fmtRate(rate.value)}</div>
           <Field label="Fecha de llegada" error={errors.arrivalDate?.message}>
             <input className="input mono" type="date" {...register('arrivalDate')} />
           </Field>

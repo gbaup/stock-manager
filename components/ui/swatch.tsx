@@ -1,4 +1,4 @@
-import { colorByName } from '@/app/lib/domain';
+import { colorByName } from '@/app/lib/format';
 import type { Photo } from '@/app/lib/photo';
 import { Icon } from './icon';
 

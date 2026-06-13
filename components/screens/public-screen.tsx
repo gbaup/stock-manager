@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { colorByName, SIZES } from '@/app/lib/domain';
+import { SIZES } from '@/app/lib/domain';
+import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
 type PublicModel = ModelMeta & { stock: number };

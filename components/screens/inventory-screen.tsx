@@ -7,7 +7,7 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { colorByName } from '@/app/lib/domain';
+import { colorByName } from '@/app/lib/format';
 import type { ModelWithStats } from '@/app/lib/domain';
 
 type Layout = 'cards' | 'rows' | 'grid';

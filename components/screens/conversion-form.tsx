@@ -7,9 +7,7 @@ import { Field } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { Modal } from '@/components/ui/modal';
 import { Icon } from '@/components/ui/icon';
-import {
-  uyu, usd, fmtRate, personInitial, todayISO,
-} from '@/app/lib/domain';
+import { uyu, usd, fmtRate, personInitial, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { UserSummary } from '@/app/lib/domain';
 import { createConversion } from '@/app/actions/conversions';
