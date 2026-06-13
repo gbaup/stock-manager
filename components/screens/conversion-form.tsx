@@ -108,6 +108,8 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
         onSave={() => canSave && setConfirm(true)}
         saveLabel="Registrar"
         canSave={canSave}
+        isSaving={pending}
+        savingLabel="Registrando…"
       />
 
       <div className="body">
@@ -242,7 +244,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
             disabled={!canSave || pending}
             onClick={() => canSave && setConfirm(true)}
           >
-            {sameCur ? 'Registrar transferencia' : 'Registrar cambio'}
+            {pending ? 'Registrando…' : (sameCur ? 'Registrar transferencia' : 'Registrar cambio')}
           </button>
         </div>
       </div>

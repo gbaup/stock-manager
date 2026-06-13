@@ -113,7 +113,8 @@ export function PurchaseForm({
         title={step === 1 ? 'Nueva compra · info' : 'Nueva compra · items'}
         onSave={step === 1 ? handleNextStep : handleSubmit(onSubmit)}
         saveLabel={step === 1 ? 'Siguiente' : 'Registrar'}
-        canSave={!pending}
+        isSaving={pending}
+        savingLabel="Registrando…"
       />
       <Stepper step={step} labels={['Info del batch', 'Items']} />
 
@@ -319,7 +320,7 @@ export function PurchaseForm({
               </div>
 
               <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-                Registrar compra
+                {pending ? 'Registrando…' : 'Registrar compra'}
               </button>
             </>
           )}

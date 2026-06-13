@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Icon } from './icon';
 
 export function TopBar({
@@ -55,7 +55,6 @@ export function BottomNavShell({ active = '' }: { active?: string }) {
 
 export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const active = pathname.startsWith('/home')
     ? 'home'
@@ -74,10 +73,12 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   return (
     <nav className="bottomnav">
       {items.map((it) => (
-        <button
+        <Link
           key={it.id}
+          href={it.href}
+          prefetch
           className={`navbtn ${active === it.id ? 'is-active' : ''}`}
-          onClick={() => router.push(it.href)}
+          style={{ textDecoration: 'none' }}
         >
           <div style={{ position: 'relative' }}>
             <Icon
@@ -90,7 +91,7 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
             )}
           </div>
           {it.label}
-        </button>
+        </Link>
       ))}
     </nav>
   );
@@ -102,20 +103,40 @@ export function FormHead({
   onSave,
   saveLabel = 'Guardar',
   canSave = true,
+  isSaving = false,
+  savingLabel = 'Guardando…',
 }: {
   onCancel: () => void;
   title: string;
   onSave?: () => void;
   saveLabel?: string;
   canSave?: boolean;
+  isSaving?: boolean;
+  savingLabel?: string;
 }) {
   return (
     <header className="form-head">
-      <button className="link" onClick={onCancel}>Cancelar</button>
+      <button className="link" onClick={onCancel} disabled={isSaving}>Cancelar</button>
       <div className="title">{title}</div>
-      <button className="link accent" onClick={onSave} disabled={!canSave}>
-        {saveLabel}
+      <button className="link accent" onClick={onSave} disabled={!canSave || isSaving}>
+        {isSaving ? savingLabel : saveLabel}
       </button>
+    </header>
+  );
+}
+
+export function FormHeadShell({
+  title,
+  saveLabel = 'Guardar',
+}: {
+  title: string;
+  saveLabel?: string;
+}) {
+  return (
+    <header className="form-head">
+      <button className="link" disabled>Cancelar</button>
+      <div className="title">{title}</div>
+      <button className="link accent" disabled>{saveLabel}</button>
     </header>
   );
 }
