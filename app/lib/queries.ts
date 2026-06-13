@@ -4,11 +4,26 @@ import { fmtDate } from './format';
 import { stockByModel, countStock } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
+import type { Photo } from './photo';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, ExpenseRecord, ConversionRecord,
   AdjustmentRecord, UserSummary,
 } from './domain';
+
+export type HomeSaleItem = {
+  id: string;
+  catalogProductId: string;
+  teamName: string;
+  color: string;
+  version: string | null;
+  number: string | null;
+  photos: Photo[];
+  price: number;
+  date: string;
+  collectedByUserId: string | null;
+  collectedByAlias: string | null;
+};
 
 function toISODate(d: Date | null): string | null {
   if (!d) return null;
@@ -277,6 +292,43 @@ export async function getPublicModels() {
     .filter((p) => p.stock > 0);
 
   return { models, today: fmtDate(new Date().toISOString().split('T')[0]) };
+}
+
+export async function getHomeSales(): Promise<HomeSaleItem[]> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag(CACHE_TAGS.saldos);
+  const items = await prisma.inventoryItem.findMany({
+    where: { status: 'sold' },
+    include: {
+      product: { include: { team: true } },
+      sale: {
+        select: {
+          id: true,
+          price: true,
+          date: true,
+          collectedByUserId: true,
+          collectedByUser: { select: { alias: true } },
+        },
+      },
+    },
+  });
+  return items
+    .filter((i) => i.sale !== null)
+    .map((i) => ({
+      id: i.sale!.id,
+      catalogProductId: i.catalogProductId,
+      teamName: i.product.team.name,
+      color: i.product.color,
+      version: i.product.version,
+      number: i.product.number !== null ? String(i.product.number) : null,
+      photos: parsePhotos(i.product.photos),
+      price: Number(i.sale!.price),
+      date: toISODate(i.sale!.date)!,
+      collectedByUserId: i.sale!.collectedByUserId,
+      collectedByAlias: i.sale!.collectedByUser?.alias ?? null,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function getTransitCount(): Promise<number> {
