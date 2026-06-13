@@ -1,5 +1,23 @@
 import type { Movement } from './types';
-import type { BatchSummary } from '../domain';
+
+// Structural shape of a batch that this projection needs. Any object that
+// matches it works — BatchSummary (used by purchase listings) is a superset,
+// and the saldos pipeline constructs an even leaner object straight from
+// Prisma rows to avoid serializing photos/products it never reads.
+export type ProjectableBatch = {
+  id: string;
+  purchaseDate: string;
+  arrivalDate: string | null;
+  supplier: string | null;
+  quantity: number;
+  shippingPriceUsd: number | null;
+  shippingPriceUyu: number | null;
+  supplierPaidByUserId: string | null;
+  supplierPaidByAlias: string | null;
+  shippingPaidByUserId: string | null;
+  shippingPaidByAlias: string | null;
+  items: Array<{ basePriceUsd: number }>;
+};
 
 // A batch produces up to two movements:
 //   1. Supplier payment (USD outflow) attributed to whoever paid the supplier.
@@ -7,7 +25,7 @@ import type { BatchSummary } from '../domain';
 //   2. Shipping payment (UYU and/or USD outflow) attributed to whoever paid
 //      shipping. Recorded only once the batch has arrived (shipping isn't a
 //      saldos event until the items physically land).
-export function projectPurchase(batch: BatchSummary): Movement[] {
+export function projectPurchase(batch: ProjectableBatch): Movement[] {
   const out: Movement[] = [];
 
   const baseUsd = batch.items.reduce((s, it) => s + it.basePriceUsd, 0);

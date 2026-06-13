@@ -1,7 +1,6 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import { CACHE_TAGS } from './cache-tags';
-import { batchToSummary } from './queries';
 import type { ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from './domain';
 import {
   buildMovements,
@@ -9,7 +8,7 @@ import {
   balanceTotals,
   settleBalances,
 } from './ledger';
-import type { Movement, PersonBalance, SettleTransfer } from './ledger';
+import type { Movement, PersonBalance, SettleTransfer, ProjectableBatch } from './ledger';
 
 export type BuiltSaldos = {
   movements: Movement[];
@@ -85,27 +84,37 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
   cacheTag(CACHE_TAGS.purchases);
   cacheTag(CACHE_TAGS.users);
 
-  const [batchRows, soldItems, expenses, convRows, adjRows, userRows] = await Promise.all([
+  const [batchRows, saleRows, expenses, convRows, adjRows, userRows] = await Promise.all([
     prisma.batch.findMany({
-      include: {
-        items: { include: { product: { include: { team: true } } } },
-        supplierPaidByUser: true,
-        shippingPaidByUser: true,
+      select: {
+        id: true,
+        purchaseDate: true,
+        arrivalDate: true,
+        supplier: true,
+        shippingPriceUsd: true,
+        shippingPriceUyu: true,
+        supplierPaidByUserId: true,
+        supplierPaidByUser: { select: { alias: true } },
+        shippingPaidByUserId: true,
+        shippingPaidByUser: { select: { alias: true } },
+        items: { select: { basePriceUsd: true } },
       },
       orderBy: { purchaseDate: 'desc' },
     }),
-    prisma.inventoryItem.findMany({
-      where: { status: 'sold' },
-      include: {
-        product: { include: { team: true } },
-        sale: {
+    prisma.sale.findMany({
+      select: {
+        id: true,
+        price: true,
+        date: true,
+        collectedByUserId: true,
+        collectedByUser: { select: { alias: true } },
+        item: {
           select: {
-            id: true, price: true, date: true,
-            collectedByUserId: true,
-            collectedByUser: { select: { alias: true } },
+            product: { select: { team: { select: { name: true } } } },
           },
         },
       },
+      orderBy: { date: 'desc' },
     }),
     prisma.expense.findMany({ orderBy: { date: 'desc' }, include: { paidByUser: true } }),
     prisma.conversion.findMany({ orderBy: { date: 'desc' }, include: { fromUser: true, toUser: true } }),
@@ -113,22 +122,32 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
     prisma.user.findMany({ select: { id: true, alias: true }, orderBy: { alias: 'asc' } }),
   ]);
 
-  const purchases = batchRows.map((b) =>
-    batchToSummary(b, b.items.map((i) => ({ ...i, product: i.product })))
-  );
+  const purchases: ProjectableBatch[] = batchRows.map((b) => ({
+    id: b.id,
+    purchaseDate: toISODate(b.purchaseDate)!,
+    arrivalDate: toISODate(b.arrivalDate),
+    supplier: b.supplier,
+    quantity: b.items.length,
+    shippingPriceUsd: b.shippingPriceUsd ? Number(b.shippingPriceUsd) : null,
+    shippingPriceUyu: b.shippingPriceUyu ? Number(b.shippingPriceUyu) : null,
+    supplierPaidByUserId: b.supplierPaidByUserId,
+    supplierPaidByAlias: b.supplierPaidByUser?.alias ?? null,
+    shippingPaidByUserId: b.shippingPaidByUserId,
+    shippingPaidByAlias: b.shippingPaidByUser?.alias ?? null,
+    items: b.items.map((i) => ({ basePriceUsd: Number(i.basePriceUsd) })),
+  }));
+
   const users: UserSummary[] = userRows.map((u) => ({ id: u.id, alias: u.alias }));
 
-  const sales = soldItems
-    .filter((i) => i.sale !== null)
-    .map((i) => ({
-      id: i.sale!.id,
-      date: toISODate(i.sale!.date)!,
-      price: Number(i.sale!.price),
-      collectedByUserId: i.sale!.collectedByUserId,
-      collectedByAlias: i.sale!.collectedByUser?.alias ?? null,
-      quantity: 1,
-      model: i.product.team.name,
-    }));
+  const sales = saleRows.map((s) => ({
+    id: s.id,
+    date: toISODate(s.date)!,
+    price: Number(s.price),
+    collectedByUserId: s.collectedByUserId,
+    collectedByAlias: s.collectedByUser?.alias ?? null,
+    quantity: 1,
+    model: s.item.product.team.name,
+  }));
 
   const movements = buildMovements({
     sales,
