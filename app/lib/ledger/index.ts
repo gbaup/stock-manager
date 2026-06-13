@@ -41,22 +41,6 @@ export function balancesByPerson(
   for (const u of users) result[u.alias] = emptyBalance();
 
   for (const m of movements) {
-    if (m.kind === 'cambio') {
-      if (!m.conv) continue;
-      const c = m.conv;
-      const fb = result[c.fromUserAlias];
-      const tb = result[c.toUserAlias];
-      if (fb) {
-        if (c.fromCur === 'USD') { fb.usd -= c.fromAmount; fb.outUsd += c.fromAmount; }
-        else { fb.uyu -= c.fromAmount; fb.outUyu += c.fromAmount; }
-      }
-      if (tb) {
-        if (c.toCur === 'USD') { tb.usd += c.toAmount; tb.inUsd += c.toAmount; }
-        else { tb.uyu += c.toAmount; tb.inUyu += c.toAmount; }
-      }
-      continue;
-    }
-
     const b = result[m.person];
     if (!b) continue;
     b.uyu += m.uyu;
@@ -88,8 +72,8 @@ export function settleBalances(
   balances: Record<string, PersonBalance>,
   users: UserSummary[],
 ): SettleTransfer[] {
+  if (users.length !== 2) throw new Error(`settleBalances requires exactly 2 users, got ${users.length}`);
   const [u1, u2] = users;
-  if (!u1 || !u2) return [];
 
   const b1 = balances[u1.alias] ?? emptyBalance();
   const b2 = balances[u2.alias] ?? emptyBalance();

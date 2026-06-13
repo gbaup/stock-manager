@@ -8,11 +8,9 @@ import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { uyu, usd, fmtDate, personInitial } from '@/app/lib/format';
 import type { UserSummary } from '@/app/lib/domain';
-import { buildMovements, balancesByPerson, balanceTotals, hasUsdActivity, settleBalances } from '@/app/lib/ledger';
-import type { Movement, PersonBalance } from '@/app/lib/ledger';
-import type { BatchSummary, ExpenseRecord, ConversionRecord, AdjustmentRecord } from '@/app/lib/domain';
+import { hasUsdActivity } from '@/app/lib/ledger';
+import type { Movement, PersonBalance, SettleTransfer } from '@/app/lib/ledger';
 
-type SaleRow = { id: string; date: string; price: number; collectedByUserId: string | null; collectedByAlias: string | null; quantity: number; model: string };
 type Layout = 'resumen' | 'saldar' | 'planilla';
 
 function signClass(n: number) {
@@ -33,28 +31,24 @@ function Avatar({ name, size = 34 }: { name: string; size?: number }) {
 }
 
 export function SaldosScreen({
-  purchases,
-  sales,
-  expenses,
-  conversions,
-  adjustments,
-  transitCount,
+  movements,
+  balances,
+  totals,
+  settle,
   users,
+  transitCount,
 }: {
-  purchases: BatchSummary[];
-  sales: SaleRow[];
-  expenses: ExpenseRecord[];
-  conversions: ConversionRecord[];
-  adjustments: AdjustmentRecord[];
-  transitCount: number;
+  movements: Movement[];
+  balances: Record<string, PersonBalance>;
+  totals: { uyu: number; usd: number };
+  settle: SettleTransfer[];
   users: UserSummary[];
+  transitCount: number;
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState<Layout>('resumen');
 
-  const movements = buildMovements({ sales, purchases, expenses, conversions, adjustments });
-  const balances = balancesByPerson(movements, users);
-  const { uyu: totalUyu, usd: totalUsd } = balanceTotals(balances, users);
+  const { uyu: totalUyu, usd: totalUsd } = totals;
 
   return (
     <div className="screen">
@@ -78,7 +72,7 @@ export function SaldosScreen({
             <CardsHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} />
           )}
           {layout === 'saldar' && (
-            <SettleHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} />
+            <SettleHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} settle={settle} users={users} />
           )}
           {layout === 'planilla' && (
             <LedgerLayout balances={balances} movements={movements} users={users} />
@@ -176,18 +170,19 @@ function CardsHeader({
 }
 
 function SettleHeader({
-  balances, totalUyu, totalUsd, users,
+  balances, totalUyu, totalUsd, settle, users,
 }: {
   balances: Record<string, PersonBalance>;
   totalUyu: number;
   totalUsd: number;
+  settle: SettleTransfer[];
   users: UserSummary[];
 }) {
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
     return b ? hasUsdActivity(b) : false;
   });
-  const transfers = settleBalances(balances, users);
+  const transfers = settle;
 
   return (
     <>
@@ -319,26 +314,11 @@ const KIND_DOT_CLASS: Record<string, string> = {
 };
 
 function LedgerRow({ m }: { m: Movement }) {
-  const isConv = m.kind === 'cambio' && m.conv;
   const dotCls = KIND_DOT_CLASS[m.kind] ?? '';
-
-  const chips = isConv && m.conv
-    ? [
-      { cur: m.conv.fromCur, n: -(m.conv.fromAmount) },
-      { cur: m.conv.toCur, n: +(m.conv.toAmount) },
-    ]
-    : m.uyu !== 0 || m.usd !== 0
-      ? [
-        ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
-        ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
-      ]
-      : [];
-
-  const convFlow = isConv && m.conv
-    ? m.conv.fromUserAlias !== m.conv.toUserAlias
-      ? `${m.conv.fromUserAlias} → ${m.conv.toUserAlias}`
-      : m.conv.fromUserAlias
-    : null;
+  const chips = [
+    ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
+    ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
+  ];
 
   return (
     <div className="lrow">
@@ -348,11 +328,10 @@ function LedgerRow({ m }: { m: Movement }) {
           {m.title}
         </div>
         <div className="lrow-sub">
-          {fmtDate(m.date)} · {isConv && convFlow ? convFlow : m.sub || m.person}
-          {isConv && m.conv && m.sub ? ` · ${m.sub}` : ''}
+          {fmtDate(m.date)} · {m.sub || m.person}
         </div>
       </div>
-      <div className="lrow-person">{isConv ? '—' : (m.person || '—')}</div>
+      <div className="lrow-person">{m.person || '—'}</div>
       <div className="lrow-amt">
         {chips.map((pt, i) => (
           <span key={i} className={`amt ${signClass(pt.n)}`}>
@@ -381,25 +360,12 @@ const MOV_ICON: Record<string, Parameters<typeof Icon>[0]['name']> = {
 };
 
 function MovCard({ m }: { m: Movement }) {
-  const isConv = m.kind === 'cambio' && m.conv;
   const icoCls = MOV_ICO_CLASS[m.kind] ?? '';
   const iconName = MOV_ICON[m.kind] ?? 'receipt';
-
-  const chips = isConv && m.conv
-    ? [
-      { cur: m.conv.fromCur, n: -(m.conv.fromAmount) },
-      { cur: m.conv.toCur, n: +(m.conv.toAmount) },
-    ]
-    : [
-      ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
-      ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
-    ];
-
-  const convFlow = isConv && m.conv
-    ? m.conv.fromUserAlias !== m.conv.toUserAlias
-      ? `${m.conv.fromUserAlias} → ${m.conv.toUserAlias}`
-      : m.conv.fromUserAlias
-    : null;
+  const chips = [
+    ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
+    ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
+  ];
 
   return (
     <div className="mov">
@@ -409,12 +375,7 @@ function MovCard({ m }: { m: Movement }) {
       <div className="mov-main">
         <div className="mov-title capitalize">{m.title}</div>
         <div className="mov-sub">
-          {fmtDate(m.date)} ·{' '}
-          {isConv && convFlow ? (
-            <><strong>{convFlow}</strong>{m.sub ? ` · ${m.sub}` : ''}</>
-          ) : (
-            <><strong>{m.person || '—'}</strong>{m.sub ? ` · ${m.sub}` : ''}</>
-          )}
+          {fmtDate(m.date)} · <strong>{m.person || '—'}</strong>{m.sub ? ` · ${m.sub}` : ''}
         </div>
       </div>
       <div className="mov-amt">
