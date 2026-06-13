@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormHead } from '@/components/ui/chrome';
 import { Icon } from '@/components/ui/icon';
-import { Swatch } from '@/components/ui/swatch';
+import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { Field, TextInput, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
@@ -133,6 +133,7 @@ export function QuickSaleForm({
                       <Swatch
                         color={m.color}
                         number={m.number}
+                        photo={coverOf(m)}
                         className="sale-sw"
                         style={{ width: 38, height: 44, fontSize: 14 }}
                       />
@@ -161,6 +162,7 @@ export function QuickSaleForm({
                 <Swatch
                   color={model.color}
                   number={model.number}
+                  photo={coverOf(model)}
                   style={{ width: 56, height: 64, fontSize: 21 }}
                 />
                 <div className="qs-p-main">
