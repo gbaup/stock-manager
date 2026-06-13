@@ -1,17 +1,18 @@
-import type { BatchSummary, ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from '../domain';
+import type { ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from '../domain';
 import type { Movement, PersonBalance, SettleTransfer, SaleRow } from './types';
 import { emptyBalance } from './types';
 import { projectSale } from './sale-projection';
-import { projectPurchase } from './purchase-projection';
+import { projectPurchase, type ProjectableBatch } from './purchase-projection';
 import { projectExpense } from './expense-projection';
 import { projectConversion } from './conversion-projection';
 import { projectAdjustment } from './adjustment-projection';
 
 export type { Movement, PersonBalance, SettleTransfer, MovementKind, SaleRow } from './types';
+export type { ProjectableBatch } from './purchase-projection';
 
 type LedgerEvents = {
   sales: SaleRow[];
-  purchases: BatchSummary[];
+  purchases: ProjectableBatch[];
   expenses: ExpenseRecord[];
   conversions?: ConversionRecord[];
   adjustments?: AdjustmentRecord[];
