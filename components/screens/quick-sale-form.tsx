@@ -18,10 +18,12 @@ export function QuickSaleForm({
   models,
   users,
   usdRate,
+  sessionUserId,
 }: {
   models: ModelWithStats[];
   users: UserSummary[];
   usdRate: number;
+  sessionUserId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -33,15 +35,11 @@ export function QuickSaleForm({
   const [date, setDate] = useState('');
   const [method, setMethod] = useState('');
   const [description, setDescription] = useState('');
-  const [collectedByUserId, setCollectedByUserId] = useState('');
+  const [collectedByUserId, setCollectedByUserId] = useState(sessionUserId);
 
   useEffect(() => {
     setDate(new Date().toISOString().split('T')[0]);
-    const stored = localStorage.getItem('sc_currentUser');
-    if (stored && users.some((u) => u.id === stored)) {
-      setCollectedByUserId(stored);
-    }
-  }, [users]);
+  }, []);
 
   const model = models.find((m) => m.id === selectedModelId) ?? null;
   const stock = model?.stock ?? 0;

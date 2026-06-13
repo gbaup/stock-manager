@@ -48,65 +48,27 @@ function Avatar({ name, size }: { name: string; size: number }) {
   );
 }
 
-function LoginScreen({ users, onPick }: { users: UserSummary[]; onPick: (id: string) => void }) {
-  return (
-    <div className="screen login-screen">
-      <div className="login-body">
-        <div className="login-eyebrow">
-          <span className="brand-dot" />STOCKCONTROL
-        </div>
-        <h1 className="login-title">
-          ¿Quién está<br />usando la caja?
-        </h1>
-        <p className="login-sub">
-          Cada venta y cada cobro queda a tu nombre para llevar bien los saldos.
-        </p>
-        <div className="login-people">
-          {users.map((u) => (
-            <button key={u.id} className="login-person" onClick={() => onPick(u.id)}>
-              <Avatar name={u.alias} size={56} />
-              <span className="lp-name">{u.alias}</span>
-              <Icon name="chevR" size={20} />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function HomeScreen({
   models,
   sales,
   users,
+  sessionUserId,
 }: {
   models: ModelWithStats[];
   sales: HomeSaleItem[];
   users: UserSummary[];
+  sessionUserId: string;
 }) {
   const router = useRouter();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('sc_currentUser');
-    const valid = users.some((u) => u.id === stored) ? stored : null;
-    setCurrentUserId(valid);
     setHydrated(true);
-  }, [users]);
-
-  const pickUser = (userId: string) => {
-    localStorage.setItem('sc_currentUser', userId);
-    setCurrentUserId(userId);
-  };
+  }, []);
 
   if (!hydrated) return null;
 
-  if (!currentUserId) {
-    return <LoginScreen users={users} onPick={pickUser} />;
-  }
-
-  const currentUser = users.find((u) => u.id === currentUserId)!;
+  const currentUser = users.find((u) => u.id === sessionUserId) ?? users[0];
 
   return (
     <HomeContent
@@ -114,7 +76,6 @@ export function HomeScreen({
       sales={sales}
       users={users}
       currentUser={currentUser}
-      onSwitchUser={() => setCurrentUserId(null)}
       onQuickSale={() => router.push('/home/sell')}
       onOpenModel={(id) => router.push(`/inventory/${id}`)}
     />
@@ -126,7 +87,6 @@ function HomeContent({
   sales,
   users,
   currentUser,
-  onSwitchUser,
   onQuickSale,
   onOpenModel,
 }: {
@@ -134,7 +94,6 @@ function HomeContent({
   sales: HomeSaleItem[];
   users: UserSummary[];
   currentUser: UserSummary;
-  onSwitchUser: () => void;
   onQuickSale: () => void;
   onOpenModel: (id: string) => void;
 }) {
@@ -181,9 +140,9 @@ function HomeContent({
           </div>
           <h1 className="home-hi">Hola, {currentUser.alias}</h1>
         </div>
-        <button className="home-avatar" onClick={onSwitchUser} aria-label="Cambiar de usuario">
+        <div className="home-avatar">
           <Avatar name={currentUser.alias} size={44} />
-        </button>
+        </div>
       </header>
 
       <div className="body">
