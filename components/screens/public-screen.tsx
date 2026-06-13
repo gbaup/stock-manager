@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { colorByName, SIZES } from '@/app/lib/domain';
+import { SIZES } from '@/app/lib/domain';
+import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
 type PublicModel = ModelMeta & { stock: number };
@@ -15,7 +16,7 @@ const VIEW_KEY = 'sc_pub_view';
 function SizeChips({ sizes }: { sizes: string[] }) {
   if (!sizes.length) return null;
   return (
-    <div className="size-chips">
+    <div className="size-chips capitalize">
       {sizes.map((s) => <span key={s} className="size-chip">{s}</span>)}
     </div>
   );
@@ -247,7 +248,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
         )}
       </div>
       <div className="pub-card-body">
-        <div className="pub-card-team">{model.team}</div>
+        <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
           {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''}
         </div>

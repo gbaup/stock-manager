@@ -1,6 +1,6 @@
 import type { Movement } from './types';
 import type { ConversionRecord } from '../domain';
-import { fmtRate } from '../domain';
+import { fmtRate } from '../format';
 
 // A conversion is a single event that affects two people in two currencies.
 // We project it as one 'cambio' movement carrying the raw record on `conv`

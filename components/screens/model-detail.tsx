@@ -6,7 +6,7 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { fmtDate, uyu, usd } from '@/app/lib/domain';
+import { fmtDate, uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
@@ -103,7 +103,7 @@ export function ModelDetailScreen({
           ) : (
             <div className="timeline">
               {model.events.map((ev, i) => (
-                <EventRow key={i} ev={ev} usdRate={usdRate} onArrive={(id) => router.push(`/purchases/${id}/arrival`)} />
+                <EventRow key={i} ev={ev} usdRate={usdRate} />
               ))}
             </div>
           )}
@@ -114,7 +114,7 @@ export function ModelDetailScreen({
   );
 }
 
-function EventRow({ ev, usdRate, onArrive }: { ev: TimelineEvent; usdRate: number; onArrive: (id: string) => void }) {
+function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
   if (ev.type === 'sale') {
     const s = ev.data;
     return (
@@ -146,9 +146,6 @@ function EventRow({ ev, usdRate, onArrive }: { ev: TimelineEvent; usdRate: numbe
         <div className="event-main">
           <div className="event-title">Compra en camino · {ev.qty} u.</div>
           <div className="event-sub">{meta}</div>
-          <button className="btn btn-secondary btn-sm" style={{ marginTop: 9 }} onClick={() => onArrive(b.id)}>
-            <Icon name="check" size={16} />Marcar llegada
-          </button>
         </div>
       </div>
     );

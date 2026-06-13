@@ -6,9 +6,7 @@ import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
-import {
-  uyu, usd, fmtDate, personInitial,
-} from '@/app/lib/domain';
+import { uyu, usd, fmtDate, personInitial } from '@/app/lib/format';
 import type { UserSummary } from '@/app/lib/domain';
 import { buildMovements, balancesByPerson, balanceTotals, hasUsdActivity, settleBalances } from '@/app/lib/ledger';
 import type { Movement, PersonBalance } from '@/app/lib/ledger';

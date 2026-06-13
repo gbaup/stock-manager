@@ -98,8 +98,6 @@ model InventoryItem {
   size             String   @db.VarChar(10)
   basePriceUsd     Decimal  @map("base_price_usd") @db.Decimal(10, 2)
   basePriceUyu     Decimal  @map("base_price_uyu") @db.Decimal(10, 2)
-  finalPriceUsd    Decimal? @map("final_price_usd") @db.Decimal(10, 2)
-  finalPriceUyu    Decimal? @map("final_price_uyu") @db.Decimal(10, 2)
   status           String   @default("available") @db.VarChar(20)
 
   product CatalogProduct @relation(fields: [catalogProductId], references: [id])
