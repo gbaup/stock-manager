@@ -137,7 +137,7 @@ export function QuickSaleForm({
                         style={{ width: 38, height: 44, fontSize: 14 }}
                       />
                       <div className="qs-r-main">
-                        <div className="qs-r-team">{m.team}</div>
+                        <div className="qs-r-team capitalize">{m.team}</div>
                         <div className="qs-r-meta">
                           {m.season} · {m.version} · {m.color}
                           {m.player ? ` · ${m.player}` : ''}
