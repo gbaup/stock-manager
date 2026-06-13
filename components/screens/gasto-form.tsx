@@ -56,7 +56,8 @@ export function GastoForm({ users }: { users: UserSummary[] }) {
         title="Nuevo gasto"
         onSave={handleSubmit(onSubmit)}
         saveLabel="Registrar gasto"
-        canSave={!pending}
+        isSaving={pending}
+        savingLabel="Registrando…"
       />
       <div className="body">
         <div className="body-pad">
@@ -137,7 +138,7 @@ export function GastoForm({ users }: { users: UserSummary[] }) {
             disabled={pending}
             onClick={handleSubmit(onSubmit)}
           >
-            Registrar gasto
+            {pending ? 'Registrando…' : 'Registrar gasto'}
           </button>
         </div>
       </div>

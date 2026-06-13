@@ -213,11 +213,10 @@ function HomeContent({
               <span>
                 {remaining > 0
                   ? `Mostrando ${shown.length} de ${list.length}`
-                  : `${list.length} ${list.length === 1 ? 'venta' : 'ventas'}${
-                      personFilter !== 'all'
-                        ? ` · ${users.find((u) => u.id === personFilter)?.alias ?? ''}`
-                        : ''
-                    }`}
+                  : `${list.length} ${list.length === 1 ? 'venta' : 'ventas'}${personFilter !== 'all'
+                    ? ` · ${users.find((u) => u.id === personFilter)?.alias ?? ''}`
+                    : ''
+                  }`}
               </span>
             </div>
           )}
@@ -252,7 +251,7 @@ function HomeContent({
                       </div>
                     )}
                     <div className="sale-main">
-                      <div className="sale-team">{s.teamName}</div>
+                      <div className="sale-team capitalize">{s.teamName}</div>
                       <div className="sale-meta">
                         <ColorDot color={s.color} />
                         {s.color}{s.version ? ` · ${s.version}` : ''}

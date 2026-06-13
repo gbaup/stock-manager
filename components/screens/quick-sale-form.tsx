@@ -93,7 +93,9 @@ export function QuickSaleForm({
         title="Registrar venta"
         onSave={handleSave}
         saveLabel="Registrar"
-        canSave={canSave && !pending}
+        canSave={canSave}
+        isSaving={pending}
+        savingLabel="Registrando…"
       />
       <div className="body">
         <div className="body-pad">
@@ -265,7 +267,7 @@ export function QuickSaleForm({
                 disabled={!canSave || pending}
                 onClick={handleSave}
               >
-                Registrar venta
+                {pending ? 'Registrando…' : 'Registrar venta'}
               </button>
             </>
           )}
