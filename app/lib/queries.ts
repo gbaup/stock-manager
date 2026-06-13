@@ -4,7 +4,6 @@ import { fmtDate } from './format';
 import { stockByModel, countStock } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
-import type { Photo } from './photo';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, UserSummary,
@@ -17,7 +16,6 @@ export type HomeSaleItem = {
   color: string;
   version: string | null;
   number: string | null;
-  photos: Photo[];
   price: number;
   date: string;
   collectedByUserId: string | null;
@@ -297,37 +295,41 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
   'use cache';
   cacheLife('hours');
   cacheTag(CACHE_TAGS.saldos);
-  const items = await prisma.inventoryItem.findMany({
-    where: { status: 'sold' },
-    include: {
-      product: { include: { team: true } },
-      sale: {
+  const sales = await prisma.sale.findMany({
+    select: {
+      id: true,
+      price: true,
+      date: true,
+      collectedByUserId: true,
+      collectedByUser: { select: { alias: true } },
+      item: {
         select: {
-          id: true,
-          price: true,
-          date: true,
-          collectedByUserId: true,
-          collectedByUser: { select: { alias: true } },
+          catalogProductId: true,
+          product: {
+            select: {
+              color: true,
+              version: true,
+              number: true,
+              team: { select: { name: true } },
+            },
+          },
         },
       },
     },
+    orderBy: { date: 'desc' },
   });
-  return items
-    .filter((i) => i.sale !== null)
-    .map((i) => ({
-      id: i.sale!.id,
-      catalogProductId: i.catalogProductId,
-      teamName: i.product.team.name,
-      color: i.product.color,
-      version: i.product.version,
-      number: i.product.number !== null ? String(i.product.number) : null,
-      photos: parsePhotos(i.product.photos),
-      price: Number(i.sale!.price),
-      date: toISODate(i.sale!.date)!,
-      collectedByUserId: i.sale!.collectedByUserId,
-      collectedByAlias: i.sale!.collectedByUser?.alias ?? null,
-    }))
-    .sort((a, b) => b.date.localeCompare(a.date));
+  return sales.map((s) => ({
+    id: s.id,
+    catalogProductId: s.item.catalogProductId,
+    teamName: s.item.product.team.name,
+    color: s.item.product.color,
+    version: s.item.product.version,
+    number: s.item.product.number !== null ? String(s.item.product.number) : null,
+    price: Number(s.price),
+    date: toISODate(s.date)!,
+    collectedByUserId: s.collectedByUserId,
+    collectedByAlias: s.collectedByUser?.alias ?? null,
+  }));
 }
 
 export async function getTransitCount(): Promise<number> {

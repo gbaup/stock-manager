@@ -107,6 +107,8 @@ model InventoryItem {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  @@index([status])
+  @@index([catalogProductId, status])
   @@map("inventory_items")
 }
 
