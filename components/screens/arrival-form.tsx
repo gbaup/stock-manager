@@ -89,7 +89,8 @@ export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users
         title="Marcar llegada"
         onSave={handleSubmit(onSubmit)}
         saveLabel="Confirmar"
-        canSave={!pending}
+        isSaving={pending}
+        savingLabel="Confirmando…"
       />
       <div className="body">
         <div className="body-pad">
@@ -166,7 +167,7 @@ export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users
           </div>
 
           <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-            Confirmar llegada
+            {pending ? 'Confirmando…' : 'Confirmar llegada'}
           </button>
         </div>
       </div>

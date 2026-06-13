@@ -49,7 +49,8 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
         onCancel={() => router.back()}
         title="Registrar venta"
         onSave={handleSubmit(onSubmit)}
-        canSave={!pending}
+        isSaving={pending}
+        savingLabel="Registrando…"
       />
       <div className="body">
         <div className="body-pad">
@@ -150,7 +151,7 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
           </Field>
 
           <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-            Registrar venta
+            {pending ? 'Registrando…' : 'Registrar venta'}
           </button>
         </div>
       </div>

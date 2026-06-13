@@ -63,7 +63,8 @@ export function ModelForm({
         title={initial ? 'Editar modelo' : 'Nuevo modelo'}
         onSave={handleSubmit(onSubmit)}
         saveLabel={initial ? 'Guardar cambios' : 'Crear modelo'}
-        canSave={!pending}
+        isSaving={pending}
+        savingLabel={initial ? 'Guardando…' : 'Creando…'}
       />
       <div className="body">
         <div className="body-pad">
@@ -187,7 +188,7 @@ export function ModelForm({
           </Field>
 
           <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-            {initial ? 'Guardar cambios' : 'Crear modelo'}
+            {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
           </button>
         </div>
       </div>
