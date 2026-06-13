@@ -37,7 +37,6 @@ export function SaldosScreen({
   settle,
   users,
   transitCount,
-  users,
 }: {
   movements: Movement[];
   balances: Record<string, PersonBalance>;
@@ -45,7 +44,6 @@ export function SaldosScreen({
   settle: SettleTransfer[];
   users: UserSummary[];
   transitCount: number;
-  users: UserSummary[];
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState<Layout>('resumen');
