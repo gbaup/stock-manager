@@ -62,9 +62,8 @@ export function HomeScreen({
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setHydrated(true); }, []);
 
   if (!hydrated) return null;
 
@@ -101,7 +100,8 @@ function HomeContent({
   const [range, setRange] = useState<Range>('mes');
   const [visible, setVisible] = useState(PAGE);
 
-  useEffect(() => { setVisible(PAGE); }, [personFilter, range]);
+  const pickPerson = (id: string) => { setPersonFilter(id); setVisible(PAGE); };
+  const pickRange = (r: Range) => { setRange(r); setVisible(PAGE); };
 
   const monthSales = sales.filter((s) => inDateRange(s.date, 'mes'));
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
@@ -186,7 +186,7 @@ function HomeContent({
           <div className="chips">
             <button
               className={`chip ${personFilter === 'all' ? 'is-active' : ''}`}
-              onClick={() => setPersonFilter('all')}
+              onClick={() => pickPerson('all')}
             >
               Todos
             </button>
@@ -194,7 +194,7 @@ function HomeContent({
               <button
                 key={u.id}
                 className={`chip ${personFilter === u.id ? 'is-active' : ''}`}
-                onClick={() => setPersonFilter(u.id)}
+                onClick={() => pickPerson(u.id)}
               >
                 <Avatar name={u.alias} size={18} />
                 {u.alias}
@@ -208,7 +208,7 @@ function HomeContent({
                 key={o.value}
                 type="button"
                 className={range === o.value ? 'is-active' : ''}
-                onClick={() => setRange(o.value)}
+                onClick={() => pickRange(o.value)}
               >
                 {o.label}
               </button>

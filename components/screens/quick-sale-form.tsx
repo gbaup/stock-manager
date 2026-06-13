@@ -37,9 +37,8 @@ export function QuickSaleForm({
   const [description, setDescription] = useState('');
   const [collectedByUserId, setCollectedByUserId] = useState(sessionUserId);
 
-  useEffect(() => {
-    setDate(new Date().toISOString().split('T')[0]);
-  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setDate(new Date().toISOString().split('T')[0]); }, []);
 
   const model = models.find((m) => m.id === selectedModelId) ?? null;
   const stock = model?.stock ?? 0;
