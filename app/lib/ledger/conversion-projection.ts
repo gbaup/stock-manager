@@ -2,25 +2,37 @@ import type { Movement } from './types';
 import type { ConversionRecord } from '../domain';
 import { fmtRate } from '../format';
 
-// A conversion is a single event that affects two people in two currencies.
-// We project it as one 'cambio' movement carrying the raw record on `conv`
-// so the saldos UI can render the cross-currency chip pair, and the balance
-// fold can split the two sides correctly.
+// Each side of a conversion becomes its own Movement so the balance fold and
+// the UI treat conversions uniformly — no special `conv` field needed.
 export function projectConversion(c: ConversionRecord): Movement[] {
   const sameCur = c.fromCur === c.toCur;
-  return [{
-    id: `cambio-${c.id}`,
-    kind: 'cambio',
-    date: c.date,
-    person: c.fromUserAlias,
-    title: sameCur
-      ? 'Transferencia entre socios'
-      : c.fromCur === 'UYU'
-        ? 'Cambio · Pesos → Dólares'
-        : 'Cambio · Dólares → Pesos',
-    sub: sameCur ? '' : `TC ${fmtRate(c.rate)}`,
-    uyu: 0,
-    usd: 0,
-    conv: c,
-  }];
+  const title = sameCur
+    ? 'Transferencia entre socios'
+    : c.fromCur === 'UYU'
+      ? 'Cambio · Pesos → Dólares'
+      : 'Cambio · Dólares → Pesos';
+  const sub = sameCur ? '' : `TC ${fmtRate(c.rate)}`;
+
+  return [
+    {
+      id: `cambio-${c.id}-from`,
+      kind: 'cambio',
+      date: c.date,
+      person: c.fromUserAlias,
+      title,
+      sub,
+      uyu: c.fromCur === 'UYU' ? -c.fromAmount : 0,
+      usd: c.fromCur === 'USD' ? -c.fromAmount : 0,
+    },
+    {
+      id: `cambio-${c.id}-to`,
+      kind: 'cambio',
+      date: c.date,
+      person: c.toUserAlias,
+      title,
+      sub,
+      uyu: c.toCur === 'UYU' ? c.toAmount : 0,
+      usd: c.toCur === 'USD' ? c.toAmount : 0,
+    },
+  ];
 }

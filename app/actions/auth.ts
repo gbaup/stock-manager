@@ -24,7 +24,7 @@ export async function login(_prev: unknown, formData: FormData) {
   }
 
   await createSession(user.id);
-  redirect('/inventory');
+  redirect('/home');
 }
 
 export async function logout() {
