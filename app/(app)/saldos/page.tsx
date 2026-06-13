@@ -6,6 +6,7 @@ export default async function SaldosPage() {
   const [saldos, transitCount] = await Promise.all([
     getBuiltSaldos(),
     getTransitCount(),
+    getUsers(),
   ]);
 
   return <SaldosScreen {...saldos} transitCount={transitCount} />;
