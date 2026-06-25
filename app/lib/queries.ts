@@ -22,6 +22,10 @@ export type HomeSaleItem = {
   collectedByAlias: string | null;
 };
 
+// Temporary flag: while ramping up, show every model in the public catalog
+// (not just the ones with real stock). Unset/false = normal behavior.
+const SHOW_ALL_MODELS = process.env.SHOW_ALL_MODELS === 'true';
+
 function toISODate(d: Date | null): string | null {
   if (!d) return null;
   return d.toISOString().split('T')[0];
@@ -280,13 +284,16 @@ export async function getPublicModels() {
       const availableItems = p.items.filter(
         (i) => i.batch.arrivalDate !== null && i.status === 'available'
       );
-      const sizes = [...new Set(availableItems.map((i) => i.size).filter(Boolean))];
+      // When showing all models, suppress sizes entirely (availability not guaranteed)
+      const sizes = SHOW_ALL_MODELS
+        ? []
+        : [...new Set(availableItems.map((i) => i.size).filter(Boolean))];
       return {
         ...productMeta(p, sizes),
         stock: availableItems.length,
       };
     })
-    .filter((p) => p.stock > 0);
+    .filter((p) => SHOW_ALL_MODELS || p.stock > 0);
 
   return { models, today: fmtDate(new Date().toISOString().split('T')[0]) };
 }
