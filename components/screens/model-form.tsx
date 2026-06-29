@@ -17,12 +17,19 @@ import { modelSchema, type ModelFormValues } from '@/app/lib/schemas';
 export function ModelForm({
   initial,
   teams,
+  prefillTeam,
+  fromPurchase,
 }: {
   initial?: ModelWithStats | null;
   teams: { id: string; name: string }[];
+  prefillTeam?: string;
+  fromPurchase?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const prefillTeamId = prefillTeam
+    ? (teams.find((t) => t.name.toLowerCase() === prefillTeam.trim().toLowerCase())?.id ?? '')
+    : '';
   const {
     control,
     handleSubmit,
@@ -30,7 +37,7 @@ export function ModelForm({
   } = useForm<ModelFormValues>({
     resolver: zodResolver(modelSchema),
     defaultValues: {
-      teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : '',
+      teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : prefillTeamId,
       season: initial?.season ?? '',
       version: initial?.version ?? 'Home',
       type: initial?.type ?? 'Fan',
@@ -51,7 +58,7 @@ export function ModelForm({
       if (initial?.id) {
         await updateModel(initial.id, data);
       } else {
-        await createModel(data);
+        await createModel(data, { fromPurchase });
       }
     });
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,17 +17,22 @@ import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { createPurchase } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
+import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
+
+const DRAFT_KEY = 'purchase-draft';
 
 export function PurchaseForm({
   models,
   presetModelId,
+  newModelId,
   users,
   rate,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
+  newModelId?: string;
   users: UserSummary[];
   rate: RateResult;
 }) {
@@ -42,6 +47,8 @@ export function PurchaseForm({
     handleSubmit,
     register,
     trigger,
+    getValues,
+    reset,
     formState: { errors },
   } = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
@@ -58,11 +65,33 @@ export function PurchaseForm({
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
-  const cap = (s: string) => s.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
-  const modelLabel = (m: ModelWithStats) => `${cap(m.team)} · ${cap(m.version ?? '')} · ${m.season}`;
-  const modelByLabel: Record<string, string> = {};
-  models.forEach((m) => { modelByLabel[modelLabel(m)] = m.id; });
-  const sortedModels = [...models].sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
+  // Restaura el borrador al volver de "Nuevo modelo" (la navegación desmonta el form).
+  useEffect(() => {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(DRAFT_KEY);
+    try {
+      const draft = JSON.parse(raw) as { values: PurchaseFormValues; step: number; pendingIndex: number };
+      if (newModelId && draft.values.items[draft.pendingIndex]) {
+        draft.values.items[draft.pendingIndex].modelId = newModelId;
+      }
+      reset(draft.values);
+      setStep(draft.step ?? 2);
+    } catch {
+      // borrador corrupto: lo ignoramos
+    }
+    router.replace('/purchases/new');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Guarda el borrador y navega al alta de modelo, recordando qué fila lo pidió.
+  function requestCreateModel(index: number, prefill: string) {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ values: getValues(), step, pendingIndex: index }),
+    );
+    router.push(`/inventory/new?fromPurchase=1&prefillTeam=${encodeURIComponent(prefill)}`);
+  }
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
@@ -181,22 +210,23 @@ export function PurchaseForm({
                         ) : (
                           <div className="item-swatch-empty"><Icon name="shirt" size={16} /></div>
                         )}
-                        <Controller
-                          name={`items.${index}.modelId`}
-                          control={control}
-                          render={({ field: f }) => (
-                            <select
-                              className="select item-model"
-                              value={m ? modelLabel(m) : ''}
-                              onChange={(e) => f.onChange(modelByLabel[e.target.value] || '')}
-                            >
-                              <option value="">Elegí un producto…</option>
-                              {sortedModels.map((mm) => (
-                                <option key={mm.id} value={modelLabel(mm)}>{modelLabel(mm)}</option>
-                              ))}
-                            </select>
-                          )}
-                        />
+                        <div className="item-model">
+                          <Controller
+                            name={`items.${index}.modelId`}
+                            control={control}
+                            render={({ field: f }) => (
+                              <ProductPicker
+                                value={f.value ?? ''}
+                                onChange={f.onChange}
+                                models={models}
+                                recentIds={watchedItems
+                                  .map((it, i) => (i !== index ? it.modelId : ''))
+                                  .filter(Boolean)}
+                                onRequestCreate={(prefill) => requestCreateModel(index, prefill)}
+                              />
+                            )}
+                          />
+                        </div>
                         <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
                           <Icon name="x" size={17} />
                         </button>
