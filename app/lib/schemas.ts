@@ -41,9 +41,11 @@ export type GastoFormValues = z.infer<typeof gastoSchema>;
 export const arrivalSchema = z
   .object({
     arrivalDate: z.string().min(1, 'Requerido'),
-    shippingRateUsd: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
-    weight: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un peso válido'),
+    trackingNumber: z.string().optional(),
+    shippingRateUsd: z.string().optional(),
+    weight: z.string().optional(),
     shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+    itemIds: z.array(z.string().uuid()).min(1, 'Marcá al menos un item'),
   });
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
@@ -128,7 +130,6 @@ export const purchaseSchema = z
   .object({
     purchaseDate: z.string().min(1, 'Requerido'),
     supplier: z.string().optional(),
-    trackingNumber: z.string().optional(),
     description: z.string().optional(),
     supplierPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),

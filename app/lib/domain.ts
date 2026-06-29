@@ -5,7 +5,7 @@ export type UserSummary = { id: string; alias: string };
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
 export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero'] as const;
 export const SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
-export const SHIRT_TYPES = ['Fan', 'Player', 'Retro'] as const;
+export const SHIRT_TYPES = ['Fan', 'Player', 'Retro', 'KidKit'] as const;
 export const SLEEVES = ['Corta', 'Larga'] as const;
 
 export const JERSEY_COLORS = [
@@ -47,14 +47,27 @@ export type ModelWithStats = ModelMeta & {
   inTransit: number;
 };
 
-export type PurchaseStatus = 'transit' | 'arrived';
+export type PurchaseStatus = 'transit' | 'partial' | 'arrived';
 
 export type ItemInBatch = {
   id: string;
   catalogProductId: string;
   size: string;
   basePriceUsd: number;
+  shipmentId: string | null;
   product: ModelMeta;
+};
+
+export type ShipmentRecord = {
+  id: string;
+  date: string;
+  trackingNumber: string | null;
+  shippingPriceUsd: number | null;
+  shippingPriceUyu: number | null;
+  weight: number | null;
+  shippingPaidByUserId: string | null;
+  shippingPaidByAlias: string | null;
+  itemIds: string[];
 };
 
 export type BatchSummary = {
@@ -63,6 +76,7 @@ export type BatchSummary = {
   purchaseDate: string;
   arrivalDate: string | null;
   quantity: number;
+  arrivedQuantity: number;
   trackingNumber: string | null;
   description: string | null;
   shippingPriceUsd: number | null;
@@ -74,6 +88,7 @@ export type BatchSummary = {
   shippingPaidByUserId: string | null;
   shippingPaidByAlias: string | null;
   items: ItemInBatch[];
+  shipments: ShipmentRecord[];
 };
 
 export type SaleRecord = {

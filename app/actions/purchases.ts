@@ -12,7 +12,6 @@ import { CACHE_TAGS } from '@/app/lib/cache-tags';
 const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
   supplier: z.string().optional(),
-  trackingNumber: z.string().optional(),
   description: z.string().optional(),
   supplierPaidByUserId: z.string().uuid().optional(),
   exchangeRate: z.number().finite().positive(),
@@ -29,7 +28,6 @@ type PurchaseItem = { modelId: string; size: string; basePriceUsd: number; quant
 export async function createPurchase(data: {
   purchaseDate: string;
   supplier?: string;
-  trackingNumber?: string;
   description?: string;
   supplierPaidByUserId?: string;
   exchangeRate: number;
@@ -50,7 +48,6 @@ export async function createPurchase(data: {
       data: {
         purchaseDate: new Date(data.purchaseDate),
         supplier: data.supplier?.trim().toLowerCase() || null,
-        trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
         description: data.description?.trim().toLowerCase() || null,
         quantity: expandedItems.length,
         supplierPaidByUserId: data.supplierPaidByUserId || null,
@@ -67,31 +64,70 @@ export async function createPurchase(data: {
   redirect('/purchases');
 }
 
+// Registers ONE shipment against a batch: marks the chosen pending items as
+// received and stores the shipment's tracking, cost and payer (any one of
+// these can be absent — a free shipment has no payer). The batch's overall
+// status is derived from how many of its items now belong to a shipment.
 export async function markArrived(
   batchId: string,
   data: {
     arrivalDate: string;
-    shippingRateUsd: string;
-    weight: string;
+    trackingNumber?: string;
+    shippingRateUsd?: string;
+    weight?: string;
     shippingPaidByUserId?: string;
+    itemIds: string[];
     exchangeRate: number;
   }
 ) {
   const { exchangeRate, ...rest } = data;
   if (!arrivalSchema.safeParse(rest).success) throw new Error('Invalid arrival data');
 
-  const weight = parseFloat(data.weight);
-  const shippingPriceUsd = parseFloat(data.shippingRateUsd) * weight;
+  const weight = data.weight ? parseFloat(data.weight) : 0;
+  const rateUsd = data.shippingRateUsd ? parseFloat(data.shippingRateUsd) : 0;
+  const shippingPriceUsd = rateUsd > 0 && weight > 0 ? rateUsd * weight : 0;
+  const shippingPriceUyu = shippingPriceUsd > 0 ? money.toUyu(shippingPriceUsd, exchangeRate) : 0;
 
-  await prisma.batch.update({
-    where: { id: batchId },
-    data: {
-      arrivalDate: new Date(data.arrivalDate),
-      shippingPriceUsd,
-      shippingPriceUyu: money.toUyu(shippingPriceUsd, exchangeRate),
-      weight,
-      shippingPaidByUserId: data.shippingPaidByUserId || null,
-    },
+  await prisma.$transaction(async (tx) => {
+    // Guard: the supplied itemIds must belong to this batch and still be
+    // pending (no shipment yet). Lock them in a single conditional update.
+    const eligible = await tx.inventoryItem.findMany({
+      where: { id: { in: data.itemIds }, batchId, shipmentId: null },
+      select: { id: true },
+    });
+    if (eligible.length !== data.itemIds.length) {
+      throw new Error('Algunos items ya fueron recibidos o no pertenecen a esta compra');
+    }
+
+    const shipment = await tx.shipment.create({
+      data: {
+        batchId,
+        date: new Date(data.arrivalDate),
+        trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
+        shippingPriceUsd: shippingPriceUsd > 0 ? shippingPriceUsd : null,
+        shippingPriceUyu: shippingPriceUyu > 0 ? shippingPriceUyu : null,
+        weight: weight > 0 ? weight : null,
+        shippingPaidByUserId: data.shippingPaidByUserId || null,
+      },
+      select: { id: true },
+    });
+
+    await tx.inventoryItem.updateMany({
+      where: { id: { in: data.itemIds }, batchId, shipmentId: null },
+      data: { shipmentId: shipment.id },
+    });
+
+    // Once every item is on a shipment, stamp the legacy arrivalDate column
+    // for backwards-compat with the few places that still query it.
+    const pending = await tx.inventoryItem.count({
+      where: { batchId, shipmentId: null },
+    });
+    if (pending === 0) {
+      await tx.batch.update({
+        where: { id: batchId },
+        data: { arrivalDate: new Date(data.arrivalDate) },
+      });
+    }
   });
 
   updateTag(CACHE_TAGS.purchases);

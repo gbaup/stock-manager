@@ -8,7 +8,7 @@ import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { fmtDate, uyu } from '@/app/lib/format';
-import type { BatchSummary } from '@/app/lib/domain';
+import type { BatchSummary, ShipmentRecord } from '@/app/lib/domain';
 
 export function PurchasesScreen({
   batches,
@@ -21,7 +21,12 @@ export function PurchasesScreen({
   const [tab, setTab] = useState<'pending' | 'arrived'>('pending');
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
-  const list = tab === 'pending' ? sorted.filter((b) => b.status === 'transit') : sorted.filter((b) => b.status === 'arrived');
+  // The "pending" tab now bundles both transit and partial — anything still
+  // expecting more items to arrive.
+  const list =
+    tab === 'pending'
+      ? sorted.filter((b) => b.status !== 'arrived')
+      : sorted.filter((b) => b.status === 'arrived');
   const arrivedCount = batches.filter((b) => b.status === 'arrived').length;
 
   return (
@@ -76,21 +81,32 @@ function PurchaseCard({
   batch: BatchSummary;
   onArrive: (id: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const uniqueProducts = Array.from(new Map(batch.items.map((i) => [i.catalogProductId, i.product])).values());
   const qty = batch.items.length;
   const single = uniqueProducts.length === 1 ? uniqueProducts[0] : null;
-  const isTransit = batch.status === 'transit';
+  const isArrived = batch.status === 'arrived';
+  const isPartial = batch.status === 'partial';
 
   const title = single
     ? `${single.team} · ${single.version}`
     : `${uniqueProducts.length} modelos · ${qty} items`;
 
   const sub = single
-    ? batch.supplier || batch.description || (batch.trackingNumber ? `Tracking ${batch.trackingNumber}` : `${qty} ${qty === 1 ? 'unidad' : 'unidades'}`)
+    ? batch.supplier || batch.description || `${qty} ${qty === 1 ? 'unidad' : 'unidades'}`
     : batch.description || uniqueProducts.map((m) => m.team).join(', ');
 
+  const tag =
+    batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
+    batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
+    <Tag kind="ok">recibida</Tag>;
+
+  const totalShippingUyu = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
+  const arrivalDate = batch.arrivalDate;
+  const arriveLabel = isPartial ? 'Llegó más' : 'Llegó';
+
   return (
-    <div className={`purchase-card${isTransit ? ' pending' : ''}`}>
+    <div className={`purchase-card${isArrived ? '' : ' pending'}`}>
       <div className="pc-head">
         <div className="pc-swatches">
           {uniqueProducts.slice(0, 3).map((m, i) => (
@@ -99,30 +115,68 @@ function PurchaseCard({
           {uniqueProducts.length > 3 && <span className="pc-more">+{uniqueProducts.length - 3}</span>}
         </div>
         <div className="pc-main">
-          <div className="pc-team">{title}</div>
-          <div className="pc-sub">{sub}</div>
+          <div className="pc-team capitalize">{title}</div>
+          <div className="pc-sub capitalize">{sub}</div>
         </div>
-        {isTransit ? <Tag kind="transit">en camino</Tag> : <Tag kind="ok">recibida</Tag>}
+        {tag}
       </div>
       <div className="pc-foot">
         <div className="pc-stat">
-          <div className="l">Cantidad</div>
-          <div className="v">{qty} u.</div>
+          <div className="l">Items</div>
+          <div className="v">{isPartial ? `${batch.arrivedQuantity}/${qty}` : `${qty} u.`}</div>
         </div>
         <div className="pc-stat">
-          <div className="l">{isTransit ? 'Pedido' : 'Llegó'}</div>
-          <div className="v">{fmtDate(isTransit ? batch.purchaseDate : batch.arrivalDate)}</div>
+          <div className="l">{isArrived ? 'Llegó' : 'Pedido'}</div>
+          <div className="v">{fmtDate(isArrived ? arrivalDate : batch.purchaseDate)}</div>
         </div>
-        {isTransit ? (
+        {!isArrived ? (
           <button className="btn btn-primary btn-sm" onClick={() => onArrive(batch.id)}>
-            <Icon name="check" size={16} />Llegó
+            <Icon name="check" size={16} />{arriveLabel}
           </button>
         ) : (
           <div className="pc-stat" style={{ flex: 0, textAlign: 'right' }}>
             <div className="l">Envío</div>
-            <div className="v">{batch.shippingPriceUyu && batch.shippingPriceUyu > 0 ? uyu(batch.shippingPriceUyu) : '—'}</div>
+            <div className="v">{totalShippingUyu > 0 ? uyu(totalShippingUyu) : '—'}</div>
           </div>
         )}
+      </div>
+
+      {batch.shipments.length > 0 && (
+        <>
+          <button type="button" className="pc-ships-toggle" onClick={() => setOpen((o) => !o)}>
+            <Icon
+              name="chevR"
+              size={14}
+              style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}
+            />
+            {batch.shipments.length} {batch.shipments.length === 1 ? 'envío' : 'envíos'}
+          </button>
+          {open && (
+            <div className="ship-list">
+              {batch.shipments.map((sh, i) => (
+                <ShipmentRow key={sh.id} sh={sh} index={i + 1} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
+  const n = sh.itemIds.length;
+  const meta = [
+    sh.trackingNumber,
+    sh.shippingPriceUyu && sh.shippingPriceUyu > 0 ? `envío ${uyu(sh.shippingPriceUyu)}` : null,
+    sh.shippingPaidByAlias ? `pagó ${sh.shippingPaidByAlias}` : null,
+  ].filter(Boolean).join(' · ');
+  return (
+    <div className="ship-row">
+      <span className="ship-n">#{index}</span>
+      <div className="ship-main">
+        <div className="ship-top">{fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}</div>
+        <div className="ship-meta">{meta || 'sin datos de envío'}</div>
       </div>
     </div>
   );

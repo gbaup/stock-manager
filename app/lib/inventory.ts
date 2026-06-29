@@ -37,12 +37,12 @@ export class NotEnoughStockError extends Error {
 }
 
 // Counts available/in-transit/sold items for one model. Stock means
-// "batch has arrived AND status='available'"; in-transit means the
-// batch hasn't arrived yet regardless of status.
+// "item belongs to a shipment AND status='available'"; in-transit means
+// the item has no shipment yet (still on its way).
 export async function stockOf(modelId: string): Promise<StockCount> {
   const items = await prisma.inventoryItem.findMany({
     where: { catalogProductId: modelId },
-    select: { status: true, batch: { select: { arrivalDate: true } } },
+    select: { status: true, shipmentId: true },
   });
   return countStock(items);
 }
@@ -56,11 +56,11 @@ export async function stockByModel(modelIds?: string[]): Promise<Map<string, Sto
     select: {
       catalogProductId: true,
       status: true,
-      batch: { select: { arrivalDate: true } },
+      shipmentId: true,
     },
   });
 
-  const byModel = new Map<string, Array<{ status: string; batch: { arrivalDate: Date | null } }>>();
+  const byModel = new Map<string, Array<{ status: string; shipmentId: string | null }>>();
   for (const item of items) {
     const list = byModel.get(item.catalogProductId);
     if (list) list.push(item);
@@ -78,7 +78,7 @@ export async function availableSizes(modelId: string): Promise<Array<{ size: str
     where: {
       catalogProductId: modelId,
       status: 'available',
-      batch: { arrivalDate: { not: null } },
+      shipmentId: { not: null },
     },
     select: { size: true },
   });
@@ -87,8 +87,9 @@ export async function availableSizes(modelId: string): Promise<Array<{ size: str
   return [...counts].map(([size, count]) => ({ size, count }));
 }
 
-// Inserts new items into an existing Batch. All start as `status: 'available'`;
-// in-transit visibility is gated by Batch.arrivalDate, not the item status.
+// Inserts new items into an existing Batch. All start as `status: 'available'`
+// with `shipmentId: null` (in-transit). They become stock once linked to a
+// Shipment via markArrived. The Shipment seam decides what "arrived" means.
 // Both currencies are stored: USD is the supplier price, UYU is derived at
 // purchase time using the supplied exchange rate (snapshotted on the batch).
 //
@@ -120,7 +121,7 @@ export async function addBatchItems(
 // to sold (writing both UYU and USD final prices), creates the matching Sale
 // row, and invalidates caches. Throws NotEnoughStockError if no item matches.
 //
-// FIFO by Batch.arrivalDate then InventoryItem.createdAt.
+// FIFO by Shipment.date then InventoryItem.createdAt.
 export async function recordSale(intent: SaleIntent, loggedByUserId: string): Promise<{ saleId: string }> {
   const saleId = await prisma.$transaction(async (tx) => {
     const candidate = await tx.inventoryItem.findFirst({
@@ -128,9 +129,9 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
         catalogProductId: intent.modelId,
         ...(intent.size ? { size: intent.size } : {}),
         status: 'available',
-        batch: { arrivalDate: { not: null } },
+        shipmentId: { not: null },
       },
-      orderBy: [{ batch: { arrivalDate: 'asc' } }, { createdAt: 'asc' }],
+      orderBy: [{ shipment: { date: 'asc' } }, { createdAt: 'asc' }],
       select: { id: true },
     });
     if (!candidate) throw new NotEnoughStockError();
@@ -165,15 +166,16 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
 
 // Exported so callers that have already fetched items (e.g. detail pages
 // that need items for timelines or size lists) can derive counts in-process
-// without a second DB round trip.
+// without a second DB round trip. An item is in transit until it gets linked
+// to a Shipment; once shipped, its status decides available vs sold.
 export function countStock(
-  items: Array<{ status: string; batch: { arrivalDate: Date | null } }>,
+  items: Array<{ status: string; shipmentId: string | null }>,
 ): StockCount {
   let available = 0;
   let inTransit = 0;
   let sold = 0;
   for (const i of items) {
-    if (i.batch.arrivalDate === null) inTransit += 1;
+    if (i.shipmentId === null) inTransit += 1;
     else if (i.status === 'available') available += 1;
     else if (i.status === 'sold') sold += 1;
   }

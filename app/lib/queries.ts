@@ -7,6 +7,7 @@ import { parsePhotos } from './photo';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, UserSummary,
+  ShipmentRecord,
 } from './domain';
 
 export type HomeSaleItem = {
@@ -51,6 +52,17 @@ function productMeta(p: {
   };
 }
 
+type ShipmentInput = {
+  id: string;
+  date: Date;
+  trackingNumber: string | null;
+  shippingPriceUsd: unknown;
+  shippingPriceUyu: unknown;
+  weight: unknown;
+  shippingPaidByUserId: string | null;
+  shippingPaidByUser: { alias: string } | null;
+};
+
 export function batchToSummary(
   b: {
     id: string; purchaseDate: Date; arrivalDate: Date | null;
@@ -61,32 +73,78 @@ export function batchToSummary(
     supplierPaidByUser: { alias: string } | null;
     shippingPaidByUserId: string | null;
     shippingPaidByUser: { alias: string } | null;
+    shipments: ShipmentInput[];
   },
-  items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; product: Parameters<typeof productMeta>[0] }>
+  items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
 ): BatchSummary {
+  // Map shipment -> items received via that shipment.
+  const itemsByShipment = new Map<string, string[]>();
+  for (const it of items) {
+    if (!it.shipmentId) continue;
+    const list = itemsByShipment.get(it.shipmentId);
+    if (list) list.push(it.id);
+    else itemsByShipment.set(it.shipmentId, [it.id]);
+  }
+
+  const shipments: ShipmentRecord[] = [...b.shipments]
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((s) => ({
+      id: s.id,
+      date: toISODate(s.date)!,
+      trackingNumber: s.trackingNumber,
+      shippingPriceUsd: s.shippingPriceUsd ? Number(s.shippingPriceUsd) : null,
+      shippingPriceUyu: s.shippingPriceUyu ? Number(s.shippingPriceUyu) : null,
+      weight: s.weight ? Number(s.weight) : null,
+      shippingPaidByUserId: s.shippingPaidByUserId,
+      shippingPaidByAlias: s.shippingPaidByUser?.alias ?? null,
+      itemIds: itemsByShipment.get(s.id) ?? [],
+    }));
+
+  const arrivedQuantity = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
+  const total = items.length;
+  const status: PurchaseStatus =
+    arrivedQuantity <= 0 ? 'transit' :
+    arrivedQuantity >= total ? 'arrived' :
+    'partial';
+
+  // For legacy summary fields, surface either the most recent shipment data or
+  // the batch fallback (used in case the batch row still holds metadata for an
+  // older record that hasn't been turned into a shipment yet).
+  const lastShipment = shipments[shipments.length - 1] ?? null;
+  const arrivalDate = lastShipment ? lastShipment.date : toISODate(b.arrivalDate);
+  const trackingNumber = lastShipment?.trackingNumber ?? b.trackingNumber;
+  const shippingPriceUsd = shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0) || (b.shippingPriceUsd ? Number(b.shippingPriceUsd) : 0);
+  const shippingPriceUyu = shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0) || (b.shippingPriceUyu ? Number(b.shippingPriceUyu) : 0);
+  const weight = lastShipment?.weight ?? (b.weight ? Number(b.weight) : null);
+  const shippingPaidByUserId = lastShipment?.shippingPaidByUserId ?? b.shippingPaidByUserId;
+  const shippingPaidByAlias = lastShipment?.shippingPaidByAlias ?? b.shippingPaidByUser?.alias ?? null;
+
   return {
     id: b.id,
     supplier: b.supplier,
     purchaseDate: toISODate(b.purchaseDate)!,
-    arrivalDate: toISODate(b.arrivalDate),
+    arrivalDate,
     quantity: items.length,
-    trackingNumber: b.trackingNumber,
+    arrivedQuantity,
+    trackingNumber,
     description: b.description,
-    shippingPriceUsd: b.shippingPriceUsd ? Number(b.shippingPriceUsd) : null,
-    shippingPriceUyu: b.shippingPriceUyu ? Number(b.shippingPriceUyu) : null,
-    weight: b.weight ? Number(b.weight) : null,
-    status: (b.arrivalDate ? 'arrived' : 'transit') as PurchaseStatus,
+    shippingPriceUsd: shippingPriceUsd || null,
+    shippingPriceUyu: shippingPriceUyu || null,
+    weight,
+    status,
     supplierPaidByUserId: b.supplierPaidByUserId,
     supplierPaidByAlias: b.supplierPaidByUser?.alias ?? null,
-    shippingPaidByUserId: b.shippingPaidByUserId,
-    shippingPaidByAlias: b.shippingPaidByUser?.alias ?? null,
+    shippingPaidByUserId,
+    shippingPaidByAlias,
     items: items.map((i) => ({
       id: i.id,
       catalogProductId: i.catalogProductId,
       size: i.size,
       basePriceUsd: Number(i.basePriceUsd),
+      shipmentId: i.shipmentId,
       product: productMeta(i.product),
     })),
+    shipments,
   };
 }
 
@@ -142,6 +200,10 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
             include: {
               supplierPaidByUser: true,
               shippingPaidByUser: true,
+              shipments: {
+                include: { shippingPaidByUser: true },
+                orderBy: { date: 'asc' },
+              },
             },
           },
           sale: {
@@ -166,6 +228,8 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const sold = soldItems.length;
   const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);
 
+  // Group items by batch so we can build a BatchSummary per batch even when
+  // only a subset of the items belong to this model.
   const batchMap = new Map<string, { batch: typeof p.items[0]['batch']; items: typeof p.items }>();
   for (const item of p.items) {
     if (!batchMap.has(item.batchId)) batchMap.set(item.batchId, { batch: item.batch, items: [] });
@@ -175,19 +239,39 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const events: TimelineEvent[] = [];
 
   for (const [, { batch, items }] of batchMap) {
-    const qty = items.length;
-    const batchData = batchToSummary(batch, items.map((i) => ({
-      id: i.id,
-      catalogProductId: i.catalogProductId,
-      size: i.size,
-      basePriceUsd: i.basePriceUsd,
-      product: p,
-    })));
-    const date = toISODate(batch.arrivalDate ?? batch.purchaseDate)!;
-    events.push(batch.arrivalDate
-      ? { type: 'arrived', date, data: batchData, qty }
-      : { type: 'transit', date, data: batchData, qty }
-    );
+    // Build the summary from ALL items of the batch (needed for accurate
+    // shipment grouping and totals), but compute per-model qty from `items`.
+    const allBatchItems = await prisma.inventoryItem.findMany({
+      where: { batchId: batch.id },
+      select: {
+        id: true, catalogProductId: true, size: true, basePriceUsd: true, shipmentId: true,
+        product: { include: { team: true } },
+      },
+    });
+    const batchData = batchToSummary(batch, allBatchItems);
+
+    const arrivedForModel = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
+    const transitForModel = items.length - arrivedForModel;
+
+    if (transitForModel > 0) {
+      events.push({
+        type: 'transit',
+        date: toISODate(batch.purchaseDate)!,
+        data: batchData,
+        qty: transitForModel,
+      });
+    }
+    if (arrivedForModel > 0) {
+      const lastDate = batchData.shipments.length
+        ? batchData.shipments[batchData.shipments.length - 1].date
+        : toISODate(batch.purchaseDate)!;
+      events.push({
+        type: 'arrived',
+        date: lastDate,
+        data: batchData,
+        qty: arrivedForModel,
+      });
+    }
   }
 
   // Group sales by (date, collectedByUserId) so each collector gets their own event per day
@@ -241,6 +325,10 @@ export async function getPurchases(): Promise<BatchSummary[]> {
       items: { include: { product: { include: { team: true } } } },
       supplierPaidByUser: true,
       shippingPaidByUser: true,
+      shipments: {
+        include: { shippingPaidByUser: true },
+        orderBy: { date: 'asc' },
+      },
     },
     orderBy: { purchaseDate: 'desc' },
   });
@@ -260,6 +348,10 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
       items: { include: { product: { include: { team: true } } } },
       supplierPaidByUser: true,
       shippingPaidByUser: true,
+      shipments: {
+        include: { shippingPaidByUser: true },
+        orderBy: { date: 'asc' },
+      },
     },
   });
   if (!b) return null;
@@ -274,7 +366,7 @@ export async function getPublicModels() {
   const products = await prisma.catalogProduct.findMany({
     include: {
       team: true,
-      items: { select: { status: true, size: true, batch: { select: { arrivalDate: true } } } },
+      items: { select: { status: true, size: true, shipmentId: true } },
     },
     orderBy: { team: { name: 'asc' } },
   });
@@ -282,7 +374,7 @@ export async function getPublicModels() {
   const models = products
     .map((p) => {
       const availableItems = p.items.filter(
-        (i) => i.batch.arrivalDate !== null && i.status === 'available'
+        (i) => i.shipmentId !== null && i.status === 'available'
       );
       // When showing all models, suppress sizes entirely (availability not guaranteed)
       const sizes = SHOW_ALL_MODELS
@@ -343,6 +435,12 @@ export async function getTransitCount(): Promise<number> {
   'use cache';
   cacheLife('hours');
   cacheTag(CACHE_TAGS.purchases);
-  return prisma.batch.count({ where: { arrivalDate: null } });
+  // A batch is "in transit" (or partial) as long as it has at least one item
+  // that hasn't been received via a shipment.
+  const transitBatches = await prisma.batch.findMany({
+    where: { items: { some: { shipmentId: null } } },
+    select: { id: true },
+  });
+  return transitBatches.length;
 }
 

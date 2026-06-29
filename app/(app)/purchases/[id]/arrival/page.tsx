@@ -7,5 +7,6 @@ export default async function ArrivalPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const [batch, users, rate] = await Promise.all([getBatchById(id), getUsers(), getRate()]);
   if (!batch || batch.status === 'arrived') notFound();
+  // 'transit' and 'partial' are both eligible — the form picks among pending items.
   return <ArrivalForm batch={batch} users={users} rate={rate} />;
 }

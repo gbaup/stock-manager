@@ -340,6 +340,12 @@ body {
   border-color: var(--accent-line);
 }
 
+.tag.partial {
+  background: oklch(0.93 0.04 250);
+  color: oklch(0.44 0.12 250);
+  border-color: oklch(0.86 0.05 250);
+}
+
 /* ---------- cards (direction A) ---------- */
 .card-list {
   display: flex;
@@ -3813,4 +3819,127 @@ body {
 
 .skeleton-card {
   height: 72px;
+}
+
+/* ---------- marcar llegada: selección de items por envío ---------- */
+.pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.pick-all {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 4px 2px;
+}
+
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.pick-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  transition: border-color .12s, background .12s;
+}
+
+.pick-item.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pick-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+}
+
+.pick-item.on .pick-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---------- historial de envíos en la tarjeta de compra ---------- */
+.pc-ships-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 11px;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ship-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ship-row {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+
+.ship-n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  margin-top: 1px;
+}
+
+.ship-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ship-top {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ship-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  font-family: var(--font-mono);
+  word-break: break-word;
 }

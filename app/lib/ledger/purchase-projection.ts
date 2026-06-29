@@ -4,27 +4,32 @@ import type { Movement } from './types';
 // matches it works — BatchSummary (used by purchase listings) is a superset,
 // and the saldos pipeline constructs an even leaner object straight from
 // Prisma rows to avoid serializing photos/products it never reads.
+export type ProjectableShipment = {
+  id: string;
+  date: string;
+  shippingPriceUsd: number | null;
+  shippingPriceUyu: number | null;
+  shippingPaidByUserId: string | null;
+  shippingPaidByAlias: string | null;
+};
+
 export type ProjectableBatch = {
   id: string;
   purchaseDate: string;
   arrivalDate: string | null;
   supplier: string | null;
   quantity: number;
-  shippingPriceUsd: number | null;
-  shippingPriceUyu: number | null;
   supplierPaidByUserId: string | null;
   supplierPaidByAlias: string | null;
-  shippingPaidByUserId: string | null;
-  shippingPaidByAlias: string | null;
   items: Array<{ basePriceUsd: number }>;
+  shipments: ProjectableShipment[];
 };
 
-// A batch produces up to two movements:
-//   1. Supplier payment (USD outflow) attributed to whoever paid the supplier.
-//      Recorded on purchaseDate, regardless of whether the batch has arrived.
-//   2. Shipping payment (UYU and/or USD outflow) attributed to whoever paid
-//      shipping. Recorded only once the batch has arrived (shipping isn't a
-//      saldos event until the items physically land).
+// A batch produces:
+//   1. ONE supplier-payment movement (USD outflow) recorded on purchaseDate.
+//   2. ONE shipping-payment movement PER shipment that has a cost AND a
+//      payer. With partial deliveries a single batch can yield several
+//      shipping movements on different dates.
 export function projectPurchase(batch: ProjectableBatch): Movement[] {
   const out: Movement[] = [];
 
@@ -42,19 +47,21 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
     });
   }
 
-  const shippingUyu = batch.shippingPriceUyu ?? 0;
-  const shippingUsd = batch.shippingPriceUsd ?? 0;
-  if ((shippingUyu > 0 || shippingUsd > 0) && batch.shippingPaidByUserId && batch.arrivalDate) {
-    out.push({
-      id: `pago-envio-${batch.id}`,
-      kind: 'pago-envio',
-      date: batch.arrivalDate,
-      person: batch.shippingPaidByAlias ?? '',
-      title: 'Envío',
-      sub: batch.supplier ?? `${batch.quantity} items`,
-      uyu: shippingUyu > 0 ? -shippingUyu : 0,
-      usd: shippingUsd > 0 ? -shippingUsd : 0,
-    });
+  for (const sh of batch.shipments) {
+    const shippingUyu = sh.shippingPriceUyu ?? 0;
+    const shippingUsd = sh.shippingPriceUsd ?? 0;
+    if ((shippingUyu > 0 || shippingUsd > 0) && sh.shippingPaidByUserId) {
+      out.push({
+        id: `pago-envio-${batch.id}-${sh.id}`,
+        kind: 'pago-envio',
+        date: sh.date,
+        person: sh.shippingPaidByAlias ?? '',
+        title: 'Envío',
+        sub: batch.supplier ?? `${batch.quantity} items`,
+        uyu: shippingUyu > 0 ? -shippingUyu : 0,
+        usd: shippingUsd > 0 ? -shippingUsd : 0,
+      });
+    }
   }
 
   return out;

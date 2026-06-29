@@ -139,12 +139,12 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
 
   if (ev.type === 'transit') {
     const b = ev.data;
-    const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`, b.trackingNumber].filter(Boolean).join(' · ');
+    const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
     return (
       <div className="event">
         <div className="event-ico transit"><Icon name="truck" size={17} /></div>
         <div className="event-main">
-          <div className="event-title">Compra en camino · {ev.qty} u.</div>
+          <div className="event-title">En camino · {ev.qty} u.</div>
           <div className="event-sub">{meta}</div>
         </div>
       </div>
@@ -152,20 +152,20 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
   }
 
   const b = ev.data;
-  const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`, b.weight ? `${b.weight} kg` : null].filter(Boolean).join(' · ');
+  const shipUyu = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
+  const shipUsd = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
+  const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`].filter(Boolean).join(' · ');
   return (
     <div className="event">
       <div className="event-ico buy"><Icon name="box" size={17} /></div>
       <div className="event-main">
-        <div className="event-title">Compra recibida · {ev.qty} u.</div>
+        <div className="event-title">Recibida · {ev.qty} u.</div>
         <div className="event-sub">{meta}</div>
       </div>
-      {b.shippingPriceUyu && b.shippingPriceUyu > 0 && (
+      {shipUyu > 0 && (
         <div className="event-amt" style={{ color: 'var(--text-muted)' }}>
-          envío {uyu(b.shippingPriceUyu)}
-          {b.shippingPriceUsd && b.shippingPriceUsd > 0 && (
-            <span className="sec">{usd(b.shippingPriceUsd)}</span>
-          )}
+          envío {uyu(shipUyu)}
+          {shipUsd > 0 && <span className="sec">{usd(shipUsd)}</span>}
         </div>
       )}
     </div>

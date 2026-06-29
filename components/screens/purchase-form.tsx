@@ -48,7 +48,6 @@ export function PurchaseForm({
     defaultValues: {
       purchaseDate: todayISO(),
       supplier: '',
-      trackingNumber: '',
       description: '',
       supplierPaidByUserId: '',
       items: presetModelId
@@ -81,7 +80,6 @@ export function PurchaseForm({
       await createPurchase({
         purchaseDate: data.purchaseDate,
         supplier: data.supplier || undefined,
-        trackingNumber: data.trackingNumber || undefined,
         description: data.description || undefined,
         supplierPaidByUserId: data.supplierPaidByUserId || undefined,
         exchangeRate: rate.value,
@@ -126,29 +124,13 @@ export function PurchaseForm({
               <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
                 <input className="input mono" type="date" {...register('purchaseDate')} />
               </Field>
-              <Field label="Cantidad">
-                <div className="calc-field">
-                  <span className="calc-val">{totalQty}</span>
-                  <span className="calc-hint">se calcula de los items</span>
-                </div>
-              </Field>
 
-              <div className="section-label">Seguimiento</div>
               <Field label="Proveedor" optional>
                 <Controller
                   name="supplier"
                   control={control}
                   render={({ field }) => (
                     <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
-                  )}
-                />
-              </Field>
-              <Field label="Número de tracking" optional>
-                <Controller
-                  name="trackingNumber"
-                  control={control}
-                  render={({ field }) => (
-                    <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Nº de seguimiento" mono />
                   )}
                 />
               </Field>
@@ -161,6 +143,9 @@ export function PurchaseForm({
                   )}
                 />
               </Field>
+              <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -2, marginBottom: 4 }}>
+                El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
+              </div>
 
               <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
                 Siguiente: agregar items
