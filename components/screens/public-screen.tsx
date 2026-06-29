@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { SIZES } from '@/app/lib/domain';
+import { SIZES, fmtSize } from '@/app/lib/domain';
 import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
@@ -17,7 +17,7 @@ function SizeChips({ sizes }: { sizes: string[] }) {
   if (!sizes.length) return null;
   return (
     <div className="size-chips capitalize">
-      {sizes.map((s) => <span key={s} className="size-chip">{s}</span>)}
+      {sizes.map((s) => <span key={s} className="size-chip">{fmtSize(s)}</span>)}
     </div>
   );
 }
@@ -372,7 +372,7 @@ function GalleryViewer({
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {model.sizes.map((s) => (
-                <span key={s} className="viewer-tag" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{s}</span>
+                <span key={s} className="viewer-tag" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fmtSize(s)}</span>
               ))}
             </div>
           </div>

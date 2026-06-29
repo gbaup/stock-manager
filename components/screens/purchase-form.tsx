@@ -11,7 +11,7 @@ import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { SIZES } from '@/app/lib/domain';
+import { sizesForType } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
@@ -212,7 +212,7 @@ export function PurchaseForm({
                             name={`items.${index}.size`}
                             control={control}
                             render={({ field: f }) => (
-                              <SelectInput value={f.value} onChange={f.onChange} options={SIZES} placeholder="Talle…" />
+                              <SelectInput value={f.value} onChange={f.onChange} options={sizesForType(m?.type)} placeholder="Talle…" />
                             )}
                           />
                         </Field>

@@ -145,7 +145,7 @@ function CardList({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: strin
             <div className="mcard-meta">{m.season} · {m.version} · {m.type}</div>
             <div className="mcard-tags capitalize">
               <Tag><ColorDot color={m.color} />{m.color}</Tag>
-              {m.player && <Tag kind="player" className="capitalize">{m.player}</Tag>}
+              {m.player && <Tag kind="player" className="capitalize">{m.number} {m.player}</Tag>}
               {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}
             </div>
           </div>

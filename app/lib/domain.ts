@@ -4,9 +4,21 @@ export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
 export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero'] as const;
-export const SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
+export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
+export const KID_SIZES = ['20', '22', '24', '26'] as const;
 export const SHIRT_TYPES = ['Fan', 'Player', 'Retro', 'KidKit'] as const;
 export const SLEEVES = ['Corta', 'Larga'] as const;
+
+const KID_SIZE_LABELS: Record<string, string> = {
+  '20': '5-6 años', '22': '7-8 años', '24': '8-10 años', '26': '10-12 años',
+};
+
+// Size options for the purchase selector, based on a model's type.
+export const sizesForType = (type: string | null | undefined): readonly string[] =>
+  type === 'kidkit' ? KID_SIZES : SIZES;
+
+// Public-facing label: kid numeric sizes -> age range, everything else unchanged.
+export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 
 export const JERSEY_COLORS = [
   { name: 'blanco', bg: '#f4f5f7', fg: '#1b2330' },
