@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     ".local/**",
+    // Generated Lighthouse report artifacts (gitignored).
+    ".unlighthouse/**",
   ]),
 ]);
 
