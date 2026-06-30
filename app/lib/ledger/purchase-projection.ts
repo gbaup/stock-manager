@@ -1,3 +1,4 @@
+import { usd } from '../format';
 import type { Movement } from './types';
 
 // Structural shape of a batch that this projection needs. Any object that
@@ -34,19 +35,24 @@ export type ProjectableBatch = {
 export function projectPurchase(batch: ProjectableBatch): Movement[] {
   const out: Movement[] = [];
 
-  for (const p of batch.supplierPayments) {
-    if (p.amountUsd > 0) {
-      out.push({
-        id: `pago-prov-${batch.id}-${p.userId}`,
-        kind: 'pago-prov',
-        date: batch.purchaseDate,
-        person: p.alias,
-        title: batch.supplier ?? 'Proveedor',
-        sub: `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`,
-        uyu: 0,
-        usd: -p.amountUsd,
-      });
-    }
+  // When more than one partner pays the supplier, each card shows that
+  // partner's share of the combined payment so a split is visible at a glance.
+  const paying = batch.supplierPayments.filter((p) => p.amountUsd > 0);
+  const totalUsd = paying.reduce((s, p) => s + p.amountUsd, 0);
+  const itemsLabel = `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`;
+
+  for (const p of paying) {
+    const pct = Math.round((p.amountUsd / totalUsd) * 100);
+    out.push({
+      id: `pago-prov-${batch.id}-${p.userId}`,
+      kind: 'pago-prov',
+      date: batch.purchaseDate,
+      person: p.alias,
+      title: batch.supplier ?? 'Proveedor',
+      sub: paying.length > 1 ? `${itemsLabel} · ${pct}%` : itemsLabel,
+      uyu: 0,
+      usd: -p.amountUsd,
+    });
   }
 
   for (const sh of batch.shipments) {
