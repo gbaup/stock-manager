@@ -131,7 +131,7 @@ export const purchaseSchema = z
     purchaseDate: z.string().min(1, 'Requerido'),
     supplier: z.string().optional(),
     description: z.string().optional(),
-    supplierPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+    supplierPayments: z.record(z.string().uuid(), numericOptional).optional(),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   });
 

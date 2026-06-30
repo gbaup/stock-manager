@@ -9,7 +9,6 @@ import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
-import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import { sizesForType } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
@@ -56,7 +55,7 @@ export function PurchaseForm({
       purchaseDate: todayISO(),
       supplier: '',
       description: '',
-      supplierPaidByUserId: '',
+      supplierPayments: {},
       items: presetModelId
         ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }]
         : [],
@@ -99,6 +98,10 @@ export function PurchaseForm({
   const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0) * (it.quantity ?? 1), 0);
   const needsSupplierPayer = totalUsd > 0;
 
+  const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
+  const paidSum = Object.values(watchedPayments).reduce((s, v) => s + (parseFloat(v ?? '') || 0), 0);
+  const payMismatch = needsSupplierPayer && paidSum > 0 && Math.round(paidSum * 100) !== Math.round(totalUsd * 100);
+
   async function handleNextStep() {
     const valid = await trigger(['purchaseDate']);
     if (valid) setStep(2);
@@ -110,7 +113,9 @@ export function PurchaseForm({
         purchaseDate: data.purchaseDate,
         supplier: data.supplier || undefined,
         description: data.description || undefined,
-        supplierPaidByUserId: data.supplierPaidByUserId || undefined,
+        supplierPayments: Object.entries(data.supplierPayments ?? {})
+          .map(([userId, v]) => ({ userId, amountUsd: parseFloat(v ?? '') || 0 }))
+          .filter((p) => p.amountUsd > 0),
         exchangeRate: rate.value,
         items: data.items
           .filter((it) => it.modelId)
@@ -125,9 +130,17 @@ export function PurchaseForm({
   }
 
   function onSubmit(data: PurchaseFormValues) {
-    if (needsSupplierPayer && !data.supplierPaidByUserId) {
+    const sum = Object.values(data.supplierPayments ?? {}).reduce(
+      (s, v) => s + (parseFloat(v ?? '') || 0),
+      0,
+    );
+    if (needsSupplierPayer && sum === 0) {
       setPendingData(data);
       setShowConfirm(true);
+      return;
+    }
+    if (needsSupplierPayer && Math.round(sum * 100) !== Math.round(totalUsd * 100)) {
+      // The two amounts must cover the base cost exactly; the live hint shows why.
       return;
     }
     doSubmit(data);
@@ -307,24 +320,23 @@ export function PurchaseForm({
               {needsSupplierPayer && (
                 <div style={{ marginTop: 14 }}>
                   <div className="section-label" style={{ margin: '0 0 8px' }}>
-                    Pago al proveedor
+                    Pago al proveedor · {usd(totalUsd)}
                   </div>
-                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} optional error={errors.supplierPaidByUserId?.message}>
-                    <Controller
-                      name="supplierPaidByUserId"
-                      control={control}
-                      render={({ field: f }) => (
-                        <Segmented
-                          options={users.map((u) => u.alias)}
-                          value={users.find((u) => u.id === f.value)?.alias ?? ''}
-                          onChange={(alias) => f.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
-                          full
-                        />
-                      )}
-                    />
-                  </Field>
-                  <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
-                    Se descuenta del saldo en US$ de quien pagó. El envío se carga aparte al marcar la llegada.
+                  {users.map((u) => (
+                    <Field key={u.id} label={u.alias} optional>
+                      <Controller
+                        name={`supplierPayments.${u.id}` as const}
+                        control={control}
+                        render={({ field: f }) => (
+                          <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                        )}
+                      />
+                    </Field>
+                  ))}
+                  <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
+                    {paidSum > 0
+                      ? `Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`
+                      : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
                   </div>
                 </div>
               )}
@@ -334,7 +346,7 @@ export function PurchaseForm({
                 <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
               </div>
 
-              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
+              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
                 {pending ? 'Registrando…' : 'Registrar compra'}
               </button>
             </>

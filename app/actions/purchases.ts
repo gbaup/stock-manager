@@ -13,7 +13,10 @@ const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
   supplier: z.string().optional(),
   description: z.string().optional(),
-  supplierPaidByUserId: z.string().uuid().optional(),
+  supplierPayments: z.array(z.object({
+    userId: z.string().uuid(),
+    amountUsd: z.number().finite().positive(),
+  })).optional(),
   exchangeRate: z.number().finite().positive(),
   items: z.array(z.object({
     modelId: z.string().min(1),
@@ -29,7 +32,7 @@ export async function createPurchase(data: {
   purchaseDate: string;
   supplier?: string;
   description?: string;
-  supplierPaidByUserId?: string;
+  supplierPayments?: { userId: string; amountUsd: number }[];
   exchangeRate: number;
   items: PurchaseItem[];
 }) {
@@ -43,6 +46,18 @@ export async function createPurchase(data: {
     }))
   );
 
+  // Each partner's entered amount becomes one supplier-payment row. When any
+  // amount is given, the two together must cover the batch's base cost — the
+  // form enforces this too, but re-check here against tampered payloads.
+  const payments = (data.supplierPayments ?? []).filter((p) => p.amountUsd > 0);
+  if (payments.length > 0) {
+    const baseUsd = expandedItems.reduce((s, it) => s + it.basePriceUsd, 0);
+    const paid = payments.reduce((s, p) => s + p.amountUsd, 0);
+    if (Math.round(paid * 100) !== Math.round(baseUsd * 100)) {
+      throw new Error('Los pagos al proveedor deben sumar el costo base total');
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     const batch = await tx.batch.create({
       data: {
@@ -50,7 +65,9 @@ export async function createPurchase(data: {
         supplier: data.supplier?.trim().toLowerCase() || null,
         description: data.description?.trim().toLowerCase() || null,
         quantity: expandedItems.length,
-        supplierPaidByUserId: data.supplierPaidByUserId || null,
+        supplierPayments: {
+          create: payments.map((p) => ({ userId: p.userId, amountUsd: p.amountUsd })),
+        },
       },
       select: { id: true },
     });

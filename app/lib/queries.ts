@@ -69,8 +69,7 @@ export function batchToSummary(
     supplier: string | null;
     trackingNumber: string | null; description: string | null;
     shippingPriceUsd: unknown; shippingPriceUyu: unknown; weight: unknown;
-    supplierPaidByUserId: string | null;
-    supplierPaidByUser: { alias: string } | null;
+    supplierPayments: Array<{ userId: string; amountUsd: unknown; user: { alias: string } }>;
     shippingPaidByUserId: string | null;
     shippingPaidByUser: { alias: string } | null;
     shipments: ShipmentInput[];
@@ -132,8 +131,11 @@ export function batchToSummary(
     shippingPriceUyu: shippingPriceUyu || null,
     weight,
     status,
-    supplierPaidByUserId: b.supplierPaidByUserId,
-    supplierPaidByAlias: b.supplierPaidByUser?.alias ?? null,
+    supplierPayments: b.supplierPayments.map((p) => ({
+      userId: p.userId,
+      alias: p.user.alias,
+      amountUsd: Number(p.amountUsd),
+    })),
     shippingPaidByUserId,
     shippingPaidByAlias,
     items: items.map((i) => ({
@@ -198,7 +200,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
         include: {
           batch: {
             include: {
-              supplierPaidByUser: true,
+              supplierPayments: { include: { user: true } },
               shippingPaidByUser: true,
               shipments: {
                 include: { shippingPaidByUser: true },
@@ -323,7 +325,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
   const batches = await prisma.batch.findMany({
     include: {
       items: { include: { product: { include: { team: true } } } },
-      supplierPaidByUser: true,
+      supplierPayments: { include: { user: true } },
       shippingPaidByUser: true,
       shipments: {
         include: { shippingPaidByUser: true },
@@ -346,7 +348,7 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
     where: { id },
     include: {
       items: { include: { product: { include: { team: true } } } },
-      supplierPaidByUser: true,
+      supplierPayments: { include: { user: true } },
       shippingPaidByUser: true,
       shipments: {
         include: { shippingPaidByUser: true },

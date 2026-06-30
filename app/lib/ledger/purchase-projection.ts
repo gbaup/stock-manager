@@ -19,32 +19,32 @@ export type ProjectableBatch = {
   arrivalDate: string | null;
   supplier: string | null;
   quantity: number;
-  supplierPaidByUserId: string | null;
-  supplierPaidByAlias: string | null;
-  items: Array<{ basePriceUsd: number }>;
+  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number }>;
   shipments: ProjectableShipment[];
 };
 
 // A batch produces:
-//   1. ONE supplier-payment movement (USD outflow) recorded on purchaseDate.
+//   1. ONE supplier-payment movement (USD outflow) PER partner who paid,
+//      recorded on purchaseDate. The two amounts together cover the base cost.
 //   2. ONE shipping-payment movement PER shipment that has a cost AND a
 //      payer. With partial deliveries a single batch can yield several
 //      shipping movements on different dates.
 export function projectPurchase(batch: ProjectableBatch): Movement[] {
   const out: Movement[] = [];
 
-  const baseUsd = batch.items.reduce((s, it) => s + it.basePriceUsd, 0);
-  if (baseUsd > 0 && batch.supplierPaidByUserId) {
-    out.push({
-      id: `pago-prov-${batch.id}`,
-      kind: 'pago-prov',
-      date: batch.purchaseDate,
-      person: batch.supplierPaidByAlias ?? '',
-      title: batch.supplier ?? 'Proveedor',
-      sub: `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`,
-      uyu: 0,
-      usd: -baseUsd,
-    });
+  for (const p of batch.supplierPayments) {
+    if (p.amountUsd > 0) {
+      out.push({
+        id: `pago-prov-${batch.id}-${p.userId}`,
+        kind: 'pago-prov',
+        date: batch.purchaseDate,
+        person: p.alias,
+        title: batch.supplier ?? 'Proveedor',
+        sub: `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`,
+        uyu: 0,
+        usd: -p.amountUsd,
+      });
+    }
   }
 
   for (const sh of batch.shipments) {

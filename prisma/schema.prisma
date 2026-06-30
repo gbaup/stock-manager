@@ -21,8 +21,8 @@ model User {
   conversionsLogged   Conversion[] @relation("ConversionLogger")
   conversionsSent     Conversion[] @relation("ConversionSender")
   conversionsReceived Conversion[] @relation("ConversionReceiver")
-  batchesSupplierPaid Batch[]      @relation("BatchSupplierPayer")
-  batchesShippingPaid Batch[]      @relation("BatchShippingPayer")
+  batchSupplierPayments BatchSupplierPayment[] @relation("BatchSupplierPaymentUser")
+  batchesShippingPaid   Batch[]                 @relation("BatchShippingPayer")
   shipmentsPaid       Shipment[]   @relation("ShipmentShippingPayer")
   adjustments         Adjustment[] @relation("AdjustmentUser")
   adjustmentsLogged   Adjustment[] @relation("AdjustmentLogger")
@@ -45,11 +45,10 @@ model Batch {
   weight           Decimal? @db.Decimal(10, 2)
   supplier         String?  @db.VarChar(200)
 
-  supplierPaidByUserId String? @map("supplier_paid_by_user_id") @db.Uuid
-  supplierPaidByUser   User?   @relation("BatchSupplierPayer", fields: [supplierPaidByUserId], references: [id])
-
   shippingPaidByUserId String? @map("shipping_paid_by_user_id") @db.Uuid
   shippingPaidByUser   User?   @relation("BatchShippingPayer", fields: [shippingPaidByUserId], references: [id])
+
+  supplierPayments BatchSupplierPayment[]
 
   items     InventoryItem[]
   shipments Shipment[]
@@ -58,6 +57,20 @@ model Batch {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("batches")
+}
+
+model BatchSupplierPayment {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId   String  @map("batch_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  amountUsd Decimal @map("amount_usd") @db.Decimal(10, 2)
+
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  user  User  @relation("BatchSupplierPaymentUser", fields: [userId], references: [id])
+
+  @@unique([batchId, userId])
+  @@index([batchId])
+  @@map("batch_supplier_payments")
 }
 
 model Shipment {

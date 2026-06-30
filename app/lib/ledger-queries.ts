@@ -91,8 +91,7 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
         purchaseDate: true,
         arrivalDate: true,
         supplier: true,
-        supplierPaidByUserId: true,
-        supplierPaidByUser: { select: { alias: true } },
+        supplierPayments: { select: { userId: true, amountUsd: true, user: { select: { alias: true } } } },
         items: { select: { basePriceUsd: true } },
         shipments: {
           select: {
@@ -135,9 +134,11 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
     arrivalDate: toISODate(b.arrivalDate),
     supplier: b.supplier,
     quantity: b.items.length,
-    supplierPaidByUserId: b.supplierPaidByUserId,
-    supplierPaidByAlias: b.supplierPaidByUser?.alias ?? null,
-    items: b.items.map((i) => ({ basePriceUsd: Number(i.basePriceUsd) })),
+    supplierPayments: b.supplierPayments.map((p) => ({
+      userId: p.userId,
+      alias: p.user.alias,
+      amountUsd: Number(p.amountUsd),
+    })),
     shipments: b.shipments.map((s) => ({
       id: s.id,
       date: toISODate(s.date)!,
