@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DetailHead, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
+import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd } from '@/app/lib/format';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
@@ -18,6 +20,9 @@ export function ModelDetailScreen({
 }) {
   const router = useRouter();
   const cover = coverOf(model);
+  const [filter, setFilter] = useState<'Ventas' | 'Todos'>('Ventas');
+
+  const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
 
   return (
     <div className="screen">
@@ -73,27 +78,26 @@ export function ModelDetailScreen({
             <div className="stat"><div className="v">{model.sold}</div><div className="l">Vendidas</div></div>
           </div>
 
-          {model.revenue > 0 && (
-            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              Ingresos:{' '}
-              <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
-            </div>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, fontSize: 13, marginTop: 18 }}>
+            {model.revenue > 0 && (
+              <div style={{ color: 'var(--text-muted)' }}>
+                Ingresos:{' '}
+                <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
+              </div>
+            )}
 
-          {model.sold > 0 && (
-            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-              Ganancia:{' '}
-              <strong style={{ color: model.profit >= 0 ? 'var(--ok)' : 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
-                {uyu(model.profit)}
-              </strong>
-              {model.profitPending && <span className="money-sec"> · provisorio</span>}
-            </div>
-          )}
+            {model.sold > 0 && (
+              <div style={{ color: 'var(--text-muted)' }}>
+                Ganancia:{' '}
+                <strong style={{ color: model.profit >= 0 ? 'var(--ok)' : 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
+                  {uyu(model.profit)}
+                </strong>
+                {model.profitPending && <span className="money-sec"> · provisorio</span>}
+              </div>
+            )}
+          </div>
 
           <div className="btn-row" style={{ marginTop: 18 }}>
-            <button className="btn btn-secondary" onClick={() => router.push(`/purchases/new?modelId=${model.id}`)}>
-              <Icon name="truck" size={19} />Compra
-            </button>
             <button
               className="btn btn-primary"
               onClick={() => router.push(`/inventory/${model.id}/sale`)}
@@ -103,12 +107,19 @@ export function ModelDetailScreen({
             </button>
           </div>
 
-          <div className="section-label">Movimientos</div>
-          {model.events.length === 0 ? (
-            <Empty icon="cart" title="Sin movimientos" desc="Registrá una compra para empezar." />
+          <div className="section-head">
+            <div className="section-label">Movimientos</div>
+            <Segmented options={['Ventas', 'Todos'] as const} value={filter} onChange={(v) => setFilter(v as 'Ventas' | 'Todos')} />
+          </div>
+          {events.length === 0 ? (
+            <Empty
+              icon="cart"
+              title={filter === 'Ventas' ? 'Sin ventas' : 'Sin movimientos'}
+              desc={filter === 'Ventas' ? 'Todavía no se vendió ninguna unidad.' : 'Registrá una compra para empezar.'}
+            />
           ) : (
             <div className="timeline">
-              {model.events.map((ev, i) => (
+              {events.map((ev, i) => (
                 <EventRow key={i} ev={ev} />
               ))}
             </div>

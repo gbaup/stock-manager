@@ -832,6 +832,27 @@ body {
   margin: 22px 2px 9px;
 }
 
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-head .section-label {
+  margin-bottom: 9px;
+}
+
+.section-head .seg {
+  padding: 2px;
+}
+
+.section-head .seg button {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
 .field {
   margin-bottom: 13px;
 }
