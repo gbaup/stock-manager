@@ -5,8 +5,8 @@ export type UserSummary = { id: string; alias: string };
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
 export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero'] as const;
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
-export const KID_SIZES = ['20', '22', '24', '26'] as const;
-export const SHIRT_TYPES = ['Fan', 'Player', 'Retro', 'KidKit'] as const;
+export const KID_SIZES = ['20', '22', '24', '26', '28'] as const;
+export const ITEM_TYPES = ['Fan', 'Player', 'Retro', 'KidKit', 'Short', 'NBA'] as const;
 export const SLEEVES = ['Corta', 'Larga'] as const;
 
 const KID_SIZE_LABELS: Record<string, string> = {

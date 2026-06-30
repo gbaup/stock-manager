@@ -8,7 +8,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { VERSIONS, SHIRT_TYPES, SLEEVES } from '@/app/lib/domain';
+import { VERSIONS, ITEM_TYPES, SLEEVES } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
@@ -52,6 +52,7 @@ export function ModelForm({
 
   const color = useWatch({ control, name: 'color' });
   const number = useWatch({ control, name: 'number' });
+  const type = useWatch({ control, name: 'type' });
 
   function onSubmit(data: ModelFormValues) {
     startTransition(async () => {
@@ -128,19 +129,21 @@ export function ModelForm({
               name="type"
               control={control}
               render={({ field }) => (
-                <Segmented options={SHIRT_TYPES} value={field.value} onChange={field.onChange} full />
+                <Segmented options={ITEM_TYPES} value={field.value} onChange={field.onChange} full />
               )}
             />
           </Field>
-          <Field label="Manga">
-            <Controller
-              name="sleeve"
-              control={control}
-              render={({ field }) => (
-                <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} full />
-              )}
-            />
-          </Field>
+          {type !== 'Short' && (
+            <Field label="Manga">
+              <Controller
+                name="sleeve"
+                control={control}
+                render={({ field }) => (
+                  <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} full />
+                )}
+              />
+            </Field>
+          )}
 
           <div className="section-label">Apariencia</div>
           <Field label="Color principal">
