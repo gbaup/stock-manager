@@ -47,8 +47,15 @@ export function SaldosScreen({
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState<Layout>('resumen');
+  const [movFilter, setMovFilter] = useState<'todos' | 'entradas' | 'salidas'>('todos');
 
   const { uyu: totalUyu, usd: totalUsd } = totals;
+
+  const filteredMovements = movements.filter((m) => {
+    if (movFilter === 'entradas') return m.uyu > 0 || m.usd > 0;
+    if (movFilter === 'salidas') return m.uyu < 0 || m.usd < 0;
+    return true;
+  });
 
   return (
     <div className="screen">
@@ -78,16 +85,24 @@ export function SaldosScreen({
             <LedgerLayout balances={balances} movements={movements} users={users} />
           )}
 
-          {layout !== 'planilla' && (
-            <>
-              <ConvActionButton />
+          {layout !== 'planilla' && <ConvActionButton />}
 
+          {layout === 'resumen' && (
+            <>
               <div className="section-label">Movimientos</div>
-              {movements.length === 0 ? (
+              <div style={{ marginBottom: 10 }}>
+                <Segmented
+                  options={['todos', 'entradas', 'salidas'] as const}
+                  value={movFilter}
+                  onChange={(v) => setMovFilter(v as typeof movFilter)}
+                  full
+                />
+              </div>
+              {filteredMovements.length === 0 ? (
                 <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
               ) : (
                 <div className="mov-list">
-                  {movements.map((m) => <MovCard key={m.id} m={m} />)}
+                  {filteredMovements.map((m) => <MovCard key={m.id} m={m} />)}
                 </div>
               )}
             </>

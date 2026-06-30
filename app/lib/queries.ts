@@ -18,6 +18,7 @@ export type HomeSaleItem = {
   color: string;
   version: string | null;
   number: string | null;
+  player: string | null;
   price: number;
   date: string;
   collectedByUserId: string | null;
@@ -463,6 +464,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
               color: true,
               version: true,
               number: true,
+              player: true,
               team: { select: { name: true } },
             },
           },
@@ -478,6 +480,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
     color: s.item.product.color,
     version: s.item.product.version,
     number: s.item.product.number !== null ? String(s.item.product.number) : null,
+    player: s.item.product.player,
     price: Number(s.price),
     date: toISODate(s.date)!,
     collectedByUserId: s.collectedByUserId,
