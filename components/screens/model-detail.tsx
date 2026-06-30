@@ -13,11 +13,9 @@ import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 export function ModelDetailScreen({
   model,
   transitCount,
-  usdRate,
 }: {
   model: ModelDetail;
   transitCount: number;
-  usdRate: number;
 }) {
   const router = useRouter();
   const cover = coverOf(model);
@@ -80,7 +78,6 @@ export function ModelDetailScreen({
             <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
               Ingresos:{' '}
               <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
-              <span className="money-sec"> · {usd(money.toUsd(model.revenue, usdRate))}</span>
             </div>
           )}
 
@@ -113,7 +110,7 @@ export function ModelDetailScreen({
           ) : (
             <div className="timeline">
               {model.events.map((ev, i) => (
-                <EventRow key={i} ev={ev} usdRate={usdRate} />
+                <EventRow key={i} ev={ev} />
               ))}
             </div>
           )}
@@ -124,7 +121,7 @@ export function ModelDetailScreen({
   );
 }
 
-function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
+function EventRow({ ev }: { ev: TimelineEvent }) {
   if (ev.type === 'sale') {
     const s = ev.data;
     return (
