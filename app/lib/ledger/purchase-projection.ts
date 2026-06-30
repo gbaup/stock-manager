@@ -11,6 +11,8 @@ export type ProjectableShipment = {
   shippingPriceUyu: number | null;
   shippingPaidByUserId: string | null;
   shippingPaidByAlias: string | null;
+  weight: number | null;
+  itemIds: string[];
 };
 
 export type ProjectableBatch = {
@@ -50,13 +52,15 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
   for (const sh of batch.shipments) {
     const shippingUsd = sh.shippingPriceUsd ?? 0;
     if (shippingUsd > 0 && sh.shippingPaidByUserId) {
+      const n = sh.itemIds.length;
+      const itemsLabel = `${n} ${n === 1 ? 'item' : 'items'}`;
       out.push({
         id: `pago-envio-${batch.id}-${sh.id}`,
         kind: 'pago-envio',
         date: sh.date,
         person: sh.shippingPaidByAlias ?? '',
         title: 'Envío',
-        sub: batch.supplier ?? `${batch.quantity} items`,
+        sub: sh.weight ? `${itemsLabel} · ${sh.weight} kg` : itemsLabel,
         // Shipping is paid in USD only. The UYU price (sh.shippingPriceUyu) is
         // a reference for sale-profit calculations, not a balance movement.
         uyu: 0,

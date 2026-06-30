@@ -101,6 +101,8 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
             shippingPriceUyu: true,
             shippingPaidByUserId: true,
             shippingPaidByUser: { select: { alias: true } },
+            weight: true,
+            items: { select: { id: true } },
           },
           orderBy: { date: 'asc' },
         },
@@ -146,6 +148,8 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
       shippingPriceUyu: s.shippingPriceUyu ? Number(s.shippingPriceUyu) : null,
       shippingPaidByUserId: s.shippingPaidByUserId,
       shippingPaidByAlias: s.shippingPaidByUser?.alias ?? null,
+      weight: s.weight ? Number(s.weight) : null,
+      itemIds: s.items.map((i) => i.id),
     })),
   }));
 
