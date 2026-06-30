@@ -76,9 +76,13 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
               control={control}
               render={({ field }) => (
                 <Segmented
-                  options={model.availableBySize.map((s) => `${s.size} (${s.count})`)}
-                  value={field.value ? `${field.value} (${sizeStock[field.value] ?? 0})` : ''}
-                  onChange={(label) => field.onChange(label.replace(/ \(\d+\)$/, ''))}
+                  options={model.availableBySize.map((s) => `${s.size.toUpperCase()} (${s.count})`)}
+                  value={field.value ? `${field.value.toUpperCase()} (${sizeStock[field.value] ?? 0})` : ''}
+                  onChange={(label) =>
+                    field.onChange(
+                      model.availableBySize.find((s) => `${s.size.toUpperCase()} (${s.count})` === label)?.size ?? ''
+                    )
+                  }
                   full
                 />
               )}

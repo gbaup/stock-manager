@@ -320,12 +320,13 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     (i) => !i.shipmentId && batchesWithShipments.has(i.batchId)
   );
 
-  // Group sales by (date, collectedByUserId) so each collector gets their own event per day
-  const saleByKey = new Map<string, { price: number; profit: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
+  // Group sales by (date, collectedByUserId, size) so each collector gets their
+  // own event per day, split by size — sizes now carry distinct cost/profit.
+  const saleByKey = new Map<string, { size: string; price: number; profit: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
   for (const item of soldItems) {
     const s = item.sale!;
     const dateKey = toISODate(s.date)!;
-    const key = `${dateKey}::${s.collectedByUserId ?? ''}`;
+    const key = `${dateKey}::${s.collectedByUserId ?? ''}::${item.size}`;
     const saleProfit = Number(s.price) - itemCostUyu(item);
     const existing = saleByKey.get(key);
     if (existing) {
@@ -333,14 +334,15 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       existing.profit += saleProfit;
       existing.qty += 1;
     } else {
-      saleByKey.set(key, { price: Number(s.price), profit: saleProfit, qty: 1, s, dateKey });
+      saleByKey.set(key, { size: item.size, price: Number(s.price), profit: saleProfit, qty: 1, s, dateKey });
     }
   }
 
-  for (const [, { price, profit: eventProfit, qty, s, dateKey }] of saleByKey) {
+  for (const [, { size, price, profit: eventProfit, qty, s, dateKey }] of saleByKey) {
     const saleData: SaleRecord = {
       id: s!.id,
       catalogProductId: id,
+      size,
       price,
       quantity: qty,
       date: dateKey,

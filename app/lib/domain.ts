@@ -109,6 +109,7 @@ export type BatchSummary = {
 export type SaleRecord = {
   id: string;
   catalogProductId: string;
+  size: string;
   price: number;
   quantity: number;
   date: string;

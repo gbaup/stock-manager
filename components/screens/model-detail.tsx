@@ -131,7 +131,10 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
       <div className="event">
         <div className="event-ico sale"><Icon name="tag" size={17} /></div>
         <div className="event-main">
-          <div className="event-title">Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}</div>
+          <div className="event-title">
+            Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+            {s.size ? ` · Talle ${s.size.toUpperCase()}` : ''}
+          </div>
           <div className="event-sub">
             {fmtDate(s.date)}
             {s.method ? ` · ${s.method}` : ''}

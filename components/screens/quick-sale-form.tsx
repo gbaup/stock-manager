@@ -185,9 +185,11 @@ export function QuickSaleForm({
               <div className="section-label">Venta</div>
               <Field label="Talle">
                 <Segmented
-                  options={sizes.map((s) => `${s.size} (${s.count})`)}
-                  value={size ? `${size} (${sizeAvail})` : ''}
-                  onChange={(label) => setSize(label.replace(/ \(\d+\)$/, ''))}
+                  options={sizes.map((s) => `${s.size.toUpperCase()} (${s.count})`)}
+                  value={size ? `${size.toUpperCase()} (${sizeAvail})` : ''}
+                  onChange={(label) =>
+                    setSize(sizes.find((s) => `${s.size.toUpperCase()} (${s.count})` === label)?.size ?? '')
+                  }
                   full
                 />
               </Field>
