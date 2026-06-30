@@ -48,9 +48,8 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
   }
 
   for (const sh of batch.shipments) {
-    const shippingUyu = sh.shippingPriceUyu ?? 0;
     const shippingUsd = sh.shippingPriceUsd ?? 0;
-    if ((shippingUyu > 0 || shippingUsd > 0) && sh.shippingPaidByUserId) {
+    if (shippingUsd > 0 && sh.shippingPaidByUserId) {
       out.push({
         id: `pago-envio-${batch.id}-${sh.id}`,
         kind: 'pago-envio',
@@ -58,8 +57,10 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
         person: sh.shippingPaidByAlias ?? '',
         title: 'Envío',
         sub: batch.supplier ?? `${batch.quantity} items`,
-        uyu: shippingUyu > 0 ? -shippingUyu : 0,
-        usd: shippingUsd > 0 ? -shippingUsd : 0,
+        // Shipping is paid in USD only. The UYU price (sh.shippingPriceUyu) is
+        // a reference for sale-profit calculations, not a balance movement.
+        uyu: 0,
+        usd: -shippingUsd,
       });
     }
   }
