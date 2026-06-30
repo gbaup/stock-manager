@@ -7,7 +7,7 @@ import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
-import { fmtDate, uyu } from '@/app/lib/format';
+import { fmtDate, usd, uyu } from '@/app/lib/format';
 import type { BatchSummary, ShipmentRecord } from '@/app/lib/domain';
 
 export function PurchasesScreen({
@@ -98,10 +98,10 @@ function PurchaseCard({
 
   const tag =
     batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
-    batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
-    <Tag kind="ok">recibida</Tag>;
+      batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
+        <Tag kind="ok">recibida</Tag>;
 
-  const totalShippingUyu = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
+  const totalShippingUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
   const arrivalDate = batch.arrivalDate;
   const arriveLabel = isPartial ? 'Llegó más' : 'Llegó';
 
@@ -126,7 +126,7 @@ function PurchaseCard({
           <div className="v">{isPartial ? `${batch.arrivedQuantity}/${qty}` : `${qty} u.`}</div>
         </div>
         <div className="pc-stat">
-          <div className="l">{isArrived ? 'Llegó' : 'Pedido'}</div>
+          <div className="l">{isArrived ? 'Lslegó' : 'Pedido'}</div>
           <div className="v">{fmtDate(isArrived ? arrivalDate : batch.purchaseDate)}</div>
         </div>
         {!isArrived ? (
@@ -136,7 +136,7 @@ function PurchaseCard({
         ) : (
           <div className="pc-stat" style={{ flex: 0, textAlign: 'right' }}>
             <div className="l">Envío</div>
-            <div className="v">{totalShippingUyu > 0 ? uyu(totalShippingUyu) : '—'}</div>
+            <div className="v">{totalShippingUsd > 0 ? usd(totalShippingUsd) : '—'}</div>
           </div>
         )}
       </div>
@@ -168,7 +168,7 @@ function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
   const n = sh.itemIds.length;
   const meta = [
     sh.trackingNumber,
-    sh.shippingPriceUyu && sh.shippingPriceUyu > 0 ? `envío ${uyu(sh.shippingPriceUyu)}` : null,
+    sh.shippingPriceUsd && sh.shippingPriceUsd > 0 ? `envío ${usd(sh.shippingPriceUsd)}` : null,
     sh.shippingPaidByAlias ? `pagó ${sh.shippingPaidByAlias}` : null,
   ].filter(Boolean).join(' · ');
   return (
