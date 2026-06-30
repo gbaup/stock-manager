@@ -19,15 +19,17 @@ import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
 export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const sizeStock = Object.fromEntries(model.availableBySize.map((s) => [s.size, s.count]));
+  const onlySize = model.availableBySize.length === 1 ? model.availableBySize[0].size : '';
   const {
     control,
     handleSubmit,
     register,
     formState: { errors },
   } = useForm<SaleFormValues>({
-    resolver: zodResolver(makeSaleSchema(stock)),
+    resolver: zodResolver(makeSaleSchema(sizeStock)),
     defaultValues: {
-      price: '', quantity: '1', date: todayISO(),
+      size: onlySize, price: '', quantity: '1', date: todayISO(),
       method: '', description: '', collectedByUserId: '',
     },
   });
@@ -68,6 +70,21 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
           </div>
 
           <div className="section-label">Venta</div>
+          <Field label="Talle" error={errors.size?.message}>
+            <Controller
+              name="size"
+              control={control}
+              render={({ field }) => (
+                <Segmented
+                  options={model.availableBySize.map((s) => `${s.size} (${s.count})`)}
+                  value={field.value ? `${field.value} (${sizeStock[field.value] ?? 0})` : ''}
+                  onChange={(label) => field.onChange(label.replace(/ \(\d+\)$/, ''))}
+                  full
+                />
+              )}
+            />
+          </Field>
+
           <Field label="Precio de venta (UYU)" error={errors.price?.message}>
             <Controller
               name="price"

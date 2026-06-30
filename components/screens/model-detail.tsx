@@ -84,6 +84,16 @@ export function ModelDetailScreen({
             </div>
           )}
 
+          {model.sold > 0 && (
+            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+              Ganancia:{' '}
+              <strong style={{ color: model.profit >= 0 ? 'var(--ok)' : 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
+                {uyu(model.profit)}
+              </strong>
+              {model.profitPending && <span className="money-sec"> · provisorio</span>}
+            </div>
+          )}
+
           <div className="btn-row" style={{ marginTop: 18 }}>
             <button className="btn btn-secondary" onClick={() => router.push(`/purchases/new?modelId=${model.id}`)}>
               <Icon name="truck" size={19} />Compra
@@ -131,7 +141,9 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
         </div>
         <div className="event-amt">
           +{uyu(s.price * s.quantity)}
-          <span className="sec">{usd(money.toUsd(s.price * s.quantity, usdRate))}</span>
+          <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
+            ganancia {uyu(s.profit)}
+          </span>
         </div>
       </div>
     );

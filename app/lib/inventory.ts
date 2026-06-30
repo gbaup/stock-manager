@@ -87,6 +87,32 @@ export async function availableSizes(modelId: string): Promise<Array<{ size: str
   return [...counts].map(([size, count]) => ({ size, count }));
 }
 
+// Batched version of availableSizes for listing pages — one query, one pass.
+// Returns a Map keyed by modelId. Models with no stock are simply absent.
+export async function availableSizesByModel(
+  modelIds?: string[],
+): Promise<Map<string, Array<{ size: string; count: number }>>> {
+  const items = await prisma.inventoryItem.findMany({
+    where: {
+      ...(modelIds ? { catalogProductId: { in: modelIds } } : {}),
+      status: 'available',
+      shipmentId: { not: null },
+    },
+    select: { catalogProductId: true, size: true },
+  });
+  const byModel = new Map<string, Map<string, number>>();
+  for (const i of items) {
+    let sizes = byModel.get(i.catalogProductId);
+    if (!sizes) { sizes = new Map(); byModel.set(i.catalogProductId, sizes); }
+    sizes.set(i.size, (sizes.get(i.size) ?? 0) + 1);
+  }
+  const result = new Map<string, Array<{ size: string; count: number }>>();
+  for (const [id, sizes] of byModel) {
+    result.set(id, [...sizes].map(([size, count]) => ({ size, count })));
+  }
+  return result;
+}
+
 // Inserts new items into an existing Batch. All start as `status: 'available'`
 // with `shipmentId: null` (in-transit). They become stock once linked to a
 // Shipment via markArrived. The Shipment seam decides what "arrived" means.

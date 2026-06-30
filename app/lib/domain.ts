@@ -57,6 +57,10 @@ export type ModelMeta = {
 export type ModelWithStats = ModelMeta & {
   stock: number;
   inTransit: number;
+  // Sizes that currently have stock, with their available unit counts. Drives
+  // the size picker on the sale forms so a sale consumes the right size (FIFO
+  // is applied *within* the chosen size).
+  availableBySize: { size: string; count: number }[];
 };
 
 export type PurchaseStatus = 'transit' | 'partial' | 'arrived';
@@ -112,6 +116,7 @@ export type SaleRecord = {
   description: string | null;
   collectedByUserId: string | null;
   collectedByAlias: string | null;
+  profit: number;
 };
 
 export type TimelineEvent =
@@ -122,8 +127,21 @@ export type TimelineEvent =
 export type ModelDetail = ModelWithStats & {
   sold: number;
   revenue: number;
+  // Revenue minus landed cost (base price + allocated shipping) of sold items,
+  // all in UYU. `profitPending` is true when at least one sold item left while
+  // still in transit, so its shipping share — and thus its profit — isn't final.
+  profit: number;
+  profitPending: boolean;
   events: TimelineEvent[];
 };
+
+// Equal-split shipping allocation: each item in a shipment carries the same
+// share of that shipment's UYU shipping cost. The single place this rule
+// lives — swap the body if allocation ever becomes weight- or cost-based.
+export function shippingShareUyu(shipment: { shippingPriceUyu: number | null; itemIds: string[] }): number {
+  if (!shipment.shippingPriceUyu || shipment.itemIds.length === 0) return 0;
+  return shipment.shippingPriceUyu / shipment.itemIds.length;
+}
 
 export type ExpenseRecord = {
   id: string;

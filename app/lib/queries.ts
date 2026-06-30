@@ -1,9 +1,10 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import { fmtDate } from './format';
-import { stockByModel, countStock } from './inventory';
+import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
+import { shippingShareUyu } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, UserSummary,
@@ -170,12 +171,13 @@ export async function getModels(): Promise<ModelWithStats[]> {
   'use cache';
   cacheLife('hours');
   cacheTag(CACHE_TAGS.models);
-  const [products, counts] = await Promise.all([
+  const [products, counts, sizes] = await Promise.all([
     prisma.catalogProduct.findMany({
       include: { team: true },
       orderBy: { createdAt: 'desc' },
     }),
     stockByModel(),
+    availableSizesByModel(),
   ]);
 
   return products.map((p) => {
@@ -184,6 +186,7 @@ export async function getModels(): Promise<ModelWithStats[]> {
       ...productMeta(p),
       stock: c?.available ?? 0,
       inTransit: c?.inTransit ?? 0,
+      availableBySize: sizes.get(p.id) ?? [],
     };
   });
 }
@@ -226,6 +229,15 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const counts = countStock(p.items);
   const stock = counts.available;
   const inTransit = counts.inTransit;
+
+  // Sizes with available stock (shipped + not sold), with per-size counts.
+  const sizeCounts = new Map<string, number>();
+  for (const i of p.items) {
+    if (i.status === 'available' && i.shipmentId !== null) {
+      sizeCounts.set(i.size, (sizeCounts.get(i.size) ?? 0) + 1);
+    }
+  }
+  const availableBySize = [...sizeCounts].map(([size, count]) => ({ size, count }));
   const soldItems = p.items.filter((i) => i.sale !== null);
   const sold = soldItems.length;
   const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);
@@ -240,6 +252,12 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   const events: TimelineEvent[] = [];
 
+  // itemId -> allocated UYU shipping cost for that unit. Built per batch so the
+  // equal-split denominator counts every item in a shipment, not just this
+  // model's. Items with no resolvable shipping (in transit) are simply absent.
+  const shippingShareByItem = new Map<string, number>();
+  const batchesWithShipments = new Set<string>();
+
   for (const [, { batch, items }] of batchMap) {
     // Build the summary from ALL items of the batch (needed for accurate
     // shipment grouping and totals), but compute per-model qty from `items`.
@@ -251,6 +269,19 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       },
     });
     const batchData = batchToSummary(batch, allBatchItems);
+
+    if (batchData.shipments.length > 0) {
+      batchesWithShipments.add(batch.id);
+      for (const sh of batchData.shipments) {
+        const share = shippingShareUyu(sh);
+        for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
+      }
+    } else if (batchData.shippingPriceUyu && allBatchItems.length > 0) {
+      // Legacy batch: shipping recorded on the batch itself, no shipment rows.
+      // Spread it evenly across every item in the batch.
+      const share = batchData.shippingPriceUyu / allBatchItems.length;
+      for (const it of allBatchItems) shippingShareByItem.set(it.id, share);
+    }
 
     const arrivedForModel = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
     const transitForModel = items.length - arrivedForModel;
@@ -276,22 +307,37 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     }
   }
 
+  // Landed cost of one sold unit, in UYU: its base price plus the shipping
+  // share resolved above (0 while in transit).
+  const itemCostUyu = (i: typeof soldItems[0]) =>
+    Number(i.basePriceUyu) + (shippingShareByItem.get(i.id) ?? 0);
+
+  const cost = soldItems.reduce((s, i) => s + itemCostUyu(i), 0);
+  const profit = revenue - cost;
+  // A unit sold before it arrived has no shipping share yet, so its profit is
+  // provisional. Legacy batches resolve via the batch-level fallback above.
+  const profitPending = soldItems.some(
+    (i) => !i.shipmentId && batchesWithShipments.has(i.batchId)
+  );
+
   // Group sales by (date, collectedByUserId) so each collector gets their own event per day
-  const saleByKey = new Map<string, { price: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
+  const saleByKey = new Map<string, { price: number; profit: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
   for (const item of soldItems) {
     const s = item.sale!;
     const dateKey = toISODate(s.date)!;
     const key = `${dateKey}::${s.collectedByUserId ?? ''}`;
+    const saleProfit = Number(s.price) - itemCostUyu(item);
     const existing = saleByKey.get(key);
     if (existing) {
       existing.price += Number(s.price);
+      existing.profit += saleProfit;
       existing.qty += 1;
     } else {
-      saleByKey.set(key, { price: Number(s.price), qty: 1, s, dateKey });
+      saleByKey.set(key, { price: Number(s.price), profit: saleProfit, qty: 1, s, dateKey });
     }
   }
 
-  for (const [, { price, qty, s, dateKey }] of saleByKey) {
+  for (const [, { price, profit: eventProfit, qty, s, dateKey }] of saleByKey) {
     const saleData: SaleRecord = {
       id: s!.id,
       catalogProductId: id,
@@ -302,6 +348,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       description: s!.description,
       collectedByUserId: s!.collectedByUserId,
       collectedByAlias: s!.collectedByUser?.alias ?? null,
+      profit: eventProfit,
     };
     events.push({ type: 'sale', date: dateKey, data: saleData, qty });
   }
@@ -312,8 +359,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     ...productMeta(p),
     stock,
     inTransit,
+    availableBySize,
     sold,
     revenue,
+    profit,
+    profitPending,
     events,
   };
 }

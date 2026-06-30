@@ -30,6 +30,7 @@ export function QuickSaleForm({
 
   const [selectedModelId, setSelectedModelId] = useState('');
   const [query, setQuery] = useState('');
+  const [size, setSize] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [date, setDate] = useState('');
@@ -43,10 +44,12 @@ export function QuickSaleForm({
 
   const model = models.find((m) => m.id === selectedModelId) ?? null;
   const stock = model?.stock ?? 0;
+  const sizes = model?.availableBySize ?? [];
+  const sizeAvail = size ? (sizes.find((s) => s.size === size)?.count ?? 0) : 0;
   const priceNum = parseFloat(price) || 0;
   const qty = parseInt(quantity, 10) || 0;
 
-  const canSave = !!model && priceNum > 0 && qty > 0 && qty <= stock && !!collectedByUserId;
+  const canSave = !!model && !!size && priceNum > 0 && qty > 0 && qty <= sizeAvail && !!collectedByUserId;
 
   const q = query.trim().toLowerCase();
   const results = models
@@ -67,6 +70,7 @@ export function QuickSaleForm({
     startTransition(async () => {
       try {
         await createSaleFromHome(model.id, {
+          size,
           price,
           quantity,
           date,
@@ -82,6 +86,8 @@ export function QuickSaleForm({
 
   function selectModel(m: ModelWithStats) {
     setSelectedModelId(m.id);
+    // Preselect the size when there's only one in stock, else clear.
+    setSize(m.availableBySize.length === 1 ? m.availableBySize[0].size : '');
   }
 
   const collectedByAlias = users.find((u) => u.id === collectedByUserId)?.alias ?? '';
@@ -160,7 +166,7 @@ export function QuickSaleForm({
             </>
           ) : (
             <>
-              <button className="qs-picked" onClick={() => setSelectedModelId('')}>
+              <button className="qs-picked" onClick={() => { setSelectedModelId(''); setSize(''); }}>
                 <Swatch
                   color={model.color}
                   number={model.number}
@@ -177,6 +183,14 @@ export function QuickSaleForm({
               </button>
 
               <div className="section-label">Venta</div>
+              <Field label="Talle">
+                <Segmented
+                  options={sizes.map((s) => `${s.size} (${s.count})`)}
+                  value={size ? `${size} (${sizeAvail})` : ''}
+                  onChange={(label) => setSize(label.replace(/ \(\d+\)$/, ''))}
+                  full
+                />
+              </Field>
               <Field label="Precio de venta (UYU)">
                 <MoneyInput value={price} onChange={setPrice} placeholder="2200" />
               </Field>
@@ -211,9 +225,9 @@ export function QuickSaleForm({
                   />
                 </Field>
               </div>
-              {qty > stock && stock > 0 && (
+              {!!size && qty > sizeAvail && (
                 <div style={{ fontSize: 12.5, color: 'var(--danger)', margin: '-6px 2px 12px' }}>
-                  Solo hay {stock} en stock.
+                  Solo hay {sizeAvail} en talle {size}.
                 </div>
               )}
 
