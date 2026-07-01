@@ -100,7 +100,7 @@ export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users
   }
 
   // Keep itemIds field in sync for zod validation
-  const canSave = nPicked > 0 && (!hasShip || true);
+  const canSave = nPicked > 0;
 
   return (
     <div className="screen">

@@ -11,6 +11,7 @@ export const SLEEVES = ['Corta', 'Larga'] as const;
 
 const KID_SIZE_LABELS: Record<string, string> = {
   '20': '5-6 años', '22': '7-8 años', '24': '8-10 años', '26': '10-12 años',
+  '28': '12-13 años',
 };
 
 // Size options for the purchase selector, based on a model's type.

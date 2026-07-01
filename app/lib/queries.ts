@@ -249,7 +249,6 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   // equal-split denominator counts every item in a shipment, not just this
   // model's. Items with no resolvable shipping (in transit) are simply absent.
   const shippingShareByItem = new Map<string, number>();
-  const batchesWithShipments = new Set<string>();
 
   // The summary needs ALL items of each batch (for accurate shipment grouping
   // and shipping totals), even though this page only renders this model's units.
@@ -273,7 +272,6 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     const batchData = batchToSummary(batch, allBatchItems);
 
     if (batchData.shipments.length > 0) {
-      batchesWithShipments.add(batch.id);
       for (const sh of batchData.shipments) {
         const share = shippingShareUyu(sh);
         for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
@@ -313,9 +311,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const profit = revenue - cost;
   // A unit sold before it arrived has no shipping share yet, so its profit is
   // provisional until its shipment lands.
-  const profitPending = soldItems.some(
-    (i) => !i.shipmentId && batchesWithShipments.has(i.batchId)
-  );
+  const profitPending = soldItems.some((i) => !i.shipmentId);
 
   // Group sales by (date, collectedByUserId, size) so each collector gets their
   // own event per day, split by size — sizes now carry distinct cost/profit.
