@@ -126,7 +126,7 @@ function PurchaseCard({
           <div className="v">{isPartial ? `${batch.arrivedQuantity}/${qty}` : `${qty} u.`}</div>
         </div>
         <div className="pc-stat">
-          <div className="l">{isArrived ? 'Lslegó' : 'Pedido'}</div>
+          <div className="l">{isArrived ? 'Llegó' : 'Pedido'}</div>
           <div className="v">{fmtDate(isArrived ? arrivalDate : batch.purchaseDate)}</div>
         </div>
         {!isArrived ? (

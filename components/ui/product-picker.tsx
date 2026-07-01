@@ -7,7 +7,7 @@ import { Swatch, coverOf } from './swatch';
 import { matchesModel, type ModelWithStats } from '@/app/lib/domain';
 
 // ---------- helpers ----------
-const ppLabel = (m: ModelWithStats) => [m.team, m.version, m.season].filter(Boolean).join(' · ');
+const ppLabel = (m: ModelWithStats) => [m.team, m.season, m.number, m.player].filter(Boolean).join(' · ');
 
 type PpGroup = { key: string; label: string; items: ModelWithStats[] };
 
@@ -53,7 +53,8 @@ function PpRow({ m, selected, onPick }: { m: ModelWithStats; selected: boolean; 
       <div className="po-text">
         <div className="po-team capitalize">
           {m.team}
-          {m.player ? ` · ${m.player}` : ''}
+          {m.number ? ` · ${m.number}` : ''}
+          {m.player ? ` ${m.player}` : ''}
         </div>
         <div className="po-sub capitalize">{[m.version, m.season, m.type].filter(Boolean).join(' · ')}</div>
       </div>
