@@ -3,11 +3,14 @@ import type { Photo } from './photo';
 export type UserSummary = { id: string; alias: string };
 
 export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibre'] as const;
-export const VERSIONS = ['Home', 'Away', 'Third', 'Fourth', 'Arquero'] as const;
+// Canonical enum values are lowercase — the same form the server stores via n()
+// and every comparison uses. UI labels are derived at render time (fmtType /
+// fmtVersion / fmtSleeve), so the picker still reads "Fan", "NBA", "Home".
+export const VERSIONS = ['home', 'away', 'third', 'fourth', 'arquero'] as const;
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
 export const KID_SIZES = ['20', '22', '24', '26', '28'] as const;
-export const ITEM_TYPES = ['Fan', 'Player', 'Retro', 'KidKit', 'Short', 'NBA'] as const;
-export const SLEEVES = ['Corta', 'Larga'] as const;
+export const ITEM_TYPES = ['fan', 'player', 'retro', 'kidkit', 'short', 'nba'] as const;
+export const SLEEVES = ['corta', 'larga'] as const;
 
 const KID_SIZE_LABELS: Record<string, string> = {
   '20': '5-6 años', '22': '7-8 años', '24': '8-10 años', '26': '10-12 años',
@@ -20,6 +23,17 @@ export const sizesForType = (type: string | null | undefined): readonly string[]
 
 // Public-facing label: kid numeric sizes -> age range, everything else unchanged.
 export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
+
+// ---- Enum display labels (lowercase canonical value -> UI label) ----
+// Most values just capitalize; the ones that don't (NBA, KidKit) live in a map.
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA',
+};
+export const fmtType = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS[t] ?? cap(t) : '');
+export const fmtVersion = (v: string | null | undefined): string => (v ? cap(v) : '');
+export const fmtSleeve = (s: string | null | undefined): string => (s ? cap(s) : '');
 
 export const JERSEY_COLORS = [
   { name: 'blanco', bg: '#f4f5f7', fg: '#1b2330' },
@@ -66,7 +80,7 @@ export type ModelWithStats = ModelMeta & {
 
 // Diacritic-insensitive, case-insensitive text key for model search.
 const normalizeText = (s: string | null | undefined): string =>
-  (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 // The single searchable string for a model: every field a picker matches on.
 // Shared by every model picker so search behaves identically everywhere.

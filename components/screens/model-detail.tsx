@@ -9,6 +9,7 @@ import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd } from '@/app/lib/format';
+import { fmtType } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
 export function ModelDetailScreen({
@@ -44,12 +45,12 @@ export function ModelDetailScreen({
               <div className="detail-team capitalize">{model.team}</div>
               <div className="detail-meta capitalize">
                 {model.season} · {model.version}
-                {model.type ? ` · ${model.type}` : ''}
+                {model.type ? ` · ${fmtType(model.type)}` : ''}
                 {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
               </div>
               <div className="detail-tags capitalize">
                 <Tag><ColorDot color={model.color} />{model.color}</Tag>
-                {model.type && <Tag>{model.type}</Tag>}
+                {model.type && <Tag>{fmtType(model.type)}</Tag>}
                 {model.sleeve && <Tag>Manga {model.sleeve}</Tag>}
                 {model.player && <Tag kind="player">{model.player}</Tag>}
                 {model.number && <Tag kind="player">#{model.number}</Tag>}
@@ -150,7 +151,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
           </div>
         </div>
         <div className="event-amt">
-          +{uyu(s.price * s.quantity)}
+          +{uyu(s.price)}
           <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
             ganancia {uyu(s.profit)}
           </span>

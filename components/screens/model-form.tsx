@@ -8,7 +8,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { VERSIONS, ITEM_TYPES, SLEEVES } from '@/app/lib/domain';
+import { VERSIONS, ITEM_TYPES, SLEEVES, fmtType, fmtVersion, fmtSleeve } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
@@ -39,9 +39,9 @@ export function ModelForm({
     defaultValues: {
       teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : prefillTeamId,
       season: initial?.season ?? '',
-      version: initial?.version ?? 'Home',
-      type: initial?.type ?? 'Fan',
-      sleeve: initial?.sleeve ?? 'Corta',
+      version: initial?.version ?? 'home',
+      type: initial?.type ?? 'fan',
+      sleeve: initial?.sleeve ?? 'corta',
       color: initial?.color ?? 'Blanco',
       number: initial?.number ?? '',
       player: initial?.player ?? '',
@@ -119,7 +119,7 @@ export function ModelForm({
                 name="version"
                 control={control}
                 render={({ field }) => (
-                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} />
+                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} renderLabel={fmtVersion} />
                 )}
               />
             </Field>
@@ -129,17 +129,17 @@ export function ModelForm({
               name="type"
               control={control}
               render={({ field }) => (
-                <Segmented options={ITEM_TYPES} value={field.value} onChange={field.onChange} full />
+                <Segmented options={ITEM_TYPES} value={field.value} onChange={field.onChange} renderLabel={fmtType} full />
               )}
             />
           </Field>
-          {type !== 'Short' && (
+          {type !== 'short' && (
             <Field label="Manga">
               <Controller
                 name="sleeve"
                 control={control}
                 render={({ field }) => (
-                  <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} full />
+                  <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} renderLabel={fmtSleeve} full />
                 )}
               />
             </Field>

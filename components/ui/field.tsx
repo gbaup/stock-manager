@@ -95,6 +95,7 @@ export function SelectInput({
   placeholder,
   name,
   mono,
+  renderLabel,
 }: {
   value: string;
   onChange?: (v: string) => void;
@@ -102,6 +103,7 @@ export function SelectInput({
   placeholder?: string;
   name?: string;
   mono?: boolean;
+  renderLabel?: (o: string) => string;
 }) {
   return (
     <div className="select-wrap">
@@ -113,7 +115,7 @@ export function SelectInput({
       >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o} value={o}>{renderLabel ? renderLabel(o) : o}</option>
         ))}
       </select>
     </div>
