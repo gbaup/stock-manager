@@ -45,12 +45,17 @@ export const gastoSchema = z.object({
 
 export type GastoFormValues = z.infer<typeof gastoSchema>;
 
+const numericOptional = z
+  .string()
+  .optional()
+  .refine((v) => v === undefined || v === '' || !isNaN(parseFloat(v)), 'Monto inválido');
+
 export const arrivalSchema = z
   .object({
     arrivalDate: z.string().min(1, 'Requerido'),
     trackingNumber: z.string().optional(),
-    shippingRateUsd: z.string().optional(),
-    weight: z.string().optional(),
+    shippingRateUsd: numericOptional,
+    weight: numericOptional,
     shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
     itemIds: z.array(z.string().uuid()).min(1, 'Marcá al menos un item'),
   });
@@ -80,11 +85,6 @@ export const conversionSchema = z
   );
 
 export type ConversionFormValues = z.infer<typeof conversionSchema>;
-
-const numericOptional = z
-  .string()
-  .optional()
-  .refine((v) => v === undefined || v === '' || !isNaN(parseFloat(v)), 'Monto inválido');
 
 export const ajusteSchema = z
   .object({

@@ -48,8 +48,8 @@ export async function createPurchase(data: {
   );
 
   // Each partner's entered amount becomes one supplier-payment row. When any
-  // amount is given, the two together must cover the batch's base cost — the
-  // form enforces this too, but re-check here against tampered payloads.
+  // amount is given, all payments together must cover the batch's base cost —
+  // the form enforces this too, but re-check here against tampered payloads.
   const payments = (data.supplierPayments ?? []).filter((p) => p.amountUsd > 0);
   if (reconcileSupplierPayments(payments, baseCostUsd(expandedItems)).status === 'mismatch') {
     throw new Error('Los pagos al proveedor deben sumar el costo base total');

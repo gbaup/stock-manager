@@ -27,7 +27,7 @@ export type ProjectableBatch = {
 
 // A batch produces:
 //   1. ONE supplier-payment movement (USD outflow) PER partner who paid,
-//      recorded on purchaseDate. The two amounts together cover the base cost.
+//      recorded on purchaseDate. All payments together cover the base cost.
 //   2. ONE shipping-payment movement PER shipment that has a cost AND a
 //      payer. With partial deliveries a single batch can yield several
 //      shipping movements on different dates.

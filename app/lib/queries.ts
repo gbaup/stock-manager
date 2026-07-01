@@ -484,10 +484,8 @@ export async function getTransitCount(): Promise<number> {
   cacheTag(CACHE_TAGS.purchases);
   // A batch is "in transit" (or partial) as long as it has at least one item
   // that hasn't been received via a shipment.
-  const transitBatches = await prisma.batch.findMany({
+  return prisma.batch.count({
     where: { items: { some: { shipmentId: null } } },
-    select: { id: true },
   });
-  return transitBatches.length;
 }
 
