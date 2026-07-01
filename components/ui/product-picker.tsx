@@ -4,21 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './icon';
 import { Swatch, coverOf } from './swatch';
-import type { ModelWithStats } from '@/app/lib/domain';
+import { matchesModel, type ModelWithStats } from '@/app/lib/domain';
 
 // ---------- helpers ----------
-const ppNorm = (s: string | null | undefined) =>
-  (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
 const ppLabel = (m: ModelWithStats) => [m.team, m.version, m.season].filter(Boolean).join(' · ');
-
-function ppHaystack(m: ModelWithStats): string {
-  return ppNorm(
-    [m.team, m.version, m.season, m.player, m.number && '#' + m.number, m.type, m.sleeve, m.color, m.description]
-      .filter(Boolean)
-      .join(' '),
-  );
-}
 
 type PpGroup = { key: string; label: string; items: ModelWithStats[] };
 
@@ -40,8 +29,7 @@ function ppByTeam(list: ModelWithStats[]): PpGroup[] {
 
 // agrupa por equipo; sin búsqueda, "En este batch" arriba.
 function ppGroups(models: ModelWithStats[], q: string, recentIds: string[]): PpGroup[] {
-  const ql = ppNorm(q.trim());
-  if (ql) return ppByTeam(models.filter((m) => ppHaystack(m).includes(ql)));
+  if (q.trim()) return ppByTeam(models.filter((m) => matchesModel(m, q)));
 
   const seen = new Set<string>();
   const recents = recentIds

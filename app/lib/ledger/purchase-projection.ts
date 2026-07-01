@@ -1,4 +1,3 @@
-import { usd } from '../format';
 import type { Movement } from './types';
 
 // Structural shape of a batch that this projection needs. Any object that

@@ -8,9 +8,10 @@ import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { Field, TextInput, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
+import { SizePicker } from '@/components/ui/size-picker';
 import { uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
-import { METHODS } from '@/app/lib/domain';
+import { METHODS, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
 
@@ -51,16 +52,8 @@ export function QuickSaleForm({
 
   const canSave = !!model && !!size && priceNum > 0 && qty > 0 && qty <= sizeAvail && !!collectedByUserId;
 
-  const q = query.trim().toLowerCase();
   const results = models
-    .filter((m) => {
-      if (!q) return true;
-      return [m.team, m.season, m.version, m.color, m.player, m.number]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(q);
-    })
+    .filter((m) => matchesModel(m, query))
     .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
     .slice(0, 7);
 
@@ -184,14 +177,7 @@ export function QuickSaleForm({
 
               <div className="section-label">Venta</div>
               <Field label="Talle">
-                <Segmented
-                  options={sizes.map((s) => `${s.size.toUpperCase()} (${s.count})`)}
-                  value={size ? `${size.toUpperCase()} (${sizeAvail})` : ''}
-                  onChange={(label) =>
-                    setSize(sizes.find((s) => `${s.size.toUpperCase()} (${s.count})` === label)?.size ?? '')
-                  }
-                  full
-                />
+                <SizePicker availableBySize={sizes} value={size} onChange={setSize} />
               </Field>
               <Field label="Precio de venta (UYU)">
                 <MoneyInput value={price} onChange={setPrice} placeholder="2200" />

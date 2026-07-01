@@ -4,10 +4,10 @@ import { fmtDate } from './format';
 import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
-import { shippingShareUyu } from './domain';
+import { shippingShareUyu, derivePurchaseStatus } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
-  ModelMeta, PurchaseStatus, TimelineEvent, SaleRecord, UserSummary,
+  ModelMeta, TimelineEvent, SaleRecord, UserSummary,
   ShipmentRecord,
 } from './domain';
 
@@ -70,10 +70,7 @@ export function batchToSummary(
     id: string; purchaseDate: Date; arrivalDate: Date | null;
     supplier: string | null;
     trackingNumber: string | null; description: string | null;
-    shippingPriceUsd: unknown; shippingPriceUyu: unknown; weight: unknown;
     supplierPayments: Array<{ userId: string; amountUsd: unknown; user: { alias: string } }>;
-    shippingPaidByUserId: string | null;
-    shippingPaidByUser: { alias: string } | null;
     shipments: ShipmentInput[];
   },
   items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
@@ -102,23 +99,19 @@ export function batchToSummary(
     }));
 
   const arrivedQuantity = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
-  const total = items.length;
-  const status: PurchaseStatus =
-    arrivedQuantity <= 0 ? 'transit' :
-    arrivedQuantity >= total ? 'arrived' :
-    'partial';
+  const status = derivePurchaseStatus(arrivedQuantity, items.length);
 
-  // For legacy summary fields, surface either the most recent shipment data or
-  // the batch fallback (used in case the batch row still holds metadata for an
-  // older record that hasn't been turned into a shipment yet).
+  // Delivery data lives on shipments (ADR 0004). Summary fields surface the most
+  // recent shipment; totals fold across all of them. `arrivalDate` falls back to
+  // the batch's convenience stamp only when nothing has shipped yet.
   const lastShipment = shipments[shipments.length - 1] ?? null;
   const arrivalDate = lastShipment ? lastShipment.date : toISODate(b.arrivalDate);
   const trackingNumber = lastShipment?.trackingNumber ?? b.trackingNumber;
-  const shippingPriceUsd = shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0) || (b.shippingPriceUsd ? Number(b.shippingPriceUsd) : 0);
-  const shippingPriceUyu = shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0) || (b.shippingPriceUyu ? Number(b.shippingPriceUyu) : 0);
-  const weight = lastShipment?.weight ?? (b.weight ? Number(b.weight) : null);
-  const shippingPaidByUserId = lastShipment?.shippingPaidByUserId ?? b.shippingPaidByUserId;
-  const shippingPaidByAlias = lastShipment?.shippingPaidByAlias ?? b.shippingPaidByUser?.alias ?? null;
+  const shippingPriceUsd = shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
+  const shippingPriceUyu = shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
+  const weight = lastShipment?.weight ?? null;
+  const shippingPaidByUserId = lastShipment?.shippingPaidByUserId ?? null;
+  const shippingPaidByAlias = lastShipment?.shippingPaidByAlias ?? null;
 
   return {
     id: b.id,
@@ -205,7 +198,6 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
           batch: {
             include: {
               supplierPayments: { include: { user: true } },
-              shippingPaidByUser: true,
               shipments: {
                 include: { shippingPaidByUser: true },
                 orderBy: { date: 'asc' },
@@ -259,16 +251,25 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const shippingShareByItem = new Map<string, number>();
   const batchesWithShipments = new Set<string>();
 
+  // The summary needs ALL items of each batch (for accurate shipment grouping
+  // and shipping totals), even though this page only renders this model's units.
+  // Fetch them for every relevant batch in one query, then group in memory.
+  const allBatchItemsRaw = await prisma.inventoryItem.findMany({
+    where: { batchId: { in: [...batchMap.keys()] } },
+    select: {
+      id: true, batchId: true, catalogProductId: true, size: true, basePriceUsd: true, shipmentId: true,
+      product: { include: { team: true } },
+    },
+  });
+  const itemsByBatch = new Map<string, typeof allBatchItemsRaw>();
+  for (const it of allBatchItemsRaw) {
+    const list = itemsByBatch.get(it.batchId);
+    if (list) list.push(it);
+    else itemsByBatch.set(it.batchId, [it]);
+  }
+
   for (const [, { batch, items }] of batchMap) {
-    // Build the summary from ALL items of the batch (needed for accurate
-    // shipment grouping and totals), but compute per-model qty from `items`.
-    const allBatchItems = await prisma.inventoryItem.findMany({
-      where: { batchId: batch.id },
-      select: {
-        id: true, catalogProductId: true, size: true, basePriceUsd: true, shipmentId: true,
-        product: { include: { team: true } },
-      },
-    });
+    const allBatchItems = itemsByBatch.get(batch.id) ?? [];
     const batchData = batchToSummary(batch, allBatchItems);
 
     if (batchData.shipments.length > 0) {
@@ -277,11 +278,6 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
         const share = shippingShareUyu(sh);
         for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
       }
-    } else if (batchData.shippingPriceUyu && allBatchItems.length > 0) {
-      // Legacy batch: shipping recorded on the batch itself, no shipment rows.
-      // Spread it evenly across every item in the batch.
-      const share = batchData.shippingPriceUyu / allBatchItems.length;
-      for (const it of allBatchItems) shippingShareByItem.set(it.id, share);
     }
 
     const arrivedForModel = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
@@ -316,7 +312,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const cost = soldItems.reduce((s, i) => s + itemCostUyu(i), 0);
   const profit = revenue - cost;
   // A unit sold before it arrived has no shipping share yet, so its profit is
-  // provisional. Legacy batches resolve via the batch-level fallback above.
+  // provisional until its shipment lands.
   const profitPending = soldItems.some(
     (i) => !i.shipmentId && batchesWithShipments.has(i.batchId)
   );
@@ -379,7 +375,6 @@ export async function getPurchases(): Promise<BatchSummary[]> {
     include: {
       items: { include: { product: { include: { team: true } } } },
       supplierPayments: { include: { user: true } },
-      shippingPaidByUser: true,
       shipments: {
         include: { shippingPaidByUser: true },
         orderBy: { date: 'asc' },
@@ -402,7 +397,6 @@ export async function getBatchById(id: string): Promise<BatchSummary | null> {
     include: {
       items: { include: { product: { include: { team: true } } } },
       supplierPayments: { include: { user: true } },
-      shippingPaidByUser: true,
       shipments: {
         include: { shippingPaidByUser: true },
         orderBy: { date: 'asc' },

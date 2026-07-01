@@ -10,7 +10,7 @@ import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { sizesForType } from '@/app/lib/domain';
+import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
@@ -95,12 +95,14 @@ export function PurchaseForm({
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
   const totalQty = validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
-  const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0) * (it.quantity ?? 1), 0);
+  const totalUsd = baseCostUsd(
+    validItems.map((it) => ({ basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0, quantity: it.quantity ?? 1 })),
+  );
   const needsSupplierPayer = totalUsd > 0;
 
   const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
-  const paidSum = Object.values(watchedPayments).reduce((s, v) => s + (parseFloat(v ?? '') || 0), 0);
-  const payMismatch = needsSupplierPayer && paidSum > 0 && Math.round(paidSum * 100) !== Math.round(totalUsd * 100);
+  const { paidSum, status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
+  const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
 
   async function handleNextStep() {
     const valid = await trigger(['purchaseDate']);
@@ -113,9 +115,7 @@ export function PurchaseForm({
         purchaseDate: data.purchaseDate,
         supplier: data.supplier || undefined,
         description: data.description || undefined,
-        supplierPayments: Object.entries(data.supplierPayments ?? {})
-          .map(([userId, v]) => ({ userId, amountUsd: parseFloat(v ?? '') || 0 }))
-          .filter((p) => p.amountUsd > 0),
+        supplierPayments: toSupplierPaymentArray(data.supplierPayments),
         exchangeRate: rate.value,
         items: data.items
           .filter((it) => it.modelId)
@@ -130,16 +130,14 @@ export function PurchaseForm({
   }
 
   function onSubmit(data: PurchaseFormValues) {
-    const sum = Object.values(data.supplierPayments ?? {}).reduce(
-      (s, v) => s + (parseFloat(v ?? '') || 0),
-      0,
-    );
-    if (needsSupplierPayer && sum === 0) {
+    const { status } = reconcileSupplierPayments(toSupplierPaymentArray(data.supplierPayments), totalUsd);
+    if (needsSupplierPayer && status === 'empty') {
+      // Nobody paid yet — a valid state, but confirm before saving.
       setPendingData(data);
       setShowConfirm(true);
       return;
     }
-    if (needsSupplierPayer && Math.round(sum * 100) !== Math.round(totalUsd * 100)) {
+    if (needsSupplierPayer && status === 'mismatch') {
       // The two amounts must cover the base cost exactly; the live hint shows why.
       return;
     }

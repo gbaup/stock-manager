@@ -22,7 +22,6 @@ model User {
   conversionsSent     Conversion[] @relation("ConversionSender")
   conversionsReceived Conversion[] @relation("ConversionReceiver")
   batchSupplierPayments BatchSupplierPayment[] @relation("BatchSupplierPaymentUser")
-  batchesShippingPaid   Batch[]                 @relation("BatchShippingPayer")
   shipmentsPaid       Shipment[]   @relation("ShipmentShippingPayer")
   adjustments         Adjustment[] @relation("AdjustmentUser")
   adjustmentsLogged   Adjustment[] @relation("AdjustmentLogger")
@@ -40,13 +39,7 @@ model Batch {
   quantity         Int
   trackingNumber   String?  @map("tracking_number") @db.VarChar(100)
   description      String?  @db.Text
-  shippingPriceUsd Decimal? @map("shipping_price_usd") @db.Decimal(10, 2)
-  shippingPriceUyu Decimal? @map("shipping_price_uyu") @db.Decimal(10, 2)
-  weight           Decimal? @db.Decimal(10, 2)
   supplier         String?  @db.VarChar(200)
-
-  shippingPaidByUserId String? @map("shipping_paid_by_user_id") @db.Uuid
-  shippingPaidByUser   User?   @relation("BatchShippingPayer", fields: [shippingPaidByUserId], references: [id])
 
   supplierPayments BatchSupplierPayment[]
 

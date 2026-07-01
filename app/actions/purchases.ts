@@ -6,7 +6,8 @@ import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
-import { money } from '@/app/lib/money';
+import { computeShippingPrice } from '@/app/lib/money';
+import { baseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
 import { CACHE_TAGS } from '@/app/lib/cache-tags';
 
 const createPurchaseSchema = z.object({
@@ -50,12 +51,8 @@ export async function createPurchase(data: {
   // amount is given, the two together must cover the batch's base cost — the
   // form enforces this too, but re-check here against tampered payloads.
   const payments = (data.supplierPayments ?? []).filter((p) => p.amountUsd > 0);
-  if (payments.length > 0) {
-    const baseUsd = expandedItems.reduce((s, it) => s + it.basePriceUsd, 0);
-    const paid = payments.reduce((s, p) => s + p.amountUsd, 0);
-    if (Math.round(paid * 100) !== Math.round(baseUsd * 100)) {
-      throw new Error('Los pagos al proveedor deben sumar el costo base total');
-    }
+  if (reconcileSupplierPayments(payments, baseCostUsd(expandedItems)).status === 'mismatch') {
+    throw new Error('Los pagos al proveedor deben sumar el costo base total');
   }
 
   await prisma.$transaction(async (tx) => {
@@ -102,8 +99,7 @@ export async function markArrived(
 
   const weight = data.weight ? parseFloat(data.weight) : 0;
   const rateUsd = data.shippingRateUsd ? parseFloat(data.shippingRateUsd) : 0;
-  const shippingPriceUsd = rateUsd > 0 && weight > 0 ? rateUsd * weight : 0;
-  const shippingPriceUyu = shippingPriceUsd > 0 ? money.toUyu(shippingPriceUsd, exchangeRate) : 0;
+  const shipping = computeShippingPrice({ rateUsd, weight, exchangeRate });
 
   await prisma.$transaction(async (tx) => {
     // Guard: the supplied itemIds must belong to this batch and still be
@@ -121,8 +117,8 @@ export async function markArrived(
         batchId,
         date: new Date(data.arrivalDate),
         trackingNumber: data.trackingNumber?.trim().toLowerCase() || null,
-        shippingPriceUsd: shippingPriceUsd > 0 ? shippingPriceUsd : null,
-        shippingPriceUyu: shippingPriceUyu > 0 ? shippingPriceUyu : null,
+        shippingPriceUsd: shipping.usd,
+        shippingPriceUyu: shipping.uyu,
         weight: weight > 0 ? weight : null,
         shippingPaidByUserId: data.shippingPaidByUserId || null,
       },

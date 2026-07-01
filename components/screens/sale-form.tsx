@@ -7,8 +7,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Segmented } from '@/components/ui/segmented';
+import { SizePicker } from '@/components/ui/size-picker';
 import { Field, TextInput, SelectInput, TextAreaInput, MoneyInput } from '@/components/ui/field';
-import { METHODS } from '@/app/lib/domain';
+import { METHODS, sizeStockOf } from '@/app/lib/domain';
 import { usd, uyu, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
@@ -19,7 +20,7 @@ import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
 export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const sizeStock = Object.fromEntries(model.availableBySize.map((s) => [s.size, s.count]));
+  const sizeStock = sizeStockOf(model);
   const onlySize = model.availableBySize.length === 1 ? model.availableBySize[0].size : '';
   const {
     control,
@@ -75,16 +76,7 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
               name="size"
               control={control}
               render={({ field }) => (
-                <Segmented
-                  options={model.availableBySize.map((s) => `${s.size.toUpperCase()} (${s.count})`)}
-                  value={field.value ? `${field.value.toUpperCase()} (${sizeStock[field.value] ?? 0})` : ''}
-                  onChange={(label) =>
-                    field.onChange(
-                      model.availableBySize.find((s) => `${s.size.toUpperCase()} (${s.count})` === label)?.size ?? ''
-                    )
-                  }
-                  full
-                />
+                <SizePicker availableBySize={model.availableBySize} value={field.value} onChange={field.onChange} />
               )}
             />
           </Field>

@@ -63,7 +63,40 @@ export type ModelWithStats = ModelMeta & {
   availableBySize: { size: string; count: number }[];
 };
 
+// Diacritic-insensitive, case-insensitive text key for model search.
+const normalizeText = (s: string | null | undefined): string =>
+  (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// The single searchable string for a model: every field a picker matches on.
+// Shared by every model picker so search behaves identically everywhere.
+export function modelHaystack(m: ModelMeta): string {
+  return normalizeText(
+    [m.team, m.version, m.season, m.player, m.number && '#' + m.number, m.type, m.sleeve, m.color, m.description]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+// Does a model match a free-text query? Empty query matches everything.
+export function matchesModel(m: ModelMeta, query: string): boolean {
+  const q = normalizeText(query.trim());
+  return q === '' || modelHaystack(m).includes(q);
+}
+
+// Size -> available unit count, the shape the sale schema validates against.
+export const sizeStockOf = (
+  model: { availableBySize: { size: string; count: number }[] },
+): Record<string, number> => Object.fromEntries(model.availableBySize.map((s) => [s.size, s.count]));
+
 export type PurchaseStatus = 'transit' | 'partial' | 'arrived';
+
+// A batch's arrival state, derived from how many of its items have shipped —
+// never stored. See ADR 0004.
+export function derivePurchaseStatus(arrivedQuantity: number, totalQuantity: number): PurchaseStatus {
+  if (arrivedQuantity <= 0) return 'transit';
+  if (arrivedQuantity >= totalQuantity) return 'arrived';
+  return 'partial';
+}
 
 export type ItemInBatch = {
   id: string;
@@ -142,6 +175,41 @@ export type ModelDetail = ModelWithStats & {
 export function shippingShareUyu(shipment: { shippingPriceUyu: number | null; itemIds: string[] }): number {
   if (!shipment.shippingPriceUyu || shipment.itemIds.length === 0) return 0;
   return shipment.shippingPriceUyu / shipment.itemIds.length;
+}
+
+// ---- Supplier-payment reconciliation (see CONTEXT.md "Reconciliation") ----
+
+export type SupplierPaymentStatus = 'empty' | 'exact' | 'mismatch';
+
+// A batch's base cost in USD: the sum of its items' base prices. Accepts either
+// per-line items (with a quantity) or already-expanded unit rows.
+export function baseCostUsd(items: { basePriceUsd: number; quantity?: number }[]): number {
+  return items.reduce((s, it) => s + it.basePriceUsd * (it.quantity ?? 1), 0);
+}
+
+// The reconciliation rule: given the partners' payments and the base cost, is
+// the batch `empty` (nobody paid — a valid state), `exact` (payments cover the
+// cost), or `mismatch` (paid, but the totals disagree — invalid)?
+export function reconcileSupplierPayments(
+  payments: { amountUsd: number }[],
+  baseCost: number,
+): { paidSum: number; status: SupplierPaymentStatus } {
+  const paid = payments.filter((p) => p.amountUsd > 0);
+  const paidSum = paid.reduce((s, p) => s + p.amountUsd, 0);
+  if (paid.length === 0) return { paidSum: 0, status: 'empty' };
+  const status: SupplierPaymentStatus =
+    Math.round(paidSum * 100) === Math.round(baseCost * 100) ? 'exact' : 'mismatch';
+  return { paidSum, status };
+}
+
+// Turns the form's `{ userId: "amount" }` dict into the wire array the action
+// takes, dropping blanks and non-positive amounts.
+export function toSupplierPaymentArray(
+  dict: Record<string, string | undefined> | undefined,
+): { userId: string; amountUsd: number }[] {
+  return Object.entries(dict ?? {})
+    .map(([userId, v]) => ({ userId, amountUsd: parseFloat(v ?? '') || 0 }))
+    .filter((p) => p.amountUsd > 0);
 }
 
 export type ExpenseRecord = {
