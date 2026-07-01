@@ -10,6 +10,7 @@ import { prisma } from '@/app/lib/prisma';
 export async function createSaleFromHome(
   modelId: string,
   data: {
+    size: string;
     price: string;
     quantity: string;
     date: string;
@@ -29,7 +30,7 @@ export async function createSaleFromHome(
   const saleDate = new Date(data.date);
 
   const available = await prisma.inventoryItem.count({
-    where: { catalogProductId: modelId, status: 'available', batch: { arrivalDate: { not: null } } },
+    where: { catalogProductId: modelId, size: data.size, status: 'available', shipmentId: { not: null } },
   });
   if (available < qty) throw new Error('Stock insuficiente');
 
@@ -38,7 +39,7 @@ export async function createSaleFromHome(
       await recordSale(
         {
           modelId,
-          size: null,
+          size: data.size,
           priceUyu,
           exchangeRate,
           date: saleDate,
@@ -60,6 +61,7 @@ export async function createSaleFromHome(
 export async function createSale(
   modelId: string,
   data: {
+    size: string;
     price: string;
     quantity: string;
     date: string;
@@ -79,7 +81,7 @@ export async function createSale(
   const saleDate = new Date(data.date);
 
   const available = await prisma.inventoryItem.count({
-    where: { catalogProductId: modelId, status: 'available', batch: { arrivalDate: { not: null } } },
+    where: { catalogProductId: modelId, size: data.size, status: 'available', shipmentId: { not: null } },
   });
   if (available < qty) throw new Error('Stock insuficiente');
 
@@ -88,7 +90,7 @@ export async function createSale(
       await recordSale(
         {
           modelId,
-          size: null,
+          size: data.size,
           priceUyu,
           exchangeRate,
           date: saleDate,

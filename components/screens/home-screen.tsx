@@ -252,9 +252,10 @@ function HomeContent({
                     )}
                     <div className="sale-main">
                       <div className="sale-team capitalize">{s.teamName}</div>
-                      <div className="sale-meta">
+                      <div className="sale-meta capitalize">
                         <ColorDot color={s.color} />
-                        {s.color}{s.version ? ` · ${s.version}` : ''}
+                        {s.version ? ` ${s.version}` : ''}
+                        {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
                       </div>
                     </div>
                     <div className="sale-end">

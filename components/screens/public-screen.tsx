@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { SIZES } from '@/app/lib/domain';
+import { SIZES, fmtSize } from '@/app/lib/domain';
 import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
@@ -16,8 +16,8 @@ const VIEW_KEY = 'sc_pub_view';
 function SizeChips({ sizes }: { sizes: string[] }) {
   if (!sizes.length) return null;
   return (
-    <div className="size-chips capitalize">
-      {sizes.map((s) => <span key={s} className="size-chip">{s}</span>)}
+    <div className="size-chips uppercase">
+      {sizes.map((s) => <span key={s} className="size-chip">{fmtSize(s)}</span>)}
     </div>
   );
 }
@@ -250,7 +250,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
       <div className="pub-card-body">
         <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
-          {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''}
+          {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''} {model.number ? ` · ${model.number}` : ''} {model.player ? ` ${model.player}` : ''}
         </div>
         <SizeChips sizes={model.sizes} />
         <div className="avail-badge"><span className="avail-dot" />Disponible</div>
@@ -372,7 +372,7 @@ function GalleryViewer({
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {model.sizes.map((s) => (
-                <span key={s} className="viewer-tag" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{s}</span>
+                <span key={s} className="viewer-tag" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fmtSize(s)}</span>
               ))}
             </div>
           </div>

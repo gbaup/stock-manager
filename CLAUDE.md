@@ -60,6 +60,7 @@ SESSION_SECRET
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
+SHOW_ALL_MODELS   # optional, temporary. "true" = public catalog shows ALL models, not just in-stock ones (sizes hidden). Unset/false = normal behavior.
 ```
 
 ## Conventions

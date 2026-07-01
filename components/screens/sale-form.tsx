@@ -7,8 +7,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Segmented } from '@/components/ui/segmented';
+import { SizePicker } from '@/components/ui/size-picker';
 import { Field, TextInput, SelectInput, TextAreaInput, MoneyInput } from '@/components/ui/field';
-import { METHODS } from '@/app/lib/domain';
+import { METHODS, sizeStockOf } from '@/app/lib/domain';
 import { usd, uyu, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
@@ -19,15 +20,17 @@ import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
 export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const sizeStock = sizeStockOf(model);
+  const onlySize = model.availableBySize.length === 1 ? model.availableBySize[0].size : '';
   const {
     control,
     handleSubmit,
     register,
     formState: { errors },
   } = useForm<SaleFormValues>({
-    resolver: zodResolver(makeSaleSchema(stock)),
+    resolver: zodResolver(makeSaleSchema(sizeStock)),
     defaultValues: {
-      price: '', quantity: '1', date: todayISO(),
+      size: onlySize, price: '', quantity: '1', date: todayISO(),
       method: '', description: '', collectedByUserId: '',
     },
   });
@@ -68,6 +71,16 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
           </div>
 
           <div className="section-label">Venta</div>
+          <Field label="Talle" error={errors.size?.message}>
+            <Controller
+              name="size"
+              control={control}
+              render={({ field }) => (
+                <SizePicker availableBySize={model.availableBySize} value={field.value} onChange={field.onChange} />
+              )}
+            />
+          </Field>
+
           <Field label="Precio de venta (UYU)" error={errors.price?.message}>
             <Controller
               name="price"

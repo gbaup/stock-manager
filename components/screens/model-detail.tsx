@@ -1,26 +1,29 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DetailHead, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
+import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd } from '@/app/lib/format';
-import { money } from '@/app/lib/money';
+import { fmtType } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
 export function ModelDetailScreen({
   model,
   transitCount,
-  usdRate,
 }: {
   model: ModelDetail;
   transitCount: number;
-  usdRate: number;
 }) {
   const router = useRouter();
   const cover = coverOf(model);
+  const [filter, setFilter] = useState<'Ventas' | 'Todos'>('Ventas');
+
+  const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
 
   return (
     <div className="screen">
@@ -42,12 +45,12 @@ export function ModelDetailScreen({
               <div className="detail-team capitalize">{model.team}</div>
               <div className="detail-meta capitalize">
                 {model.season} · {model.version}
-                {model.type ? ` · ${model.type}` : ''}
+                {model.type ? ` · ${fmtType(model.type)}` : ''}
                 {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
               </div>
               <div className="detail-tags capitalize">
                 <Tag><ColorDot color={model.color} />{model.color}</Tag>
-                {model.type && <Tag>{model.type}</Tag>}
+                {model.type && <Tag>{fmtType(model.type)}</Tag>}
                 {model.sleeve && <Tag>Manga {model.sleeve}</Tag>}
                 {model.player && <Tag kind="player">{model.player}</Tag>}
                 {model.number && <Tag kind="player">#{model.number}</Tag>}
@@ -76,18 +79,26 @@ export function ModelDetailScreen({
             <div className="stat"><div className="v">{model.sold}</div><div className="l">Vendidas</div></div>
           </div>
 
-          {model.revenue > 0 && (
-            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              Ingresos:{' '}
-              <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
-              <span className="money-sec"> · {usd(money.toUsd(model.revenue, usdRate))}</span>
-            </div>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, fontSize: 13, marginTop: 18 }}>
+            {model.revenue > 0 && (
+              <div style={{ color: 'var(--text-muted)' }}>
+                Ingresos:{' '}
+                <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{uyu(model.revenue)}</strong>
+              </div>
+            )}
+
+            {model.sold > 0 && (
+              <div style={{ color: 'var(--text-muted)' }}>
+                Ganancia:{' '}
+                <strong style={{ color: model.profit >= 0 ? 'var(--ok)' : 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
+                  {uyu(model.profit)}
+                </strong>
+                {model.profitPending && <span className="money-sec"> · provisorio</span>}
+              </div>
+            )}
+          </div>
 
           <div className="btn-row" style={{ marginTop: 18 }}>
-            <button className="btn btn-secondary" onClick={() => router.push(`/purchases/new?modelId=${model.id}`)}>
-              <Icon name="truck" size={19} />Compra
-            </button>
             <button
               className="btn btn-primary"
               onClick={() => router.push(`/inventory/${model.id}/sale`)}
@@ -97,13 +108,20 @@ export function ModelDetailScreen({
             </button>
           </div>
 
-          <div className="section-label">Movimientos</div>
-          {model.events.length === 0 ? (
-            <Empty icon="cart" title="Sin movimientos" desc="Registrá una compra para empezar." />
+          <div className="section-head">
+            <div className="section-label">Movimientos</div>
+            <Segmented options={['Ventas', 'Todos'] as const} value={filter} onChange={(v) => setFilter(v as 'Ventas' | 'Todos')} />
+          </div>
+          {events.length === 0 ? (
+            <Empty
+              icon="cart"
+              title={filter === 'Ventas' ? 'Sin ventas' : 'Sin movimientos'}
+              desc={filter === 'Ventas' ? 'Todavía no se vendió ninguna unidad.' : 'Registrá una compra para empezar.'}
+            />
           ) : (
             <div className="timeline">
-              {model.events.map((ev, i) => (
-                <EventRow key={i} ev={ev} usdRate={usdRate} />
+              {events.map((ev, i) => (
+                <EventRow key={i} ev={ev} />
               ))}
             </div>
           )}
@@ -114,14 +132,17 @@ export function ModelDetailScreen({
   );
 }
 
-function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
+function EventRow({ ev }: { ev: TimelineEvent }) {
   if (ev.type === 'sale') {
     const s = ev.data;
     return (
       <div className="event">
         <div className="event-ico sale"><Icon name="tag" size={17} /></div>
         <div className="event-main">
-          <div className="event-title">Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}</div>
+          <div className="event-title">
+            Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+            {s.size ? ` · Talle ${s.size.toUpperCase()}` : ''}
+          </div>
           <div className="event-sub">
             {fmtDate(s.date)}
             {s.method ? ` · ${s.method}` : ''}
@@ -130,8 +151,10 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
           </div>
         </div>
         <div className="event-amt">
-          +{uyu(s.price * s.quantity)}
-          <span className="sec">{usd(money.toUsd(s.price * s.quantity, usdRate))}</span>
+          +{uyu(s.price)}
+          <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
+            ganancia {uyu(s.profit)}
+          </span>
         </div>
       </div>
     );
@@ -139,12 +162,12 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
 
   if (ev.type === 'transit') {
     const b = ev.data;
-    const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`, b.trackingNumber].filter(Boolean).join(' · ');
+    const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
     return (
       <div className="event">
         <div className="event-ico transit"><Icon name="truck" size={17} /></div>
         <div className="event-main">
-          <div className="event-title">Compra en camino · {ev.qty} u.</div>
+          <div className="event-title">En camino · {ev.qty} u.</div>
           <div className="event-sub">{meta}</div>
         </div>
       </div>
@@ -152,20 +175,20 @@ function EventRow({ ev, usdRate }: { ev: TimelineEvent; usdRate: number }) {
   }
 
   const b = ev.data;
-  const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`, b.weight ? `${b.weight} kg` : null].filter(Boolean).join(' · ');
+  const shipUyu = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
+  const shipUsd = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
+  const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`].filter(Boolean).join(' · ');
   return (
     <div className="event">
       <div className="event-ico buy"><Icon name="box" size={17} /></div>
       <div className="event-main">
-        <div className="event-title">Compra recibida · {ev.qty} u.</div>
+        <div className="event-title">Recibida · {ev.qty} u.</div>
         <div className="event-sub">{meta}</div>
       </div>
-      {b.shippingPriceUyu && b.shippingPriceUyu > 0 && (
+      {shipUyu > 0 && (
         <div className="event-amt" style={{ color: 'var(--text-muted)' }}>
-          envío {uyu(b.shippingPriceUyu)}
-          {b.shippingPriceUsd && b.shippingPriceUsd > 0 && (
-            <span className="sec">{usd(b.shippingPriceUsd)}</span>
-          )}
+          envío {uyu(shipUyu)}
+          {shipUsd > 0 && <span className="sec">{usd(shipUsd)}</span>}
         </div>
       )}
     </div>

@@ -21,8 +21,8 @@ model User {
   conversionsLogged   Conversion[] @relation("ConversionLogger")
   conversionsSent     Conversion[] @relation("ConversionSender")
   conversionsReceived Conversion[] @relation("ConversionReceiver")
-  batchesSupplierPaid Batch[]      @relation("BatchSupplierPayer")
-  batchesShippingPaid Batch[]      @relation("BatchShippingPayer")
+  batchSupplierPayments BatchSupplierPayment[] @relation("BatchSupplierPaymentUser")
+  shipmentsPaid       Shipment[]   @relation("ShipmentShippingPayer")
   adjustments         Adjustment[] @relation("AdjustmentUser")
   adjustmentsLogged   Adjustment[] @relation("AdjustmentLogger")
 
@@ -39,23 +39,53 @@ model Batch {
   quantity         Int
   trackingNumber   String?  @map("tracking_number") @db.VarChar(100)
   description      String?  @db.Text
-  shippingPriceUsd Decimal? @map("shipping_price_usd") @db.Decimal(10, 2)
-  shippingPriceUyu Decimal? @map("shipping_price_uyu") @db.Decimal(10, 2)
-  weight           Decimal? @db.Decimal(10, 2)
   supplier         String?  @db.VarChar(200)
 
-  supplierPaidByUserId String? @map("supplier_paid_by_user_id") @db.Uuid
-  supplierPaidByUser   User?   @relation("BatchSupplierPayer", fields: [supplierPaidByUserId], references: [id])
+  supplierPayments BatchSupplierPayment[]
 
-  shippingPaidByUserId String? @map("shipping_paid_by_user_id") @db.Uuid
-  shippingPaidByUser   User?   @relation("BatchShippingPayer", fields: [shippingPaidByUserId], references: [id])
-
-  items InventoryItem[]
+  items     InventoryItem[]
+  shipments Shipment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("batches")
+}
+
+model BatchSupplierPayment {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId   String  @map("batch_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  amountUsd Decimal @map("amount_usd") @db.Decimal(10, 2)
+
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  user  User  @relation("BatchSupplierPaymentUser", fields: [userId], references: [id])
+
+  @@unique([batchId, userId])
+  @@index([batchId])
+  @@map("batch_supplier_payments")
+}
+
+model Shipment {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId          String   @map("batch_id") @db.Uuid
+  date             DateTime @db.Date
+  trackingNumber   String?  @map("tracking_number") @db.VarChar(100)
+  shippingPriceUsd Decimal? @map("shipping_price_usd") @db.Decimal(10, 2)
+  shippingPriceUyu Decimal? @map("shipping_price_uyu") @db.Decimal(10, 2)
+  weight           Decimal? @db.Decimal(10, 2)
+
+  shippingPaidByUserId String? @map("shipping_paid_by_user_id") @db.Uuid
+  shippingPaidByUser   User?   @relation("ShipmentShippingPayer", fields: [shippingPaidByUserId], references: [id])
+
+  batch Batch           @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  items InventoryItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([batchId])
+  @@map("shipments")
 }
 
 model Team {
@@ -95,20 +125,23 @@ model InventoryItem {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   catalogProductId String   @map("catalog_product_id") @db.Uuid
   batchId          String   @map("batch_id") @db.Uuid
+  shipmentId       String?  @map("shipment_id") @db.Uuid
   size             String   @db.VarChar(10)
   basePriceUsd     Decimal  @map("base_price_usd") @db.Decimal(10, 2)
   basePriceUyu     Decimal  @map("base_price_uyu") @db.Decimal(10, 2)
   status           String   @default("available") @db.VarChar(20)
 
-  product CatalogProduct @relation(fields: [catalogProductId], references: [id])
-  batch   Batch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  sale    Sale?
+  product  CatalogProduct @relation(fields: [catalogProductId], references: [id])
+  batch    Batch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  shipment Shipment?      @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  sale     Sale?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([catalogProductId, status])
+  @@index([shipmentId])
   @@map("inventory_items")
 }
 
