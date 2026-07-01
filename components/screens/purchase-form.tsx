@@ -62,7 +62,7 @@ export function PurchaseForm({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, prepend, remove } = useFieldArray({ control, name: 'items' });
 
   // Restaura el borrador al volver de "Nuevo modelo" (la navegación desmonta el form).
   useEffect(() => {
@@ -194,6 +194,32 @@ export function PurchaseForm({
             </>
           ) : (
             <>
+              {validItems.length > 0 && (
+                <div className="batch-summary">
+                  <div className="bs-row">
+                    <span>Cantidad</span>
+                    <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
+                  </div>
+                  <div className="bs-row">
+                    <span>Costo base total</span>
+                    <strong>{usd(totalUsd)}</strong>
+                  </div>
+                  <div className="bs-row">
+                    <span>Tipo de cambio</span>
+                    <strong>$U {fmtRate(rate.value)}</strong>
+                  </div>
+                </div>
+              )}
+
+              <button
+                className="btn btn-secondary"
+                style={{ marginTop: 12 }}
+                type="button"
+                onClick={() => prepend({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
+              >
+                <Icon name="plus" size={19} />Agregar item
+              </button>
+
               <div className="section-label">Items del batch</div>
               {fields.length === 0 && (
                 <Empty title="Sin items todavía" desc="Agregá un item por cada camiseta del pedido." icon="box" />
@@ -288,32 +314,6 @@ export function PurchaseForm({
                   );
                 })}
               </div>
-
-              <button
-                className="btn btn-secondary"
-                style={{ marginTop: 12 }}
-                type="button"
-                onClick={() => append({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
-              >
-                <Icon name="plus" size={19} />Agregar item
-              </button>
-
-              {validItems.length > 0 && (
-                <div className="batch-summary">
-                  <div className="bs-row">
-                    <span>Cantidad</span>
-                    <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
-                  </div>
-                  <div className="bs-row">
-                    <span>Costo base total</span>
-                    <strong>{usd(totalUsd)}</strong>
-                  </div>
-                  <div className="bs-row">
-                    <span>Tipo de cambio</span>
-                    <strong>$U {fmtRate(rate.value)}</strong>
-                  </div>
-                </div>
-              )}
 
               {needsSupplierPayer && (
                 <div style={{ marginTop: 14 }}>
