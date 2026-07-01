@@ -30,8 +30,21 @@ The whole pool of `InventoryItem`s the business owns. Used both as the domain co
 ### Operations
 
 **Batch**:
-A purchase order. Groups one or more `InventoryItem`s with a supplier, an exchange rate, shipping costs, a tracking number, and an `arrivalDate` (null while in transit, set when it lands).
-_Avoid_: Order, Shipment, Purchase (purchase is the *action*, batch is the *thing*).
+A purchase order. Groups one or more `InventoryItem`s with a supplier, supplier payments, and an exchange rate. A batch lands in one or more `Shipment`s — it does not itself carry shipping cost or arrival data.
+_Avoid_: Order, Purchase (purchase is the *action*, batch is the *thing*). A `Shipment` is a part of a batch, not a synonym for it.
+
+**Shipment**:
+One physical delivery of *some* of a `Batch`'s items. A batch can arrive in several shipments over time (partial deliveries), so a `Shipment` owns the things that vary per delivery: its `date`, tracking number, shipping cost (USD + snapshotted UYU), weight, who paid the shipping, and the set of `InventoryItem`s it carried. An item becomes `Stock` only once it belongs to a shipment.
+
+**Purchase status**:
+A `Batch`'s arrival state, *derived* from how many of its items belong to a shipment — never stored. **transit** = none arrived, **partial** = some, **arrived** = all.
+
+**Supplier payment**:
+A partner's contribution toward a `Batch`'s **base cost** (the sum of its items' `basePriceUsd`). A batch can be paid by more than one partner, so payments are stored as rows (`BatchSupplierPayment`), one per paying partner — not a single payer column. Always in USD.
+_Avoid_: payer, "paid by" (those described the old single-payer column, now dropped).
+
+**Reconciliation**:
+The rule binding supplier payments to a batch's base cost. A batch is in one of three states: **empty** (nobody has paid yet — a legitimate state for initial stock carried at reference prices, no balance is touched), **exact** (the partners' payments sum to the base cost), or **mismatch** (they were entered but don't sum to it — invalid, blocked). Only `exact` and `empty` may be saved.
 
 **Sale**:
 The record of one `InventoryItem` being sold to a person. One Sale = one item. Carries the final price (typically UYU), the date, the method, and who collected the money.

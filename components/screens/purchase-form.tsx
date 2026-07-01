@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,25 +9,29 @@ import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
 import { Icon } from '@/components/ui/icon';
-import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { SIZES } from '@/app/lib/domain';
+import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { createPurchase } from '@/app/actions/purchases';
 import { coverOf } from '@/components/ui/swatch';
+import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
+
+const DRAFT_KEY = 'purchase-draft';
 
 export function PurchaseForm({
   models,
   presetModelId,
+  newModelId,
   users,
   rate,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
+  newModelId?: string;
   users: UserSummary[];
   rate: RateResult;
 }) {
@@ -42,34 +46,63 @@ export function PurchaseForm({
     handleSubmit,
     register,
     trigger,
+    getValues,
+    reset,
     formState: { errors },
   } = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
     defaultValues: {
       purchaseDate: todayISO(),
       supplier: '',
-      trackingNumber: '',
       description: '',
-      supplierPaidByUserId: '',
+      supplierPayments: {},
       items: presetModelId
         ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }]
         : [],
     },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, prepend, remove } = useFieldArray({ control, name: 'items' });
 
-  const cap = (s: string) => s.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
-  const modelLabel = (m: ModelWithStats) => `${cap(m.team)} · ${cap(m.version ?? '')} · ${m.season}`;
-  const modelByLabel: Record<string, string> = {};
-  models.forEach((m) => { modelByLabel[modelLabel(m)] = m.id; });
-  const sortedModels = [...models].sort((a, b) => modelLabel(a).localeCompare(modelLabel(b)));
+  // Restaura el borrador al volver de "Nuevo modelo" (la navegación desmonta el form).
+  useEffect(() => {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(DRAFT_KEY);
+    try {
+      const draft = JSON.parse(raw) as { values: PurchaseFormValues; step: number; pendingIndex: number };
+      if (newModelId && draft.values.items[draft.pendingIndex]) {
+        draft.values.items[draft.pendingIndex].modelId = newModelId;
+      }
+      reset(draft.values);
+      setStep(draft.step ?? 2);
+    } catch {
+      // borrador corrupto: lo ignoramos
+    }
+    router.replace('/purchases/new');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Guarda el borrador y navega al alta de modelo, recordando qué fila lo pidió.
+  function requestCreateModel(index: number, prefill: string) {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ values: getValues(), step, pendingIndex: index }),
+    );
+    router.push(`/inventory/new?fromPurchase=1&prefillTeam=${encodeURIComponent(prefill)}`);
+  }
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
   const totalQty = validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
-  const totalUsd = validItems.reduce((s, it) => s + (parseFloat(it.basePriceUsd ?? '') || 0) * (it.quantity ?? 1), 0);
+  const totalUsd = baseCostUsd(
+    validItems.map((it) => ({ basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0, quantity: it.quantity ?? 1 })),
+  );
   const needsSupplierPayer = totalUsd > 0;
+
+  const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
+  const { paidSum, status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
+  const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
 
   async function handleNextStep() {
     const valid = await trigger(['purchaseDate']);
@@ -81,9 +114,8 @@ export function PurchaseForm({
       await createPurchase({
         purchaseDate: data.purchaseDate,
         supplier: data.supplier || undefined,
-        trackingNumber: data.trackingNumber || undefined,
         description: data.description || undefined,
-        supplierPaidByUserId: data.supplierPaidByUserId || undefined,
+        supplierPayments: toSupplierPaymentArray(data.supplierPayments),
         exchangeRate: rate.value,
         items: data.items
           .filter((it) => it.modelId)
@@ -98,9 +130,15 @@ export function PurchaseForm({
   }
 
   function onSubmit(data: PurchaseFormValues) {
-    if (needsSupplierPayer && !data.supplierPaidByUserId) {
+    const { status } = reconcileSupplierPayments(toSupplierPaymentArray(data.supplierPayments), totalUsd);
+    if (needsSupplierPayer && status === 'empty') {
+      // Nobody paid yet — a valid state, but confirm before saving.
       setPendingData(data);
       setShowConfirm(true);
+      return;
+    }
+    if (needsSupplierPayer && status === 'mismatch') {
+      // The two amounts must cover the base cost exactly; the live hint shows why.
       return;
     }
     doSubmit(data);
@@ -126,29 +164,13 @@ export function PurchaseForm({
               <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
                 <input className="input mono" type="date" {...register('purchaseDate')} />
               </Field>
-              <Field label="Cantidad">
-                <div className="calc-field">
-                  <span className="calc-val">{totalQty}</span>
-                  <span className="calc-hint">se calcula de los items</span>
-                </div>
-              </Field>
 
-              <div className="section-label">Seguimiento</div>
               <Field label="Proveedor" optional>
                 <Controller
                   name="supplier"
                   control={control}
                   render={({ field }) => (
                     <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
-                  )}
-                />
-              </Field>
-              <Field label="Número de tracking" optional>
-                <Controller
-                  name="trackingNumber"
-                  control={control}
-                  render={({ field }) => (
-                    <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Nº de seguimiento" mono />
                   )}
                 />
               </Field>
@@ -161,6 +183,9 @@ export function PurchaseForm({
                   )}
                 />
               </Field>
+              <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -2, marginBottom: 4 }}>
+                El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
+              </div>
 
               <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
                 Siguiente: agregar items
@@ -169,6 +194,32 @@ export function PurchaseForm({
             </>
           ) : (
             <>
+              {validItems.length > 0 && (
+                <div className="batch-summary">
+                  <div className="bs-row">
+                    <span>Cantidad</span>
+                    <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
+                  </div>
+                  <div className="bs-row">
+                    <span>Costo base total</span>
+                    <strong>{usd(totalUsd)}</strong>
+                  </div>
+                  <div className="bs-row">
+                    <span>Tipo de cambio</span>
+                    <strong>$U {fmtRate(rate.value)}</strong>
+                  </div>
+                </div>
+              )}
+
+              <button
+                className="btn btn-secondary"
+                style={{ marginTop: 12 }}
+                type="button"
+                onClick={() => prepend({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
+              >
+                <Icon name="plus" size={19} />Agregar item
+              </button>
+
               <div className="section-label">Items del batch</div>
               {fields.length === 0 && (
                 <Empty title="Sin items todavía" desc="Agregá un item por cada camiseta del pedido." icon="box" />
@@ -196,22 +247,23 @@ export function PurchaseForm({
                         ) : (
                           <div className="item-swatch-empty"><Icon name="shirt" size={16} /></div>
                         )}
-                        <Controller
-                          name={`items.${index}.modelId`}
-                          control={control}
-                          render={({ field: f }) => (
-                            <select
-                              className="select item-model"
-                              value={m ? modelLabel(m) : ''}
-                              onChange={(e) => f.onChange(modelByLabel[e.target.value] || '')}
-                            >
-                              <option value="">Elegí un producto…</option>
-                              {sortedModels.map((mm) => (
-                                <option key={mm.id} value={modelLabel(mm)}>{modelLabel(mm)}</option>
-                              ))}
-                            </select>
-                          )}
-                        />
+                        <div className="item-model">
+                          <Controller
+                            name={`items.${index}.modelId`}
+                            control={control}
+                            render={({ field: f }) => (
+                              <ProductPicker
+                                value={f.value ?? ''}
+                                onChange={f.onChange}
+                                models={models}
+                                recentIds={watchedItems
+                                  .map((it, i) => (i !== index ? it.modelId : ''))
+                                  .filter(Boolean)}
+                                onRequestCreate={(prefill) => requestCreateModel(index, prefill)}
+                              />
+                            )}
+                          />
+                        </div>
                         <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
                           <Icon name="x" size={17} />
                         </button>
@@ -227,7 +279,7 @@ export function PurchaseForm({
                             name={`items.${index}.size`}
                             control={control}
                             render={({ field: f }) => (
-                              <SelectInput value={f.value} onChange={f.onChange} options={SIZES} placeholder="Talle…" />
+                              <SelectInput value={f.value} onChange={f.onChange} options={sizesForType(m?.type)} placeholder="Talle…" />
                             )}
                           />
                         </Field>
@@ -263,53 +315,26 @@ export function PurchaseForm({
                 })}
               </div>
 
-              <button
-                className="btn btn-secondary"
-                style={{ marginTop: 12 }}
-                type="button"
-                onClick={() => append({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
-              >
-                <Icon name="plus" size={19} />Agregar item
-              </button>
-
-              {validItems.length > 0 && (
-                <div className="batch-summary">
-                  <div className="bs-row">
-                    <span>Cantidad</span>
-                    <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
-                  </div>
-                  <div className="bs-row">
-                    <span>Costo base total</span>
-                    <strong>{usd(totalUsd)}</strong>
-                  </div>
-                  <div className="bs-row">
-                    <span>Tipo de cambio</span>
-                    <strong>$U {fmtRate(rate.value)}</strong>
-                  </div>
-                </div>
-              )}
-
               {needsSupplierPayer && (
                 <div style={{ marginTop: 14 }}>
                   <div className="section-label" style={{ margin: '0 0 8px' }}>
-                    Pago al proveedor
+                    Pago al proveedor · {usd(totalUsd)}
                   </div>
-                  <Field label={`¿Quién le pagó al proveedor? · ${usd(totalUsd)}`} optional error={errors.supplierPaidByUserId?.message}>
-                    <Controller
-                      name="supplierPaidByUserId"
-                      control={control}
-                      render={({ field: f }) => (
-                        <Segmented
-                          options={users.map((u) => u.alias)}
-                          value={users.find((u) => u.id === f.value)?.alias ?? ''}
-                          onChange={(alias) => f.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
-                          full
-                        />
-                      )}
-                    />
-                  </Field>
-                  <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
-                    Se descuenta del saldo en US$ de quien pagó. El envío se carga aparte al marcar la llegada.
+                  {users.map((u) => (
+                    <Field key={u.id} label={u.alias} optional>
+                      <Controller
+                        name={`supplierPayments.${u.id}` as const}
+                        control={control}
+                        render={({ field: f }) => (
+                          <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                        )}
+                      />
+                    </Field>
+                  ))}
+                  <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
+                    {paidSum > 0
+                      ? `Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`
+                      : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
                   </div>
                 </div>
               )}
@@ -319,7 +344,7 @@ export function PurchaseForm({
                 <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
               </div>
 
-              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
+              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
                 {pending ? 'Registrando…' : 'Registrar compra'}
               </button>
             </>

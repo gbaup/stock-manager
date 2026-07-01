@@ -5,9 +5,17 @@ import { PurchaseForm } from '@/components/screens/purchase-form';
 export default async function NewPurchasePage({
   searchParams,
 }: {
-  searchParams: Promise<{ modelId?: string }>;
+  searchParams: Promise<{ modelId?: string; newModelId?: string }>;
 }) {
-  const { modelId } = await searchParams;
+  const { modelId, newModelId } = await searchParams;
   const [models, users, rate] = await Promise.all([getModels(), getUsers(), getRate()]);
-  return <PurchaseForm models={models} presetModelId={modelId} users={users} rate={rate} />;
+  return (
+    <PurchaseForm
+      models={models}
+      presetModelId={modelId}
+      newModelId={newModelId}
+      users={users}
+      rate={rate}
+    />
+  );
 }

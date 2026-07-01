@@ -14,7 +14,10 @@ function parseNumber(s: string | undefined): number | null {
   return isNaN(parsed) ? null : parsed;
 }
 
-export async function createModel(data: ModelFormValues): Promise<{ errors: Record<string, string[]> } | void> {
+export async function createModel(
+  data: ModelFormValues,
+  opts?: { fromPurchase?: boolean },
+): Promise<{ errors: Record<string, string[]> } | void> {
   const result = modelSchema.safeParse(data);
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
@@ -44,6 +47,7 @@ export async function createModel(data: ModelFormValues): Promise<{ errors: Reco
     throw e;
   }
   updateTag('models');
+  if (opts?.fromPurchase) redirect(`/purchases/new?newModelId=${modelId}`);
   redirect(`/inventory/${modelId}`);
 }
 

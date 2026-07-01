@@ -25,7 +25,7 @@ export function uyu(n: number): string {
 }
 
 export function usd(n: number): string {
-  return `US$ ${new Intl.NumberFormat('es-UY').format(Math.round(n))}`;
+  return `US$ ${new Intl.NumberFormat('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
 }
 
 export function signedUyu(n: number): string {

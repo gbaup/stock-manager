@@ -5,11 +5,13 @@ export function Segmented({
   value,
   onChange,
   full = false,
+  renderLabel,
 }: {
   options: readonly string[];
   value: string;
   onChange: (v: string) => void;
   full?: boolean;
+  renderLabel?: (opt: string) => string;
 }) {
   return (
     <div className={`seg${full ? ' seg-full' : ''}`}>
@@ -20,7 +22,7 @@ export function Segmented({
           className={value === opt ? 'is-active' : ''}
           onClick={() => onChange(opt)}
         >
-          {opt}
+          {renderLabel ? renderLabel(opt) : opt}
         </button>
       ))}
     </div>

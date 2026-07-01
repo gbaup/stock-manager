@@ -7,6 +7,7 @@ export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
 }
 
 const saleFields = {
+  size: z.string().min(1, 'Elegí un talle'),
   price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
   quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
   date: z.string().min(1, 'Requerido'),
@@ -17,16 +18,22 @@ const saleFields = {
 
 export const saleSchema = z.object(saleFields);
 
-export const makeSaleSchema = (stock: number) =>
-  z.object({
-    ...saleFields,
-    quantity: z
-      .string()
-      .refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0')
-      .refine((v) => parseInt(v, 10) <= stock, `Solo hay ${stock} en stock`),
+// `sizeStock` maps each in-stock size to its available count. Quantity is
+// capped to the *selected* size's stock, not the model total.
+export const makeSaleSchema = (sizeStock: Record<string, number>) =>
+  z.object(saleFields).superRefine((data, ctx) => {
+    const avail = sizeStock[data.size] ?? 0;
+    const qty = parseInt(data.quantity, 10);
+    if (qty > 0 && qty > avail) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['quantity'],
+        message: avail === 0 ? 'Sin stock en ese talle' : `Solo hay ${avail} en ese talle`,
+      });
+    }
   });
 
-export type SaleFormValues = z.infer<ReturnType<typeof makeSaleSchema>>;
+export type SaleFormValues = z.infer<typeof saleSchema>;
 
 export const gastoSchema = z.object({
   title: z.string().min(1, 'Requerido'),
@@ -38,12 +45,19 @@ export const gastoSchema = z.object({
 
 export type GastoFormValues = z.infer<typeof gastoSchema>;
 
+const numericOptional = z
+  .string()
+  .optional()
+  .refine((v) => v === undefined || v === '' || !isNaN(parseFloat(v)), 'Monto inválido');
+
 export const arrivalSchema = z
   .object({
     arrivalDate: z.string().min(1, 'Requerido'),
-    shippingRateUsd: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
-    weight: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un peso válido'),
+    trackingNumber: z.string().optional(),
+    shippingRateUsd: numericOptional,
+    weight: numericOptional,
     shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+    itemIds: z.array(z.string().uuid()).min(1, 'Marcá al menos un item'),
   });
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
@@ -71,11 +85,6 @@ export const conversionSchema = z
   );
 
 export type ConversionFormValues = z.infer<typeof conversionSchema>;
-
-const numericOptional = z
-  .string()
-  .optional()
-  .refine((v) => v === undefined || v === '' || !isNaN(parseFloat(v)), 'Monto inválido');
 
 export const ajusteSchema = z
   .object({
@@ -128,9 +137,8 @@ export const purchaseSchema = z
   .object({
     purchaseDate: z.string().min(1, 'Requerido'),
     supplier: z.string().optional(),
-    trackingNumber: z.string().optional(),
     description: z.string().optional(),
-    supplierPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+    supplierPayments: z.record(z.string().uuid(), numericOptional).optional(),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   });
 

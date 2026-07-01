@@ -4,57 +4,74 @@ import type { Movement } from './types';
 // matches it works — BatchSummary (used by purchase listings) is a superset,
 // and the saldos pipeline constructs an even leaner object straight from
 // Prisma rows to avoid serializing photos/products it never reads.
+export type ProjectableShipment = {
+  id: string;
+  date: string;
+  shippingPriceUsd: number | null;
+  shippingPriceUyu: number | null;
+  shippingPaidByUserId: string | null;
+  shippingPaidByAlias: string | null;
+  weight: number | null;
+  itemIds: string[];
+};
+
 export type ProjectableBatch = {
   id: string;
   purchaseDate: string;
   arrivalDate: string | null;
   supplier: string | null;
   quantity: number;
-  shippingPriceUsd: number | null;
-  shippingPriceUyu: number | null;
-  supplierPaidByUserId: string | null;
-  supplierPaidByAlias: string | null;
-  shippingPaidByUserId: string | null;
-  shippingPaidByAlias: string | null;
-  items: Array<{ basePriceUsd: number }>;
+  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number }>;
+  shipments: ProjectableShipment[];
 };
 
-// A batch produces up to two movements:
-//   1. Supplier payment (USD outflow) attributed to whoever paid the supplier.
-//      Recorded on purchaseDate, regardless of whether the batch has arrived.
-//   2. Shipping payment (UYU and/or USD outflow) attributed to whoever paid
-//      shipping. Recorded only once the batch has arrived (shipping isn't a
-//      saldos event until the items physically land).
+// A batch produces:
+//   1. ONE supplier-payment movement (USD outflow) PER partner who paid,
+//      recorded on purchaseDate. All payments together cover the base cost.
+//   2. ONE shipping-payment movement PER shipment that has a cost AND a
+//      payer. With partial deliveries a single batch can yield several
+//      shipping movements on different dates.
 export function projectPurchase(batch: ProjectableBatch): Movement[] {
   const out: Movement[] = [];
 
-  const baseUsd = batch.items.reduce((s, it) => s + it.basePriceUsd, 0);
-  if (baseUsd > 0 && batch.supplierPaidByUserId) {
+  // When more than one partner pays the supplier, each card shows that
+  // partner's share of the combined payment so a split is visible at a glance.
+  const paying = batch.supplierPayments.filter((p) => p.amountUsd > 0);
+  const totalUsd = paying.reduce((s, p) => s + p.amountUsd, 0);
+  const itemsLabel = `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`;
+
+  for (const p of paying) {
+    const pct = Math.round((p.amountUsd / totalUsd) * 100);
     out.push({
-      id: `pago-prov-${batch.id}`,
+      id: `pago-prov-${batch.id}-${p.userId}`,
       kind: 'pago-prov',
       date: batch.purchaseDate,
-      person: batch.supplierPaidByAlias ?? '',
+      person: p.alias,
       title: batch.supplier ?? 'Proveedor',
-      sub: `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`,
+      sub: paying.length > 1 ? `${itemsLabel} · ${pct}%` : itemsLabel,
       uyu: 0,
-      usd: -baseUsd,
+      usd: -p.amountUsd,
     });
   }
 
-  const shippingUyu = batch.shippingPriceUyu ?? 0;
-  const shippingUsd = batch.shippingPriceUsd ?? 0;
-  if ((shippingUyu > 0 || shippingUsd > 0) && batch.shippingPaidByUserId && batch.arrivalDate) {
-    out.push({
-      id: `pago-envio-${batch.id}`,
-      kind: 'pago-envio',
-      date: batch.arrivalDate,
-      person: batch.shippingPaidByAlias ?? '',
-      title: 'Envío',
-      sub: batch.supplier ?? `${batch.quantity} items`,
-      uyu: shippingUyu > 0 ? -shippingUyu : 0,
-      usd: shippingUsd > 0 ? -shippingUsd : 0,
-    });
+  for (const sh of batch.shipments) {
+    const shippingUsd = sh.shippingPriceUsd ?? 0;
+    if (shippingUsd > 0 && sh.shippingPaidByUserId) {
+      const n = sh.itemIds.length;
+      const itemsLabel = `${n} ${n === 1 ? 'item' : 'items'}`;
+      out.push({
+        id: `pago-envio-${batch.id}-${sh.id}`,
+        kind: 'pago-envio',
+        date: sh.date,
+        person: sh.shippingPaidByAlias ?? '',
+        title: 'Envío',
+        sub: sh.weight ? `${itemsLabel} · ${sh.weight} kg` : itemsLabel,
+        // Shipping is paid in USD only. The UYU price (sh.shippingPriceUyu) is
+        // a reference for sale-profit calculations, not a balance movement.
+        uyu: 0,
+        usd: -shippingUsd,
+      });
+    }
   }
 
   return out;

@@ -8,7 +8,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { VERSIONS, SHIRT_TYPES, SLEEVES } from '@/app/lib/domain';
+import { VERSIONS, ITEM_TYPES, SLEEVES, fmtType, fmtVersion, fmtSleeve } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
@@ -17,12 +17,19 @@ import { modelSchema, type ModelFormValues } from '@/app/lib/schemas';
 export function ModelForm({
   initial,
   teams,
+  prefillTeam,
+  fromPurchase,
 }: {
   initial?: ModelWithStats | null;
   teams: { id: string; name: string }[];
+  prefillTeam?: string;
+  fromPurchase?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const prefillTeamId = prefillTeam
+    ? (teams.find((t) => t.name.toLowerCase() === prefillTeam.trim().toLowerCase())?.id ?? '')
+    : '';
   const {
     control,
     handleSubmit,
@@ -30,11 +37,11 @@ export function ModelForm({
   } = useForm<ModelFormValues>({
     resolver: zodResolver(modelSchema),
     defaultValues: {
-      teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : '',
+      teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : prefillTeamId,
       season: initial?.season ?? '',
-      version: initial?.version ?? 'Home',
-      type: initial?.type ?? 'Fan',
-      sleeve: initial?.sleeve ?? 'Corta',
+      version: initial?.version ?? 'home',
+      type: initial?.type ?? 'fan',
+      sleeve: initial?.sleeve ?? 'corta',
       color: initial?.color ?? 'Blanco',
       number: initial?.number ?? '',
       player: initial?.player ?? '',
@@ -45,13 +52,14 @@ export function ModelForm({
 
   const color = useWatch({ control, name: 'color' });
   const number = useWatch({ control, name: 'number' });
+  const type = useWatch({ control, name: 'type' });
 
   function onSubmit(data: ModelFormValues) {
     startTransition(async () => {
       if (initial?.id) {
         await updateModel(initial.id, data);
       } else {
-        await createModel(data);
+        await createModel(data, { fromPurchase });
       }
     });
   }
@@ -111,7 +119,7 @@ export function ModelForm({
                 name="version"
                 control={control}
                 render={({ field }) => (
-                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} />
+                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} renderLabel={fmtVersion} />
                 )}
               />
             </Field>
@@ -121,19 +129,21 @@ export function ModelForm({
               name="type"
               control={control}
               render={({ field }) => (
-                <Segmented options={SHIRT_TYPES} value={field.value} onChange={field.onChange} full />
+                <Segmented options={ITEM_TYPES} value={field.value} onChange={field.onChange} renderLabel={fmtType} full />
               )}
             />
           </Field>
-          <Field label="Manga">
-            <Controller
-              name="sleeve"
-              control={control}
-              render={({ field }) => (
-                <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} full />
-              )}
-            />
-          </Field>
+          {type !== 'short' && (
+            <Field label="Manga">
+              <Controller
+                name="sleeve"
+                control={control}
+                render={({ field }) => (
+                  <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} renderLabel={fmtSleeve} full />
+                )}
+              />
+            </Field>
+          )}
 
           <div className="section-label">Apariencia</div>
           <Field label="Color principal">
