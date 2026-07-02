@@ -17,7 +17,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'StockControl',
+  title: 'RetroPilchas',
   description: 'Inventario de camisetas',
 };
 
