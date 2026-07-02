@@ -8,7 +8,8 @@ const secret = new TextEncoder().encode(sessionSecret);
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === '/login' || pathname.startsWith('/public')) return NextResponse.next();
+  if (pathname === '/login' || pathname.startsWith('/public') || pathname === '/api/whatsapp')
+    return NextResponse.next();
 
   const session = request.cookies.get('session')?.value;
   let valid = false;
@@ -16,7 +17,7 @@ export async function proxy(request: NextRequest) {
     try {
       await jwtVerify(session, secret, { algorithms: ['HS256'] });
       valid = true;
-    } catch {}
+    } catch { }
   }
 
   if (!valid) {
