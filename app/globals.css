@@ -2036,15 +2036,6 @@ body {
   background: var(--surface);
 }
 
-.pub-back {
-  position: absolute;
-  left: 16px;
-  top: calc(var(--safe-top) + 12px);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
 .public-badge {
   display: inline-flex;
   align-items: center;
@@ -2058,12 +2049,6 @@ body {
   font-weight: 700;
   border: 1px solid var(--accent-line);
   white-space: nowrap;
-}
-
-.public-title {
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
 }
 
 .public-sub {
