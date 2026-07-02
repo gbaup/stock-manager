@@ -52,6 +52,17 @@ The `ModelMeta` / `ModelWithStats` / `ModelDetail` types in `domain.ts` are the 
 
 `components/ui/photo-gallery.tsx` currently handles files client-side (resize to base64). The client implementation for calling `/api/upload` and replacing base64 with Cloudinary URLs is the pending work on `feature/image-storage`.
 
+## WhatsApp bot
+
+`app/api/whatsapp/route.ts` is the Meta WhatsApp Cloud API webhook (Node runtime). `GET` handles Meta's verify handshake; `POST` verifies the `X-Hub-Signature-256` HMAC (over the raw body) and dispatches the message. All bot logic lives in `app/lib/whatsapp/`:
+
+- `conversation.ts` — orchestrator: loads/persists per-phone state (`BotConversation` table), dedupes Meta retries by `lastMessageId`, resolves role, handles global commands (`cancelar`/`menu`, public "hablar con una persona"), dispatches to a flow.
+- `flows/admin-sale.ts` — guided sale registration for admins. Mirrors the web sale form and calls the same `recordSale` primitive (`app/lib/inventory.ts`).
+- `flows/public-stock.ts` — read-only catalog browsing for the public (team → model → sizes) via `getPublicModels`.
+- `client.ts` (axios send helpers), `verify.ts` (signature/handshake), `parse.ts` (webhook → `IncomingMessage`; the seam where an LLM interpreter would plug in later), `types.ts`, `messages.ts` (all Spanish copy).
+
+Identity: a sender whose WhatsApp number matches a `User.phoneNumber` (E.164 digits, no `+`) is an **admin**; everyone else is **public**. Seed the two admins' numbers on the `User` rows. It's a guided state machine (no LLM yet).
+
 ## Environment variables
 
 ```
@@ -61,6 +72,11 @@ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
 SHOW_ALL_MODELS   # optional, temporary. "true" = public catalog shows ALL models, not just in-stock ones (sizes hidden). Unset/false = normal behavior.
+
+WHATSAPP_VERIFY_TOKEN      # arbitrary string; matched during the webhook GET handshake
+WHATSAPP_ACCESS_TOKEN      # Meta Graph API token for the business phone number
+WHATSAPP_PHONE_NUMBER_ID   # the sending phone-number id (Graph API path segment)
+WHATSAPP_APP_SECRET        # app secret; verifies X-Hub-Signature-256 on inbound POSTs (optional in dev)
 ```
 
 ## Conventions
