@@ -292,8 +292,10 @@ export function PurchaseForm({
                                 className="input mono"
                                 type="number"
                                 min={1}
-                                value={f.value ?? 1}
-                                onChange={(e) => f.onChange(parseInt(e.target.value, 10) || 1)}
+                                inputMode="numeric"
+                                value={f.value ?? ''}
+                                onChange={(e) => f.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                                onBlur={(e) => { if (e.target.value === '') f.onChange(1); }}
                               />
                             )}
                           />
