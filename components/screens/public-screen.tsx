@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { SIZES, fmtSize } from '@/app/lib/domain';
+import { SIZES, KID_SIZES, fmtSize } from '@/app/lib/domain';
 import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
@@ -22,7 +22,7 @@ function SizeChips({ sizes }: { sizes: string[] }) {
   );
 }
 
-export function PublicScreen({ models, today }: { models: PublicModel[]; today: string }) {
+export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[]; today: string; loggedIn: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'team' | 'newest'>('team');
@@ -41,12 +41,21 @@ export function PublicScreen({ models, today }: { models: PublicModel[]; today: 
     localStorage.setItem(VIEW_KEY, v);
   }
 
-  const allTypes = [...new Set(models.map((m) => m.type).filter(Boolean) as string[])];
+  const TYPE_ORDER = ['retro', 'fan', 'player', 'short', 'kidkit'];
+  const allTypes = TYPE_ORDER.filter((t) => models.some((m) => (m.type ?? '').toLowerCase() === t));
   const allVersions = [...new Set(models.map((m) => m.version).filter(Boolean) as string[])];
-  const allSizes = SIZES.filter((s) => models.some((m) => m.sizes.includes(s)));
+  // Kid sizes only apply to kidkit; show them only when that type is selected, and regular sizes otherwise.
+  const showKidSizes = filterTypes.includes('kidkit');
+  const showRegularSizes = filterTypes.length === 0 || filterTypes.some((t) => t !== 'kidkit');
+  const allSizes = [
+    ...(showRegularSizes ? SIZES : []),
+    ...(showKidSizes ? KID_SIZES : []),
+  ].filter((s) => models.some((m) => m.sizes.some((z) => z.toUpperCase() === s.toUpperCase())));
+  // Only apply size filters that are currently visible for the selected type(s).
+  const activeSizes = filterSizes.filter((s) => (allSizes as string[]).includes(s));
 
   const q = query.trim().toLowerCase();
-  const activeFilters = filterTypes.length + filterSizes.length + filterVersions.length;
+  const activeFilters = filterTypes.length + activeSizes.length + filterVersions.length;
 
   let list = models.filter((m) => {
     if (q) {
@@ -54,9 +63,9 @@ export function PublicScreen({ models, today }: { models: PublicModel[]; today: 
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
-    if (filterTypes.length > 0 && !filterTypes.includes(m.type ?? '')) return false;
+    if (filterTypes.length > 0 && !filterTypes.includes((m.type ?? '').toLowerCase())) return false;
     if (filterVersions.length > 0 && !filterVersions.includes(m.version ?? '')) return false;
-    if (filterSizes.length > 0 && !filterSizes.some((s) => m.sizes.includes(s))) return false;
+    if (activeSizes.length > 0 && !activeSizes.some((s) => m.sizes.some((z) => z.toUpperCase() === s.toUpperCase()))) return false;
     return true;
   });
 
@@ -79,12 +88,22 @@ export function PublicScreen({ models, today }: { models: PublicModel[]; today: 
 
   return (
     <div className="screen" style={{ background: 'var(--bg)' }}>
-      <div className="public-head">
+      <div className="form-head" style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        {loggedIn && (
+          <button
+            className="link"
+            style={{ position: 'absolute', left: 0, display: 'flex', alignItems: 'center' }}
+            onClick={() => router.push('/inventory')}
+          >
+            <Icon name="chevL" size={20} /> Atrás
+          </button>
+        )}
         <div className="public-badge">
           <Icon name="eye" size={14} />
           Catálogo público
         </div>
-        <h1 className="public-title">Camisetas disponibles</h1>
+      </div>
+      <div className='public-head'>
         <div className="public-sub">{list.length} modelos disponibles</div>
 
         <div className="search" style={{ marginTop: 14 }}>
@@ -160,7 +179,7 @@ export function PublicScreen({ models, today }: { models: PublicModel[]; today: 
               <div className="multi-chips">
                 {allSizes.map((s) => (
                   <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{s}</button>
+                    onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{fmtSize(s)}</button>
                 ))}
               </div>
             </div>
@@ -208,10 +227,6 @@ export function PublicScreen({ models, today }: { models: PublicModel[]; today: 
 
         <div className="pub-footer">
           <div className="pub-footer-note">Stock actualizado al {today}</div>
-          <button className="btn btn-secondary" onClick={() => router.push('/inventory')}>
-            <Icon name="chevL" size={18} />
-            Volver a la herramienta interna
-          </button>
         </div>
       </div>
 
