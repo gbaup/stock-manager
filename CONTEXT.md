@@ -20,6 +20,10 @@ The set of `InventoryItem`s whose `Batch` has arrived **and** whose `status` is 
 **In transit**:
 `InventoryItem`s whose `Batch` has not arrived yet, regardless of `status`. They exist in the catalog but cannot be sold.
 
+**Catalog**:
+The public-facing view of `Stock` — the set of in-stock `Model`s shown to buyers on `app/public`, with each model's available `size`s surfaced as filter facets. Buyers filter it by a curated, ordered subset of jersey `type`s (deliberately excludes internal-only types like `nba`); that ordering is a merchandising choice, distinct from the canonical `ITEM_TYPES` order.
+_Avoid_: Storefront, shop, listings page.
+
 **Photo**:
 A single image attached to a `Model`. Stored in Cloudinary; identified by a `publicId` (needed to delete) and exposed as a `url`. A `Model` holds an ordered array of photos; index 0 is the primary photo (shown in listings) by convention.
 _Avoid_: Image, Picture, Thumbnail.

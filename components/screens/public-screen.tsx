@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/icon';
 import { Empty } from '@/components/ui/empty';
-import { SIZES, KID_SIZES, fmtSize } from '@/app/lib/domain';
+import { fmtSize, fmtType } from '@/app/lib/domain';
+import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
 import { colorByName } from '@/app/lib/format';
 import type { ModelMeta } from '@/app/lib/domain';
 
@@ -41,18 +42,8 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
     localStorage.setItem(VIEW_KEY, v);
   }
 
-  const TYPE_ORDER = ['retro', 'fan', 'player', 'short', 'kidkit'];
-  const allTypes = TYPE_ORDER.filter((t) => models.some((m) => (m.type ?? '').toLowerCase() === t));
-  const allVersions = [...new Set(models.map((m) => m.version).filter(Boolean) as string[])];
-  // Kid sizes only apply to kidkit; show them only when that type is selected, and regular sizes otherwise.
-  const showKidSizes = filterTypes.includes('kidkit');
-  const showRegularSizes = filterTypes.length === 0 || filterTypes.some((t) => t !== 'kidkit');
-  const allSizes = [
-    ...(showRegularSizes ? SIZES : []),
-    ...(showKidSizes ? KID_SIZES : []),
-  ].filter((s) => models.some((m) => m.sizes.some((z) => z.toUpperCase() === s.toUpperCase())));
-  // Only apply size filters that are currently visible for the selected type(s).
-  const activeSizes = filterSizes.filter((s) => (allSizes as string[]).includes(s));
+  const { types: allTypes, sizes: allSizes, versions: allVersions, activeSizes } =
+    catalogFilterOptions(models, { types: filterTypes, sizes: filterSizes });
 
   const q = query.trim().toLowerCase();
   const activeFilters = filterTypes.length + activeSizes.length + filterVersions.length;
@@ -63,10 +54,7 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
-    if (filterTypes.length > 0 && !filterTypes.includes((m.type ?? '').toLowerCase())) return false;
-    if (filterVersions.length > 0 && !filterVersions.includes(m.version ?? '')) return false;
-    if (activeSizes.length > 0 && !activeSizes.some((s) => m.sizes.some((z) => z.toUpperCase() === s.toUpperCase()))) return false;
-    return true;
+    return modelMatchesFacets(m, { types: filterTypes, sizes: activeSizes, versions: filterVersions });
   });
 
   list = list.slice().sort((a, b) =>
@@ -168,7 +156,7 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
               <div className="multi-chips">
                 {allTypes.map((t) => (
                   <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{t}</button>
+                    onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{fmtType(t)}</button>
                 ))}
               </div>
             </div>
