@@ -3707,6 +3707,24 @@ body {
   justify-content: space-between;
 }
 
+.ch-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ch-nav button.avatar {
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ch-nav button.avatar:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .ch-l {
   font-family: var(--font-mono);
   font-size: 11px;

@@ -32,8 +32,13 @@ const MONTHS = [
   'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
-function monthLabel(): string {
-  return MONTHS[new Date().getMonth()];
+function monthFromOffset(offset: number) {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; // "YYYY-MM"
+  const label = MONTHS[d.getMonth()];
+  const showYear = d.getFullYear() !== now.getFullYear();
+  return { key, label, year: d.getFullYear(), showYear };
 }
 
 function Avatar({ name, size }: { name: string; size: number }) {
@@ -92,11 +97,19 @@ function HomeContent({
   const [personFilter, setPersonFilter] = useState('all');
   const [range, setRange] = useState<Range>('mes');
   const [visible, setVisible] = useState(PAGE);
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, negative = past
 
   const pickPerson = (id: string) => { setPersonFilter(id); setVisible(PAGE); };
   const pickRange = (r: Range) => { setRange(r); setVisible(PAGE); };
+  const stepMonth = (delta: number) => {
+    setMonthOffset((o) => Math.min(0, o + delta));
+    setVisible(PAGE);
+  };
 
-  const monthSales = sales.filter((s) => inDateRange(s.date, 'mes'));
+  const sel = monthFromOffset(monthOffset);
+  const browsingPast = monthOffset !== 0;
+
+  const monthSales = sales.filter((s) => s.date.slice(0, 7) === sel.key);
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
   const monthProfit = monthSales.reduce((a, s) => a + s.profit, 0);
   const profitPending = monthSales.some((s) => s.profitPending);
@@ -110,7 +123,7 @@ function HomeContent({
   const list = [...sales
     .filter((s) =>
       (personFilter === 'all' || s.collectedByUserId === personFilter) &&
-      inDateRange(s.date, range)
+      (browsingPast ? s.date.slice(0, 7) === sel.key : inDateRange(s.date, range))
     )]
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -144,7 +157,30 @@ function HomeContent({
         <div className="body-pad">
           <div className="cobro-hero">
             <div className="ch-top">
-              <span className="ch-l">Cobrado en {monthLabel()}</span>
+              <div className="ch-nav">
+                <button
+                  type="button"
+                  className="avatar"
+                  style={{ width: 24, height: 24, fontSize: 12 }}
+                  onClick={() => stepMonth(-1)}
+                  aria-label="Mes anterior"
+                >
+                  <Icon name="chevL" size={12} />
+                </button>
+                <span className="ch-l">
+                  Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+                </span>
+                <button
+                  type="button"
+                  className="avatar"
+                  style={{ width: 24, height: 24, fontSize: 12, opacity: browsingPast ? 1 : 0.35, pointerEvents: browsingPast ? 'auto' : 'none' }}
+                  onClick={() => stepMonth(1)}
+                  disabled={!browsingPast}
+                  aria-label="Mes siguiente"
+                >
+                  <Icon name="chevR" size={12} />
+                </button>
+              </div>
               <span className="ch-n">
                 {monthSales.length} {monthSales.length === 1 ? 'venta' : 'ventas'}
               </span>
@@ -206,13 +242,17 @@ function HomeContent({
             ))}
           </div>
 
-          <div className="seg" style={{ marginTop: 9 }}>
+          <div
+            className="seg"
+            style={{ marginTop: 9, opacity: browsingPast ? 0.4 : 1, pointerEvents: browsingPast ? 'none' : 'auto' }}
+          >
             {rangeOpts.map((o) => (
               <button
                 key={o.value}
                 type="button"
-                className={range === o.value ? 'is-active' : ''}
+                className={!browsingPast && range === o.value ? 'is-active' : ''}
                 onClick={() => pickRange(o.value)}
+                disabled={browsingPast}
               >
                 {o.label}
               </button>
@@ -224,7 +264,10 @@ function HomeContent({
               <span>
                 {remaining > 0
                   ? `Mostrando ${shown.length} de ${list.length}`
-                  : `${list.length} ${list.length === 1 ? 'venta' : 'ventas'}${personFilter !== 'all'
+                  : `${list.length} ${list.length === 1 ? 'venta' : 'ventas'}${browsingPast
+                    ? ` · ${sel.label}${sel.showYear ? ` ${sel.year}` : ''}`
+                    : ''
+                  }${personFilter !== 'all'
                     ? ` · ${users.find((u) => u.id === personFilter)?.alias ?? ''}`
                     : ''
                   }`}
