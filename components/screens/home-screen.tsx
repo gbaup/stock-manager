@@ -98,6 +98,8 @@ function HomeContent({
 
   const monthSales = sales.filter((s) => inDateRange(s.date, 'mes'));
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
+  const monthProfit = monthSales.reduce((a, s) => a + s.profit, 0);
+  const profitPending = monthSales.some((s) => s.profitPending);
   const byUser: Record<string, number> = {};
   users.forEach((u) => {
     byUser[u.id] = monthSales
@@ -148,6 +150,15 @@ function HomeContent({
               </span>
             </div>
             <div className="ch-amt">{uyu(monthTotal)}</div>
+            <div
+              className="ch-profit"
+              style={{ color: monthProfit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+            >
+              <span className="ch-profit-a">
+                {monthProfit >= 0 ? '+' : ''}{uyu(monthProfit)}
+                {profitPending && <span className="money-sec"> · provisorio</span>}
+              </span>
+            </div>
             <div className="ch-split">
               {users.map((u) => (
                 <div key={u.id} className="chs">
