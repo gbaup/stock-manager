@@ -22,12 +22,14 @@ export const sizesForType = (type: string | null | undefined): readonly string[]
   type === 'kidkit' ? KID_SIZES : SIZES;
 
 // Canonical incremental order across all size sets. KID_SIZES and SIZES are
-// disjoint, so a single combined index gives a total order. Unknown sizes sort
-// last (alphabetically among themselves) for stability.
-const SIZE_ORDER: string[] = [...KID_SIZES, ...SIZES];
+// disjoint, so a single combined index gives a total order. Sizes are stored
+// lowercase in the DB, so the order set and lookups are lowercased to match
+// (SIZES is declared uppercase for display). Unknown sizes sort last
+// (alphabetically among themselves) for stability.
+const SIZE_ORDER: string[] = [...KID_SIZES, ...SIZES].map((s) => s.toLowerCase());
 export const compareSizes = (a: string, b: string): number => {
-  const ia = SIZE_ORDER.indexOf(a);
-  const ib = SIZE_ORDER.indexOf(b);
+  const ia = SIZE_ORDER.indexOf(a.toLowerCase());
+  const ib = SIZE_ORDER.indexOf(b.toLowerCase());
   if (ia === -1 && ib === -1) return a.localeCompare(b);
   if (ia === -1) return 1;
   if (ib === -1) return -1;

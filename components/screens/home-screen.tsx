@@ -33,12 +33,15 @@ const MONTHS = [
 ];
 
 function monthFromOffset(offset: number) {
+  // UTC throughout: sale dates come from toISODate (d.toISOString()), so the
+  // month key must be built on the same UTC basis or a sale near a month
+  // boundary would bucket into the wrong month in UYU (UTC-3).
   const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; // "YYYY-MM"
-  const label = MONTHS[d.getMonth()];
-  const showYear = d.getFullYear() !== now.getFullYear();
-  return { key, label, year: d.getFullYear(), showYear };
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+  const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; // "YYYY-MM"
+  const label = MONTHS[d.getUTCMonth()];
+  const showYear = d.getUTCFullYear() !== now.getUTCFullYear();
+  return { key, label, year: d.getUTCFullYear(), showYear };
 }
 
 function Avatar({ name, size }: { name: string; size: number }) {
@@ -103,6 +106,10 @@ function HomeContent({
   const pickRange = (r: Range) => { setRange(r); setVisible(PAGE); };
   const stepMonth = (delta: number) => {
     setMonthOffset((o) => Math.min(0, o + delta));
+    // Month navigation is inherently a whole-month view, and the range control
+    // is disabled while browsing the past. Pin range to 'mes' so a previously
+    // selected range (e.g. 'hoy') doesn't silently reactivate on return.
+    setRange('mes');
     setVisible(PAGE);
   };
 

@@ -454,7 +454,6 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
           catalogProductId: true,
           size: true,
           basePriceUyu: true,
-          shipmentId: true,
           shipment: {
             select: {
               shippingPriceUyu: true,
@@ -479,10 +478,18 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
     // Landed cost of the sold unit: base price + equal-split shipping share
     // (0 while in transit). Goes through the same shippingShareUyu seam as
     // getModelDetail, so profit matches the model-detail timeline exactly.
-    const share = s.item.shipment
-      ? shippingShareUyu(Number(s.item.shipment.shippingPriceUyu), s.item.shipment._count.items)
+    // Single source of truth for "in transit": the shipment relation. Cost is
+    // provisional whenever the item has no shipment yet OR its shipment has no
+    // shipping price entered — both leave the shipping share out of the number.
+    const shipment = s.item.shipment;
+    const share = shipment
+      ? shippingShareUyu(
+          shipment.shippingPriceUyu === null ? null : Number(shipment.shippingPriceUyu),
+          shipment._count.items,
+        )
       : 0;
     const cost = Number(s.item.basePriceUyu) + share;
+    const profitPending = shipment === null || shipment.shippingPriceUyu === null;
     return {
       id: s.id,
       catalogProductId: s.item.catalogProductId,
@@ -494,7 +501,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       size: s.item.size,
       price: Number(s.price),
       profit: Number(s.price) - cost,
-      profitPending: s.item.shipmentId === null,
+      profitPending,
       date: toISODate(s.date)!,
       collectedByUserId: s.collectedByUserId,
       collectedByAlias: s.collectedByUser?.alias ?? null,
