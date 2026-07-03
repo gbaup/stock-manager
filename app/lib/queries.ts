@@ -19,7 +19,10 @@ export type HomeSaleItem = {
   version: string | null;
   number: string | null;
   player: string | null;
+  size: string;
   price: number;
+  profit: number;
+  profitPending: boolean;
   date: string;
   collectedByUserId: string | null;
   collectedByAlias: string | null;
@@ -449,6 +452,15 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       item: {
         select: {
           catalogProductId: true,
+          size: true,
+          basePriceUyu: true,
+          shipmentId: true,
+          shipment: {
+            select: {
+              shippingPriceUyu: true,
+              _count: { select: { items: true } },
+            },
+          },
           product: {
             select: {
               color: true,
@@ -463,19 +475,32 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
     },
     orderBy: { date: 'desc' },
   });
-  return sales.map((s) => ({
-    id: s.id,
-    catalogProductId: s.item.catalogProductId,
-    teamName: s.item.product.team.name,
-    color: s.item.product.color,
-    version: s.item.product.version,
-    number: s.item.product.number !== null ? String(s.item.product.number) : null,
-    player: s.item.product.player,
-    price: Number(s.price),
-    date: toISODate(s.date)!,
-    collectedByUserId: s.collectedByUserId,
-    collectedByAlias: s.collectedByUser?.alias ?? null,
-  }));
+  return sales.map((s) => {
+    // Landed cost of the sold unit: base price + equal-split shipping share
+    // (0 while in transit). Mirrors getModelDetail's accounting so profit
+    // matches the model-detail timeline exactly.
+    const share =
+      s.item.shipment && s.item.shipment.shippingPriceUyu
+        ? Number(s.item.shipment.shippingPriceUyu) / s.item.shipment._count.items
+        : 0;
+    const cost = Number(s.item.basePriceUyu) + share;
+    return {
+      id: s.id,
+      catalogProductId: s.item.catalogProductId,
+      teamName: s.item.product.team.name,
+      color: s.item.product.color,
+      version: s.item.product.version,
+      number: s.item.product.number !== null ? String(s.item.product.number) : null,
+      player: s.item.product.player,
+      size: s.item.size,
+      price: Number(s.price),
+      profit: Number(s.price) - cost,
+      profitPending: s.item.shipmentId === null,
+      date: toISODate(s.date)!,
+      collectedByUserId: s.collectedByUserId,
+      collectedByAlias: s.collectedByUser?.alias ?? null,
+    };
+  });
 }
 
 export async function getTransitCount(): Promise<number> {

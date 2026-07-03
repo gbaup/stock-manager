@@ -3937,6 +3937,15 @@ body {
   white-space: nowrap;
 }
 
+.sale-profit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
 .sale-by {
   display: flex;
   align-items: center;

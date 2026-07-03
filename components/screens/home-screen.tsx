@@ -256,10 +256,18 @@ function HomeContent({
                         <ColorDot color={s.color} />
                         {s.version ? ` ${s.version}` : ''}
                         {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
+                        {s.size ? ` · Talle ${s.size.toUpperCase()}` : ''}
                       </div>
                     </div>
                     <div className="sale-end">
                       <div className="sale-price">{uyu(s.price)}</div>
+                      <div
+                        className="sale-profit"
+                        style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+                      >
+                        {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                        {s.profitPending && <span className="money-sec"> · provisorio</span>}
+                      </div>
                       <div className="sale-by">
                         {s.collectedByAlias && <Avatar name={s.collectedByAlias} size={18} />}
                         <span>{fmtDate(s.date)}</span>
