@@ -21,6 +21,19 @@ const KID_SIZE_LABELS: Record<string, string> = {
 export const sizesForType = (type: string | null | undefined): readonly string[] =>
   type === 'kidkit' ? KID_SIZES : SIZES;
 
+// Canonical incremental order across all size sets. KID_SIZES and SIZES are
+// disjoint, so a single combined index gives a total order. Unknown sizes sort
+// last (alphabetically among themselves) for stability.
+const SIZE_ORDER: string[] = [...KID_SIZES, ...SIZES];
+export const compareSizes = (a: string, b: string): number => {
+  const ia = SIZE_ORDER.indexOf(a);
+  const ib = SIZE_ORDER.indexOf(b);
+  if (ia === -1 && ib === -1) return a.localeCompare(b);
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+};
+
 // Public-facing label: kid numeric sizes -> age range, everything else unchanged.
 export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 
