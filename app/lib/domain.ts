@@ -200,9 +200,11 @@ export type ModelDetail = ModelWithStats & {
 // Equal-split shipping allocation: each item in a shipment carries the same
 // share of that shipment's UYU shipping cost. The single place this rule
 // lives — swap the body if allocation ever becomes weight- or cost-based.
-export function shippingShareUyu(shipment: { shippingPriceUyu: number | null; itemIds: string[] }): number {
-  if (!shipment.shippingPriceUyu || shipment.itemIds.length === 0) return 0;
-  return shipment.shippingPriceUyu / shipment.itemIds.length;
+// Takes the raw price and item count so every caller can reach it regardless
+// of how it holds the shipment (an itemIds array or a relation _count).
+export function shippingShareUyu(shippingPriceUyu: number | null, itemCount: number): number {
+  if (!shippingPriceUyu || itemCount === 0) return 0;
+  return shippingPriceUyu / itemCount;
 }
 
 // ---- Supplier-payment reconciliation (see CONTEXT.md "Reconciliation") ----

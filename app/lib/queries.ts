@@ -276,7 +276,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
     if (batchData.shipments.length > 0) {
       for (const sh of batchData.shipments) {
-        const share = shippingShareUyu(sh);
+        const share = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
         for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
       }
     }
@@ -477,12 +477,11 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
   });
   return sales.map((s) => {
     // Landed cost of the sold unit: base price + equal-split shipping share
-    // (0 while in transit). Mirrors getModelDetail's accounting so profit
-    // matches the model-detail timeline exactly.
-    const share =
-      s.item.shipment && s.item.shipment.shippingPriceUyu
-        ? Number(s.item.shipment.shippingPriceUyu) / s.item.shipment._count.items
-        : 0;
+    // (0 while in transit). Goes through the same shippingShareUyu seam as
+    // getModelDetail, so profit matches the model-detail timeline exactly.
+    const share = s.item.shipment
+      ? shippingShareUyu(Number(s.item.shipment.shippingPriceUyu), s.item.shipment._count.items)
+      : 0;
     const cost = Number(s.item.basePriceUyu) + share;
     return {
       id: s.id,

@@ -109,7 +109,13 @@ function HomeContent({
   const sel = monthFromOffset(monthOffset);
   const browsingPast = monthOffset !== 0;
 
-  const monthSales = sales.filter((s) => s.date.slice(0, 7) === sel.key);
+  // Membership in the selected month has a single definition — the sel.key
+  // from monthFromOffset. The hero total always uses it; the list uses it for
+  // the 'mes' range and when browsing past, deferring to inDateRange only for
+  // the other (non-month) ranges.
+  const inSelectedMonth = (iso: string) => iso.slice(0, 7) === sel.key;
+
+  const monthSales = sales.filter((s) => inSelectedMonth(s.date));
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
   const monthProfit = monthSales.reduce((a, s) => a + s.profit, 0);
   const profitPending = monthSales.some((s) => s.profitPending);
@@ -123,7 +129,7 @@ function HomeContent({
   const list = [...sales
     .filter((s) =>
       (personFilter === 'all' || s.collectedByUserId === personFilter) &&
-      (browsingPast ? s.date.slice(0, 7) === sel.key : inDateRange(s.date, range))
+      (browsingPast || range === 'mes' ? inSelectedMonth(s.date) : inDateRange(s.date, range))
     )]
     .sort((a, b) => b.date.localeCompare(a.date));
 
