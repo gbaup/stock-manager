@@ -11,7 +11,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { SizePicker } from '@/components/ui/size-picker';
 import { uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
-import { METHODS, matchesModel } from '@/app/lib/domain';
+import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
 
@@ -155,8 +155,8 @@ export function QuickSaleForm({
                       <div className="qs-r-main">
                         <div className="qs-r-team capitalize">{m.team}</div>
                         <div className="qs-r-meta">
-                          {m.season} · {m.version} · {m.type}
-                          {m.number ? ` · ${m.number}` : ''} {m.player ? `${m.player}` : ''}
+                          {m.season} · {m.version} · {fmtType(m.type)}
+                          {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
                         </div>
                       </div>
                       <div
