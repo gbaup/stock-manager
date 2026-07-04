@@ -32,8 +32,16 @@ const MONTHS = [
   'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
-function monthLabel(): string {
-  return MONTHS[new Date().getMonth()];
+function monthFromOffset(offset: number) {
+  // UTC throughout: sale dates come from toISODate (d.toISOString()), so the
+  // month key must be built on the same UTC basis or a sale near a month
+  // boundary would bucket into the wrong month in UYU (UTC-3).
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+  const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; // "YYYY-MM"
+  const label = MONTHS[d.getUTCMonth()];
+  const showYear = d.getUTCFullYear() !== now.getUTCFullYear();
+  return { key, label, year: d.getUTCFullYear(), showYear };
 }
 
 function Avatar({ name, size }: { name: string; size: number }) {
@@ -92,12 +100,32 @@ function HomeContent({
   const [personFilter, setPersonFilter] = useState('all');
   const [range, setRange] = useState<Range>('mes');
   const [visible, setVisible] = useState(PAGE);
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, negative = past
 
   const pickPerson = (id: string) => { setPersonFilter(id); setVisible(PAGE); };
   const pickRange = (r: Range) => { setRange(r); setVisible(PAGE); };
+  const stepMonth = (delta: number) => {
+    setMonthOffset((o) => Math.min(0, o + delta));
+    // Month navigation is inherently a whole-month view, and the range control
+    // is disabled while browsing the past. Pin range to 'mes' so a previously
+    // selected range (e.g. 'hoy') doesn't silently reactivate on return.
+    setRange('mes');
+    setVisible(PAGE);
+  };
 
-  const monthSales = sales.filter((s) => inDateRange(s.date, 'mes'));
+  const sel = monthFromOffset(monthOffset);
+  const browsingPast = monthOffset !== 0;
+
+  // Membership in the selected month has a single definition — the sel.key
+  // from monthFromOffset. The hero total always uses it; the list uses it for
+  // the 'mes' range and when browsing past, deferring to inDateRange only for
+  // the other (non-month) ranges.
+  const inSelectedMonth = (iso: string) => iso.slice(0, 7) === sel.key;
+
+  const monthSales = sales.filter((s) => inSelectedMonth(s.date));
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
+  const monthProfit = monthSales.reduce((a, s) => a + s.profit, 0);
+  const profitPending = monthSales.some((s) => s.profitPending);
   const byUser: Record<string, number> = {};
   users.forEach((u) => {
     byUser[u.id] = monthSales
@@ -108,7 +136,7 @@ function HomeContent({
   const list = [...sales
     .filter((s) =>
       (personFilter === 'all' || s.collectedByUserId === personFilter) &&
-      inDateRange(s.date, range)
+      (browsingPast || range === 'mes' ? inSelectedMonth(s.date) : inDateRange(s.date, range))
     )]
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -142,12 +170,44 @@ function HomeContent({
         <div className="body-pad">
           <div className="cobro-hero">
             <div className="ch-top">
-              <span className="ch-l">Cobrado en {monthLabel()}</span>
+              <div className="ch-nav">
+                <button
+                  type="button"
+                  className="avatar"
+                  style={{ width: 24, height: 24, fontSize: 12 }}
+                  onClick={() => stepMonth(-1)}
+                  aria-label="Mes anterior"
+                >
+                  <Icon name="chevL" size={12} />
+                </button>
+                <span className="ch-l">
+                  Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+                </span>
+                <button
+                  type="button"
+                  className="avatar"
+                  style={{ width: 24, height: 24, fontSize: 12, opacity: browsingPast ? 1 : 0.35, pointerEvents: browsingPast ? 'auto' : 'none' }}
+                  onClick={() => stepMonth(1)}
+                  disabled={!browsingPast}
+                  aria-label="Mes siguiente"
+                >
+                  <Icon name="chevR" size={12} />
+                </button>
+              </div>
               <span className="ch-n">
                 {monthSales.length} {monthSales.length === 1 ? 'venta' : 'ventas'}
               </span>
             </div>
             <div className="ch-amt">{uyu(monthTotal)}</div>
+            <div
+              className="ch-profit"
+              style={{ color: monthProfit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+            >
+              <span className="ch-profit-a">
+                {monthProfit >= 0 ? '+' : ''}{uyu(monthProfit)}
+                {profitPending && <span className="money-sec"> · provisorio</span>}
+              </span>
+            </div>
             <div className="ch-split">
               {users.map((u) => (
                 <div key={u.id} className="chs">
@@ -195,13 +255,17 @@ function HomeContent({
             ))}
           </div>
 
-          <div className="seg" style={{ marginTop: 9 }}>
+          <div
+            className="seg"
+            style={{ marginTop: 9, opacity: browsingPast ? 0.4 : 1, pointerEvents: browsingPast ? 'none' : 'auto' }}
+          >
             {rangeOpts.map((o) => (
               <button
                 key={o.value}
                 type="button"
-                className={range === o.value ? 'is-active' : ''}
+                className={!browsingPast && range === o.value ? 'is-active' : ''}
                 onClick={() => pickRange(o.value)}
+                disabled={browsingPast}
               >
                 {o.label}
               </button>
@@ -213,7 +277,10 @@ function HomeContent({
               <span>
                 {remaining > 0
                   ? `Mostrando ${shown.length} de ${list.length}`
-                  : `${list.length} ${list.length === 1 ? 'venta' : 'ventas'}${personFilter !== 'all'
+                  : `${list.length} ${list.length === 1 ? 'venta' : 'ventas'}${browsingPast
+                    ? ` · ${sel.label}${sel.showYear ? ` ${sel.year}` : ''}`
+                    : ''
+                  }${personFilter !== 'all'
                     ? ` · ${users.find((u) => u.id === personFilter)?.alias ?? ''}`
                     : ''
                   }`}
@@ -256,10 +323,18 @@ function HomeContent({
                         <ColorDot color={s.color} />
                         {s.version ? ` ${s.version}` : ''}
                         {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
+                        {s.size ? ` · Talle ${s.size.toUpperCase()}` : ''}
                       </div>
                     </div>
                     <div className="sale-end">
                       <div className="sale-price">{uyu(s.price)}</div>
+                      <div
+                        className="sale-profit"
+                        style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+                      >
+                        {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                        {s.profitPending && <span className="money-sec"> · provisorio</span>}
+                      </div>
                       <div className="sale-by">
                         {s.collectedByAlias && <Avatar name={s.collectedByAlias} size={18} />}
                         <span>{fmtDate(s.date)}</span>

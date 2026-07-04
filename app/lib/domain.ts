@@ -21,6 +21,21 @@ const KID_SIZE_LABELS: Record<string, string> = {
 export const sizesForType = (type: string | null | undefined): readonly string[] =>
   type === 'kidkit' ? KID_SIZES : SIZES;
 
+// Canonical incremental order across all size sets. KID_SIZES and SIZES are
+// disjoint, so a single combined index gives a total order. Sizes are stored
+// lowercase in the DB, so the order set and lookups are lowercased to match
+// (SIZES is declared uppercase for display). Unknown sizes sort last
+// (alphabetically among themselves) for stability.
+const SIZE_ORDER: string[] = [...KID_SIZES, ...SIZES].map((s) => s.toLowerCase());
+export const compareSizes = (a: string, b: string): number => {
+  const ia = SIZE_ORDER.indexOf(a.toLowerCase());
+  const ib = SIZE_ORDER.indexOf(b.toLowerCase());
+  if (ia === -1 && ib === -1) return a.localeCompare(b);
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+};
+
 // Public-facing label: kid numeric sizes -> age range, everything else unchanged.
 export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 
@@ -187,9 +202,11 @@ export type ModelDetail = ModelWithStats & {
 // Equal-split shipping allocation: each item in a shipment carries the same
 // share of that shipment's UYU shipping cost. The single place this rule
 // lives — swap the body if allocation ever becomes weight- or cost-based.
-export function shippingShareUyu(shipment: { shippingPriceUyu: number | null; itemIds: string[] }): number {
-  if (!shipment.shippingPriceUyu || shipment.itemIds.length === 0) return 0;
-  return shipment.shippingPriceUyu / shipment.itemIds.length;
+// Takes the raw price and item count so every caller can reach it regardless
+// of how it holds the shipment (an itemIds array or a relation _count).
+export function shippingShareUyu(shippingPriceUyu: number | null, itemCount: number): number {
+  if (!shippingPriceUyu || itemCount === 0) return 0;
+  return shippingPriceUyu / itemCount;
 }
 
 // ---- Supplier-payment reconciliation (see CONTEXT.md "Reconciliation") ----

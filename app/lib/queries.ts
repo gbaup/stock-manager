@@ -19,7 +19,10 @@ export type HomeSaleItem = {
   version: string | null;
   number: string | null;
   player: string | null;
+  size: string;
   price: number;
+  profit: number;
+  profitPending: boolean;
   date: string;
   collectedByUserId: string | null;
   collectedByAlias: string | null;
@@ -273,7 +276,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
     if (batchData.shipments.length > 0) {
       for (const sh of batchData.shipments) {
-        const share = shippingShareUyu(sh);
+        const share = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
         for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
       }
     }
@@ -449,6 +452,14 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       item: {
         select: {
           catalogProductId: true,
+          size: true,
+          basePriceUyu: true,
+          shipment: {
+            select: {
+              shippingPriceUyu: true,
+              _count: { select: { items: true } },
+            },
+          },
           product: {
             select: {
               color: true,
@@ -463,19 +474,39 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
     },
     orderBy: { date: 'desc' },
   });
-  return sales.map((s) => ({
-    id: s.id,
-    catalogProductId: s.item.catalogProductId,
-    teamName: s.item.product.team.name,
-    color: s.item.product.color,
-    version: s.item.product.version,
-    number: s.item.product.number !== null ? String(s.item.product.number) : null,
-    player: s.item.product.player,
-    price: Number(s.price),
-    date: toISODate(s.date)!,
-    collectedByUserId: s.collectedByUserId,
-    collectedByAlias: s.collectedByUser?.alias ?? null,
-  }));
+  return sales.map((s) => {
+    // Landed cost of the sold unit: base price + equal-split shipping share
+    // (0 while in transit). Goes through the same shippingShareUyu seam as
+    // getModelDetail, so profit matches the model-detail timeline exactly.
+    // Single source of truth for "in transit": the shipment relation. Cost is
+    // provisional whenever the item has no shipment yet OR its shipment has no
+    // shipping price entered — both leave the shipping share out of the number.
+    const shipment = s.item.shipment;
+    const share = shipment
+      ? shippingShareUyu(
+          shipment.shippingPriceUyu === null ? null : Number(shipment.shippingPriceUyu),
+          shipment._count.items,
+        )
+      : 0;
+    const cost = Number(s.item.basePriceUyu) + share;
+    const profitPending = shipment === null || shipment.shippingPriceUyu === null;
+    return {
+      id: s.id,
+      catalogProductId: s.item.catalogProductId,
+      teamName: s.item.product.team.name,
+      color: s.item.product.color,
+      version: s.item.product.version,
+      number: s.item.product.number !== null ? String(s.item.product.number) : null,
+      player: s.item.product.player,
+      size: s.item.size,
+      price: Number(s.price),
+      profit: Number(s.price) - cost,
+      profitPending,
+      date: toISODate(s.date)!,
+      collectedByUserId: s.collectedByUserId,
+      collectedByAlias: s.collectedByUser?.alias ?? null,
+    };
+  });
 }
 
 export async function getTransitCount(): Promise<number> {
