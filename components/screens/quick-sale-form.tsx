@@ -11,7 +11,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { SizePicker } from '@/components/ui/size-picker';
 import { uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
-import { METHODS, matchesModel } from '@/app/lib/domain';
+import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
 
@@ -57,6 +57,19 @@ export function QuickSaleForm({
     .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
     .slice(0, 7);
 
+  function resetForm() {
+    setSelectedModelId('');
+    setQuery('');
+    setSize('');
+    setPrice('');
+    setQuantity('1');
+    setDate(new Date().toISOString().split('T')[0]);
+    setMethod('');
+    setDescription('');
+    setCollectedByUserId(sessionUserId);
+    setSaveError(null);
+  }
+
   function handleSave() {
     if (!canSave || !model) return;
     setSaveError(null);
@@ -71,6 +84,7 @@ export function QuickSaleForm({
           description: description || undefined,
           collectedByUserId,
         });
+        resetForm();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al registrar la venta');
       }
@@ -141,8 +155,8 @@ export function QuickSaleForm({
                       <div className="qs-r-main">
                         <div className="qs-r-team capitalize">{m.team}</div>
                         <div className="qs-r-meta">
-                          {m.season} · {m.version} · {m.color}
-                          {m.player ? ` · ${m.player}` : ''}
+                          {m.season} · {m.version} · {fmtType(m.type)}
+                          {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
                         </div>
                       </div>
                       <div

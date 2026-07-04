@@ -3707,6 +3707,24 @@ body {
   justify-content: space-between;
 }
 
+.ch-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ch-nav button.avatar {
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ch-nav button.avatar:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .ch-l {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -3730,6 +3748,29 @@ body {
   line-height: 1.05;
   margin-top: 10px;
   color: var(--accent);
+}
+
+.ch-profit {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.ch-profit-l {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.ch-profit-a {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .ch-split {
@@ -3934,6 +3975,15 @@ body {
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--accent);
+  white-space: nowrap;
+}
+
+.sale-profit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
   white-space: nowrap;
 }
 

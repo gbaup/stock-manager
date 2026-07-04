@@ -2,6 +2,7 @@ import { updateTag } from 'next/cache';
 import { prisma } from './prisma';
 import { money } from './money';
 import { CACHE_TAGS } from './cache-tags';
+import { compareSizes } from './domain';
 
 // Narrow write interface: only the inventoryItem delegate is needed.
 // Both the top-level PrismaClient and a TransactionClient satisfy this.
@@ -84,7 +85,9 @@ export async function availableSizes(modelId: string): Promise<Array<{ size: str
   });
   const counts = new Map<string, number>();
   for (const i of items) counts.set(i.size, (counts.get(i.size) ?? 0) + 1);
-  return [...counts].map(([size, count]) => ({ size, count }));
+  return [...counts]
+    .map(([size, count]) => ({ size, count }))
+    .sort((a, b) => compareSizes(a.size, b.size));
 }
 
 // Batched version of availableSizes for listing pages — one query, one pass.
@@ -108,7 +111,9 @@ export async function availableSizesByModel(
   }
   const result = new Map<string, Array<{ size: string; count: number }>>();
   for (const [id, sizes] of byModel) {
-    result.set(id, [...sizes].map(([size, count]) => ({ size, count })));
+    result.set(id, [...sizes]
+      .map(([size, count]) => ({ size, count }))
+      .sort((a, b) => compareSizes(a.size, b.size)));
   }
   return result;
 }
