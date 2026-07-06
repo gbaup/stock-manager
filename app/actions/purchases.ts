@@ -52,9 +52,21 @@ export async function createPurchase(data: {
   // amount is given, all payments together must cover the batch's base cost —
   // the form enforces this too, but re-check here against tampered payloads.
   const payments = (data.supplierPayments ?? []).filter((p) => p.amountUsd > 0);
-  if (reconcileSupplierPayments(payments, baseCostUsd(expandedItems)).status === 'mismatch') {
+  const baseTotal = baseCostUsd(expandedItems);
+  if (reconcileSupplierPayments(payments, baseTotal).status === 'mismatch') {
     throw new Error('Los pagos al proveedor deben sumar el costo base total');
   }
+
+  // Spread card taxes proportionally into each item's base price so profit
+  // calculations reflect the true acquisition cost. The multiplier is the
+  // ratio of gross cost (base + all card fees) to base cost. Items with a
+  // higher base price bear a proportionally larger share of the tax.
+  const totalCardTax = payments.reduce((s, p) => s + p.amountUsd * ((p.cardTaxPct ?? 0) / 100), 0);
+  const grossMultiplier = baseTotal > 0 && totalCardTax > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
+  const itemsWithTax = expandedItems.map((it) => ({
+    ...it,
+    basePriceUsd: Math.round(it.basePriceUsd * grossMultiplier * 10000) / 10000,
+  }));
 
   await prisma.$transaction(async (tx) => {
     const batch = await tx.batch.create({
@@ -62,7 +74,7 @@ export async function createPurchase(data: {
         purchaseDate: new Date(data.purchaseDate),
         supplier: data.supplier?.trim().toLowerCase() || null,
         description: data.description?.trim().toLowerCase() || null,
-        quantity: expandedItems.length,
+        quantity: itemsWithTax.length,
         supplierPayments: {
           create: payments.map((p) => ({
             userId: p.userId,
@@ -74,7 +86,7 @@ export async function createPurchase(data: {
       select: { id: true },
     });
 
-    await addBatchItems(batch.id, expandedItems, data.exchangeRate, tx);
+    await addBatchItems(batch.id, itemsWithTax, data.exchangeRate, tx);
   });
 
   updateTag(CACHE_TAGS.purchases);
