@@ -9,7 +9,7 @@ export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibr
 export const VERSIONS = ['home', 'away', 'third', 'fourth', 'arquero'] as const;
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
 export const KID_SIZES = ['20', '22', '24', '26', '28'] as const;
-export const ITEM_TYPES = ['fan', 'player', 'retro', 'kidkit', 'short', 'nba'] as const;
+export const ITEM_TYPES = ['fan', 'player', 'retro', 'kidkit', 'short', 'nba', 'jacket'] as const;
 export const SLEEVES = ['corta', 'larga'] as const;
 
 const KID_SIZE_LABELS: Record<string, string> = {
@@ -44,7 +44,7 @@ export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
-  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA',
+  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA', jacket: 'Jacket',
 };
 export const fmtType = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS[t] ?? cap(t) : '');
 export const fmtVersion = (v: string | null | undefined): string => (v ? cap(v) : '');

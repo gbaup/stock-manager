@@ -104,35 +104,37 @@ export function ModelForm({
               )}
             />
           </Field>
-          <div className="field-row">
-            <Field label="Temporada" error={errors.season?.message}>
-              <Controller
-                name="season"
-                control={control}
-                render={({ field }) => (
-                  <TextInput value={field.value} onChange={field.onChange} placeholder="2025/26" mono />
-                )}
-              />
-            </Field>
-            <Field label="Versión">
-              <Controller
-                name="version"
-                control={control}
-                render={({ field }) => (
-                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} renderLabel={fmtVersion} />
-                )}
-              />
-            </Field>
-          </div>
-          <Field label="Tipo">
+          <Field label="Temporada" error={errors.season?.message}>
             <Controller
-              name="type"
+              name="season"
               control={control}
               render={({ field }) => (
-                <Segmented options={ITEM_TYPES} value={field.value} onChange={field.onChange} renderLabel={fmtType} full />
+                <TextInput value={field.value} onChange={field.onChange} placeholder="2025/26" mono />
               )}
             />
           </Field>
+          <div className="field-row">
+            <Field label="Tipo">
+              <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                  <SelectInput value={field.value} onChange={field.onChange} options={ITEM_TYPES} renderLabel={fmtType} />
+                )}
+              />
+            </Field>
+            {type !== 'nba' && type !== 'jacket' && (
+              <Field label="Versión">
+                <Controller
+                  name="version"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} renderLabel={fmtVersion} />
+                  )}
+                />
+              </Field>
+            )}
+          </div>
           {type !== 'short' && (
             <Field label="Manga">
               <Controller
