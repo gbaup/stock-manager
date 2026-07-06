@@ -114,15 +114,17 @@ export function ModelForm({
             />
           </Field>
           <div className="field-row">
-            <Field label="Tipo">
-              <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                  <SelectInput value={field.value} onChange={field.onChange} options={ITEM_TYPES} renderLabel={fmtType} />
-                )}
-              />
-            </Field>
+            <div style={{ flex: '0 0 calc(50% - 5.5px)', minWidth: 0 }}>
+              <Field label="Tipo">
+                <Controller
+                  name="type"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectInput value={field.value} onChange={field.onChange} options={ITEM_TYPES} renderLabel={fmtType} />
+                  )}
+                />
+              </Field>
+            </div>
             {type !== 'nba' && type !== 'jacket' && (
               <Field label="Versión">
                 <Controller
