@@ -152,6 +152,7 @@ export const purchaseSchema = z
     supplier: z.string().optional(),
     description: z.string().optional(),
     supplierPayments: z.record(z.string().uuid(), numericOptional).optional(),
+    supplierCardTaxPcts: z.record(z.string().uuid(), numericOptional).optional(),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   });
 

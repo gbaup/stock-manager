@@ -17,6 +17,7 @@ const createPurchaseSchema = z.object({
   supplierPayments: z.array(z.object({
     userId: z.string().uuid(),
     amountUsd: z.number().finite().positive(),
+    cardTaxPct: z.number().finite().min(0).optional(),
   })).optional(),
   exchangeRate: z.number().finite().positive(),
   items: z.array(z.object({
@@ -33,7 +34,7 @@ export async function createPurchase(data: {
   purchaseDate: string;
   supplier?: string;
   description?: string;
-  supplierPayments?: { userId: string; amountUsd: number }[];
+  supplierPayments?: { userId: string; amountUsd: number; cardTaxPct?: number }[];
   exchangeRate: number;
   items: PurchaseItem[];
 }) {
@@ -63,7 +64,11 @@ export async function createPurchase(data: {
         description: data.description?.trim().toLowerCase() || null,
         quantity: expandedItems.length,
         supplierPayments: {
-          create: payments.map((p) => ({ userId: p.userId, amountUsd: p.amountUsd })),
+          create: payments.map((p) => ({
+            userId: p.userId,
+            amountUsd: p.amountUsd,
+            cardTaxPct: p.cardTaxPct != null && p.cardTaxPct > 0 ? p.cardTaxPct : null,
+          })),
         },
       },
       select: { id: true },

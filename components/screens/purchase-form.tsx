@@ -56,6 +56,7 @@ export function PurchaseForm({
       supplier: '',
       description: '',
       supplierPayments: {},
+      supplierCardTaxPcts: {},
       items: presetModelId
         ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }]
         : [],
@@ -101,8 +102,16 @@ export function PurchaseForm({
   const needsSupplierPayer = totalUsd > 0;
 
   const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
+  const watchedCardTaxPcts = useWatch({ control, name: 'supplierCardTaxPcts' }) ?? {};
   const { paidSum, status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
   const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
+
+  const grossPayments = toSupplierPaymentArray(watchedPayments).map((p) => {
+    const pct = parseFloat(watchedCardTaxPcts[p.userId] ?? '') || 0;
+    return { ...p, grossUsd: Math.round(p.amountUsd * (1 + pct / 100) * 100) / 100 };
+  });
+  const totalGrossUsd = grossPayments.reduce((s, p) => s + p.grossUsd, 0);
+  const hasTax = grossPayments.some((p) => p.grossUsd > p.amountUsd);
 
   async function handleNextStep() {
     const valid = await trigger(['purchaseDate']);
@@ -111,11 +120,15 @@ export function PurchaseForm({
 
   function doSubmit(data: PurchaseFormValues) {
     startTransition(async () => {
+      const cardTaxPcts = data.supplierCardTaxPcts ?? {};
       await createPurchase({
         purchaseDate: data.purchaseDate,
         supplier: data.supplier || undefined,
         description: data.description || undefined,
-        supplierPayments: toSupplierPaymentArray(data.supplierPayments),
+        supplierPayments: toSupplierPaymentArray(data.supplierPayments).map((p) => ({
+          ...p,
+          cardTaxPct: parseFloat(cardTaxPcts[p.userId] ?? '') || undefined,
+        })),
         exchangeRate: rate.value,
         items: data.items
           .filter((it) => it.modelId)
@@ -323,19 +336,37 @@ export function PurchaseForm({
                     Pago al proveedor · {usd(totalUsd)}
                   </div>
                   {users.map((u) => (
-                    <Field key={u.id} label={u.alias} optional>
-                      <Controller
-                        name={`supplierPayments.${u.id}` as const}
-                        control={control}
-                        render={({ field: f }) => (
-                          <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                        )}
-                      />
-                    </Field>
+                    <div key={u.id} className="field-row" style={{ alignItems: 'flex-end', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <Field label={u.alias} optional>
+                          <Controller
+                            name={`supplierPayments.${u.id}` as const}
+                            control={control}
+                            render={({ field: f }) => (
+                              <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                            )}
+                          />
+                        </Field>
+                      </div>
+                      <div style={{ width: 112 }}>
+                        <Field label="Recargo tarjeta" optional>
+                          <Controller
+                            name={`supplierCardTaxPcts.${u.id}` as const}
+                            control={control}
+                            render={({ field: f }) => (
+                              <MoneyInput prefix="%" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                            )}
+                          />
+                        </Field>
+                      </div>
+                    </div>
                   ))}
                   <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
                     {paidSum > 0
-                      ? `Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`
+                      ? <>
+                          {`Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`}
+                          {hasTax && !payMismatch && ` · Costo real ${usd(totalGrossUsd)}`}
+                        </>
                       : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
                   </div>
                 </div>

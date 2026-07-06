@@ -21,7 +21,7 @@ export type ProjectableBatch = {
   arrivalDate: string | null;
   supplier: string | null;
   quantity: number;
-  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number }>;
+  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number; cardTaxPct: number | null }>;
   shipments: ProjectableShipment[];
 };
 
@@ -41,16 +41,19 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
   const itemsLabel = `${batch.quantity} ${batch.quantity === 1 ? 'item' : 'items'}`;
 
   for (const p of paying) {
-    const pct = Math.round((p.amountUsd / totalUsd) * 100);
+    const splitPct = Math.round((p.amountUsd / totalUsd) * 100);
+    const taxMultiplier = 1 + (p.cardTaxPct ?? 0) / 100;
+    const grossUsd = Math.round(p.amountUsd * taxMultiplier * 100) / 100;
+    const taxSuffix = p.cardTaxPct && p.cardTaxPct > 0 ? ` +${p.cardTaxPct}%` : '';
     out.push({
       id: `pago-prov-${batch.id}-${p.userId}`,
       kind: 'pago-prov',
       date: batch.purchaseDate,
       person: p.alias,
       title: batch.supplier ?? 'Proveedor',
-      sub: paying.length > 1 ? `${itemsLabel} · ${pct}%` : itemsLabel,
+      sub: paying.length > 1 ? `${itemsLabel} · ${splitPct}%${taxSuffix}` : `${itemsLabel}${taxSuffix}`,
       uyu: 0,
-      usd: -p.amountUsd,
+      usd: -grossUsd,
     });
   }
 
