@@ -14,6 +14,9 @@ function parseNumber(s: string | undefined): number | null {
   return isNaN(parsed) ? null : parsed;
 }
 
+const TYPES_WITHOUT_SLEEVE = new Set(['nba', 'jacket', 'short']);
+const TYPES_WITHOUT_VERSION = new Set(['nba', 'jacket']);
+
 export async function createModel(
   data: ModelFormValues,
   opts?: { fromPurchase?: boolean },
@@ -29,9 +32,9 @@ export async function createModel(
       data: {
         teamId,
         season: n(season),
-        version: n(version || 'home'),
+        version: TYPES_WITHOUT_VERSION.has(n(type || 'fan')) ? null : n(version || 'home'),
         type: n(type || 'fan'),
-        sleeve: n(sleeve || 'corta'),
+        sleeve: TYPES_WITHOUT_SLEEVE.has(n(type || 'fan')) ? null : n(sleeve || 'corta'),
         color: n(color || 'blanco'),
         number: parseNumber(number),
         player: player ? n(player) : null,
@@ -63,9 +66,9 @@ export async function updateModel(id: string, data: ModelFormValues): Promise<{ 
       data: {
         teamId,
         season: n(season),
-        version: n(version || 'home'),
+        version: TYPES_WITHOUT_VERSION.has(n(type || 'fan')) ? null : n(version || 'home'),
         type: n(type || 'fan'),
-        sleeve: n(sleeve || 'corta'),
+        sleeve: TYPES_WITHOUT_SLEEVE.has(n(type || 'fan')) ? null : n(sleeve || 'corta'),
         color: n(color || 'blanco'),
         number: parseNumber(number),
         player: player ? n(player) : null,

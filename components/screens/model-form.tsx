@@ -137,7 +137,7 @@ export function ModelForm({
               </Field>
             )}
           </div>
-          {type !== 'short' && (
+          {type !== 'short' && type !== 'nba' && type !== 'jacket' && (
             <Field label="Manga">
               <Controller
                 name="sleeve"
