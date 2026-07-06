@@ -8,7 +8,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { VERSIONS, ITEM_TYPES, SLEEVES, fmtType, fmtVersion, fmtSleeve } from '@/app/lib/domain';
+import { VERSIONS, ITEM_TYPES, SLEEVES, TYPES_WITHOUT_VERSION, TYPES_WITHOUT_SLEEVE, fmtType, fmtVersion, fmtSleeve } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
@@ -125,7 +125,7 @@ export function ModelForm({
                 />
               </Field>
             </div>
-            {type !== 'nba' && type !== 'jacket' && (
+            {!TYPES_WITHOUT_VERSION.has(type) && (
               <Field label="Versión">
                 <Controller
                   name="version"
@@ -137,7 +137,7 @@ export function ModelForm({
               </Field>
             )}
           </div>
-          {type !== 'short' && type !== 'nba' && type !== 'jacket' && (
+          {!TYPES_WITHOUT_SLEEVE.has(type) && (
             <Field label="Manga">
               <Controller
                 name="sleeve"

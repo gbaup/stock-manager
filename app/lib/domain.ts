@@ -12,6 +12,11 @@ export const KID_SIZES = ['20', '22', '24', '26', '28'] as const;
 export const ITEM_TYPES = ['fan', 'player', 'retro', 'kidkit', 'short', 'nba', 'jacket'] as const;
 export const SLEEVES = ['corta', 'larga'] as const;
 
+// Types that carry no version (e.g. jackets, NBA jerseys have no home/away).
+export const TYPES_WITHOUT_VERSION = new Set(['nba', 'jacket']);
+// Types that carry no sleeve (shorts and the above have no sleeve distinction).
+export const TYPES_WITHOUT_SLEEVE = new Set(['nba', 'jacket', 'short']);
+
 const KID_SIZE_LABELS: Record<string, string> = {
   '20': '5-6 años', '22': '7-8 años', '24': '8-10 años', '26': '10-12 años',
   '28': '12-13 años',

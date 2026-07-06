@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TYPES_WITHOUT_VERSION, TYPES_WITHOUT_SLEEVE } from '@/app/lib/domain';
 
 export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
@@ -105,26 +106,36 @@ export const ajusteSchema = z
 
 export type AjusteFormValues = z.infer<typeof ajusteSchema>;
 
-export const modelSchema = z.object({
-  teamId: z.string().min(1, 'Requerido'),
-  season: z
-    .string()
-    .min(1, 'Requerido')
-    .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
-  version: z.string(),
-  type: z.string(),
-  sleeve: z.string(),
-  color: z.string(),
-  number: z.string().optional(),
-  player: z.string().optional(),
-  description: z.string().optional(),
-  photos: z.array(z.object({
-    url: z.string().min(1),
-    publicId: z.string(),
-  })),
-});
+export const modelSchema = z
+  .object({
+    teamId: z.string().min(1, 'Requerido'),
+    season: z
+      .string()
+      .min(1, 'Requerido')
+      .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
+    version: z.string(),
+    type: z.string(),
+    sleeve: z.string(),
+    color: z.string(),
+    number: z.string().optional(),
+    player: z.string().optional(),
+    description: z.string().optional(),
+    photos: z.array(z.object({
+      url: z.string().min(1),
+      publicId: z.string(),
+    })),
+  })
+  .transform((data) => {
+    const type = (data.type || 'fan').trim().toLowerCase();
+    return {
+      ...data,
+      version: TYPES_WITHOUT_VERSION.has(type) ? null : data.version,
+      sleeve: TYPES_WITHOUT_SLEEVE.has(type) ? null : data.sleeve,
+    };
+  });
 
-export type ModelFormValues = z.infer<typeof modelSchema>;
+// Input type (form values, before the transform) so form components work with plain strings.
+export type ModelFormValues = z.input<typeof modelSchema>;
 
 const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
