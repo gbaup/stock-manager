@@ -109,5 +109,5 @@ export async function createSale(
     }
   }
 
-  redirect(`/inventory/${modelId}`);
+  redirect('/');
 }
