@@ -22,6 +22,7 @@ export function ModelDetailScreen({
   const router = useRouter();
   const cover = coverOf(model);
   const [filter, setFilter] = useState<'Ventas' | 'Todos'>('Ventas');
+  const [showSizes, setShowSizes] = useState(false);
 
   const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
 
@@ -91,18 +92,26 @@ export function ModelDetailScreen({
 
           {displaySizes.length > 0 && (
             <>
-              <div className="section-label">Stock por talle</div>
-              <div className="stat-row" style={{ flexWrap: 'wrap' }}>
-                {displaySizes.map((size) => {
-                  const count = sizeStock[size] ?? 0;
-                  return (
-                    <div key={size} className={`stat${count > 0 ? ' ok' : ''}`}>
-                      <div className="v" style={{ fontSize: '20px' }}>{count}</div>
-                      <div className="l">{size.toUpperCase()}</div>
-                    </div>
-                  );
-                })}
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                onClick={() => setShowSizes((v) => !v)}
+              >
+                <div className="section-label">Stock por talle</div>
+                <Icon name={showSizes ? 'chevU' : 'chevD'} size={14} style={{ color: 'var(--text-faint)', marginTop: 13 }} />
               </div>
+              {showSizes && (
+                <div className="stat-row" style={{ flexWrap: 'wrap' }}>
+                  {displaySizes.map((size) => {
+                    const count = sizeStock[size] ?? 0;
+                    return (
+                      <div key={size} className={`stat${count > 0 ? ' ok' : ''}`}>
+                        <div className="v" style={{ fontSize: '20px' }}>{count}</div>
+                        <div className="l">{size.toUpperCase()}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
 

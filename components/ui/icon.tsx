@@ -1,6 +1,6 @@
 import {
   Search, Plus, Package, ShoppingCart, Tag, Truck, Eye,
-  ChevronRight, ChevronLeft, Check, Pencil, X, Calendar,
+  ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Check, Pencil, X, Calendar,
   Scale, TrendingUp, Filter, Shirt, Wallet, Receipt, ArrowLeftRight,
   Camera, Image, Trash2, LayoutGrid, List, Loader2, Home, User,
 } from 'lucide-react';
@@ -15,6 +15,8 @@ const ICONS = {
   eye:      Eye,
   chevR:    ChevronRight,
   chevL:    ChevronLeft,
+  chevD:    ChevronDown,
+  chevU:    ChevronUp,
   check:    Check,
   edit:     Pencil,
   x:        X,
