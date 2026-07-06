@@ -9,7 +9,7 @@ import { Empty } from '@/components/ui/empty';
 import { Icon } from '@/components/ui/icon';
 import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd } from '@/app/lib/format';
-import { fmtType } from '@/app/lib/domain';
+import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
 export function ModelDetailScreen({
@@ -24,6 +24,16 @@ export function ModelDetailScreen({
   const [filter, setFilter] = useState<'Ventas' | 'Todos'>('Ventas');
 
   const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
+
+  const sizeStock = sizeStockOf(model);
+  const isKidkit = model.type === 'kidkit';
+  const displaySizes: string[] = isKidkit
+    ? model.availableBySize.map((s) => s.size).sort(compareSizes)
+    : (() => {
+      const core = ['s', 'm', 'l', 'xl'];
+      const extended = ['xs', '2xl', '3xl'].filter((s) => (sizeStock[s] ?? 0) > 0);
+      return [...core, ...extended].sort(compareSizes);
+    })();
 
   return (
     <div className="screen">
@@ -79,7 +89,34 @@ export function ModelDetailScreen({
             <div className="stat"><div className="v">{model.sold}</div><div className="l">Vendidas</div></div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, fontSize: 13, marginTop: 18 }}>
+          {displaySizes.length > 0 && (
+            <>
+              <div className="section-label">Stock por talle</div>
+              <div className="stat-row" style={{ flexWrap: 'wrap' }}>
+                {displaySizes.map((size) => {
+                  const count = sizeStock[size] ?? 0;
+                  return (
+                    <div key={size} className={`stat${count > 0 ? ' ok' : ''}`}>
+                      <div className="v" style={{ fontSize: '20px' }}>{count}</div>
+                      <div className="l">{size.toUpperCase()}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          <div className="btn-row" style={{ marginTop: 18 }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => router.push(`/inventory/${model.id}/sale`)}
+              disabled={model.stock === 0}
+            >
+              <Icon name="tag" size={18} />Registrar venta
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, fontSize: 13, marginTop: 18, marginBottom: 10 }}>
             {model.revenue > 0 && (
               <div style={{ color: 'var(--text-muted)' }}>
                 Ingresos:{' '}
@@ -96,16 +133,6 @@ export function ModelDetailScreen({
                 {model.profitPending && <span className="money-sec"> · provisorio</span>}
               </div>
             )}
-          </div>
-
-          <div className="btn-row" style={{ marginTop: 18 }}>
-            <button
-              className="btn btn-primary"
-              onClick={() => router.push(`/inventory/${model.id}/sale`)}
-              disabled={model.stock === 0}
-            >
-              <Icon name="tag" size={18} />Venta
-            </button>
           </div>
 
           <div className="section-head">
@@ -151,9 +178,9 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
           </div>
         </div>
         <div className="event-amt">
-          +{uyu(s.price)}
+          {uyu(s.price)}
           <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
-            ganancia {uyu(s.profit)}
+            +{uyu(s.profit)}
           </span>
         </div>
       </div>
