@@ -33,6 +33,7 @@ export function ModelForm({
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<ModelFormValues>({
     resolver: zodResolver(modelFormSchema),
@@ -56,10 +57,13 @@ export function ModelForm({
 
   function onSubmit(data: ModelFormValues) {
     startTransition(async () => {
-      if (initial?.id) {
-        await updateModel(initial.id, data);
-      } else {
-        await createModel(data, { fromPurchase });
+      const result = initial?.id
+        ? await updateModel(initial.id, data)
+        : await createModel(data, { fromPurchase });
+      if (result?.errors) {
+        for (const [field, messages] of Object.entries(result.errors)) {
+          setError(field as keyof ModelFormValues, { message: (messages as string[])[0] });
+        }
       }
     });
   }
