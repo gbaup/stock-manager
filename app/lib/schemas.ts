@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TYPES_WITHOUT_VERSION, TYPES_WITHOUT_SLEEVE } from '@/app/lib/domain';
 
 export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
@@ -13,7 +14,7 @@ const saleFields = {
   date: z.string().min(1, 'Requerido'),
   method: z.string().optional(),
   description: z.string().optional(),
-  collectedByUserId: z.string().uuid('¿Quién cobró?'),
+  collectedByUserId: z.string().uuid().optional(),
 };
 
 export const saleSchema = z.object(saleFields);
@@ -105,14 +106,15 @@ export const ajusteSchema = z
 
 export type AjusteFormValues = z.infer<typeof ajusteSchema>;
 
-export const modelSchema = z.object({
+// Validation-only schema: used by the form resolver (no transform, so RHF's TFieldValues matches).
+export const modelFormSchema = z.object({
   teamId: z.string().min(1, 'Requerido'),
   season: z
     .string()
     .min(1, 'Requerido')
     .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
   version: z.string(),
-  type: z.string(),
+  type: z.string().min(1, 'Requerido'),
   sleeve: z.string(),
   color: z.string(),
   number: z.string().optional(),
@@ -124,7 +126,18 @@ export const modelSchema = z.object({
   })),
 });
 
-export type ModelFormValues = z.infer<typeof modelSchema>;
+export type ModelFormValues = z.infer<typeof modelFormSchema>;
+
+// Action schema: adds the type→field nullification transform on top.
+// Server actions parse with this to get version/sleeve already nullified.
+export const modelSchema = modelFormSchema.transform((data) => {
+  const type = (data.type || 'fan').trim().toLowerCase();
+  return {
+    ...data,
+    version: TYPES_WITHOUT_VERSION.has(type) ? null : data.version,
+    sleeve: TYPES_WITHOUT_SLEEVE.has(type) ? null : data.sleeve,
+  };
+});
 
 const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),

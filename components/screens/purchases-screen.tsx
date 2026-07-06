@@ -6,7 +6,7 @@ import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
-import { Icon } from '@/components/ui/icon';
+import { Plus, Check, ChevronRight } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import type { BatchSummary, ShipmentRecord } from '@/app/lib/domain';
 
@@ -67,7 +67,7 @@ export function PurchasesScreen({
         </div>
       </div>
       <button className="fab" onClick={() => router.push('/purchases/new')} aria-label="Registrar compra">
-        <Icon name="plus" size={26} strokeWidth={2.2} />
+        <Plus size={26} strokeWidth={2.2} />
       </button>
       <BottomNav transitCount={transitCount} />
     </div>
@@ -131,7 +131,7 @@ function PurchaseCard({
         </div>
         {!isArrived ? (
           <button className="btn btn-primary btn-sm" onClick={() => onArrive(batch.id)}>
-            <Icon name="check" size={16} />{arriveLabel}
+            <Check size={16} strokeWidth={1.8} />{arriveLabel}
           </button>
         ) : (
           <div className="pc-stat" style={{ flex: 0, textAlign: 'right' }}>
@@ -144,11 +144,7 @@ function PurchaseCard({
       {batch.shipments.length > 0 && (
         <>
           <button type="button" className="pc-ships-toggle" onClick={() => setOpen((o) => !o)}>
-            <Icon
-              name="chevR"
-              size={14}
-              style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}
-            />
+            <ChevronRight size={14} strokeWidth={1.8} style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
             {batch.shipments.length} {batch.shipments.length === 1 ? 'envío' : 'envíos'}
           </button>
           {open && (

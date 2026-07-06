@@ -29,9 +29,9 @@ export async function createModel(
       data: {
         teamId,
         season: n(season),
-        version: n(version || 'home'),
+        version: version ? n(version) : null,
         type: n(type || 'fan'),
-        sleeve: n(sleeve || 'corta'),
+        sleeve: sleeve ? n(sleeve) : null,
         color: n(color || 'blanco'),
         number: parseNumber(number),
         player: player ? n(player) : null,
@@ -63,9 +63,9 @@ export async function updateModel(id: string, data: ModelFormValues): Promise<{ 
       data: {
         teamId,
         season: n(season),
-        version: n(version || 'home'),
+        version: version ? n(version) : null,
         type: n(type || 'fan'),
-        sleeve: n(sleeve || 'corta'),
+        sleeve: sleeve ? n(sleeve) : null,
         color: n(color || 'blanco'),
         number: parseNumber(number),
         player: player ? n(player) : null,

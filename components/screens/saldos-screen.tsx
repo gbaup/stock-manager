@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
-import { Icon } from '@/components/ui/icon';
+import { Plus, ArrowLeftRight, Check, ChevronRight, Tag as TagIcon, Package, Truck, Receipt } from 'lucide-react';
+import type { ComponentType } from 'react';
 import { Segmented } from '@/components/ui/segmented';
 import { uyu, usd, fmtDate, personInitial } from '@/app/lib/format';
 import type { UserSummary } from '@/app/lib/domain';
@@ -111,7 +112,7 @@ export function SaldosScreen({
       </div>
 
       <button className="fab" onClick={() => router.push('/saldos/expense/new')} aria-label="Agregar gasto">
-        <Icon name="plus" size={26} strokeWidth={2.2} />
+        <Plus size={26} strokeWidth={2.2} />
       </button>
       <BottomNav transitCount={transitCount} />
     </div>
@@ -213,12 +214,12 @@ function SettleHeader({
 
       <div className="settle">
         <div className="settle-eyebrow">
-          <Icon name="swap" size={14} />
+          <ArrowLeftRight size={14} strokeWidth={1.8} />
           Para emparejar la caja
         </div>
         {transfers.length === 0 ? (
           <div className="settle-eq">
-            <Icon name="check" size={16} />
+            <Check size={16} strokeWidth={1.8} />
             Están a la par
           </div>
         ) : (
@@ -227,7 +228,7 @@ function SettleHeader({
               <div key={i} className="settle-row">
                 <div className="settle-flow">
                   <span>{t.from}</span>
-                  <Icon name="chevR" size={16} />
+                  <ChevronRight size={16} strokeWidth={1.8} />
                   <span>{t.to}</span>
                 </div>
                 <span className="settle-amt">{t.currency === 'USD' ? usd(t.amount) : uyu(t.amount)}</span>
@@ -263,12 +264,12 @@ function ConvActionButton() {
   const router = useRouter();
   return (
     <button className="conv-action" onClick={() => router.push('/saldos/cambio/new')}>
-      <span className="conv-ico"><Icon name="swap" size={18} strokeWidth={2} /></span>
+      <span className="conv-ico"><ArrowLeftRight size={18} strokeWidth={2} /></span>
       <span className="conv-tx">
         <span className="conv-t">Cambiar monedas</span>
         <span className="conv-s">Entre socios y/o de pesos a dólares, a un TC a mano</span>
       </span>
-      <Icon name="chevR" size={18} strokeWidth={1.8} />
+      <ChevronRight size={18} strokeWidth={1.8} />
     </button>
   );
 }
@@ -366,17 +367,17 @@ const MOV_ICO_CLASS: Record<string, string> = {
   cambio: 'cambio',
 };
 
-const MOV_ICON: Record<string, Parameters<typeof Icon>[0]['name']> = {
-  cobro: 'tag',
-  'pago-prov': 'box',
-  'pago-envio': 'truck',
-  gasto: 'receipt',
-  cambio: 'swap',
+const MOV_ICON: Record<string, ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  cobro: TagIcon,
+  'pago-prov': Package,
+  'pago-envio': Truck,
+  gasto: Receipt,
+  cambio: ArrowLeftRight,
 };
 
 function MovCard({ m }: { m: Movement }) {
   const icoCls = MOV_ICO_CLASS[m.kind] ?? '';
-  const iconName = MOV_ICON[m.kind] ?? 'receipt';
+  const MovIcon = MOV_ICON[m.kind] ?? Receipt;
   const chips = [
     ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
     ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
@@ -385,7 +386,7 @@ function MovCard({ m }: { m: Movement }) {
   return (
     <div className="mov">
       <div className={`mov-ico ${icoCls}`}>
-        <Icon name={iconName} size={17} strokeWidth={1.8} />
+        <MovIcon size={17} strokeWidth={1.8} />
       </div>
       <div className="mov-main">
         <div className="mov-title capitalize">{m.title}</div>

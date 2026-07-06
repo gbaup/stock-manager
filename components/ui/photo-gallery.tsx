@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Icon } from './icon';
+import { Loader2, Image as ImageIcon, X, Plus } from 'lucide-react';
 import { Swatch } from './swatch';
 import { uploadFile, deleteFile } from '@/app/lib/image-client';
 import type { Photo } from '@/app/lib/photo';
@@ -53,7 +53,7 @@ export function PhotoGallery({
         <button type="button" className="pg-empty" onClick={() => inputRef.current?.click()} disabled={uploading}>
           <Swatch color={color} number={number} style={{ width: 84, height: 96, borderRadius: 'var(--r-sm)' }} />
           <span className="pg-empty-cta">
-            <Icon name={uploading ? 'loader' : 'image'} size={17} />
+            {uploading ? <Loader2 size={17} strokeWidth={1.8} /> : <ImageIcon size={17} strokeWidth={1.8} />}
             {uploading ? 'Subiendo…' : 'Agregar fotos'}
           </span>
         </button>
@@ -74,12 +74,12 @@ export function PhotoGallery({
                 onClick={(e) => { e.stopPropagation(); remove(i); }}
                 aria-label="Quitar foto"
               >
-                <Icon name="x" size={14} strokeWidth={2.6} />
+                <X size={14} strokeWidth={2.6} />
               </button>
             </div>
           ))}
           <button type="button" className="pg-add" onClick={() => inputRef.current?.click()} disabled={uploading} aria-label="Agregar más fotos">
-            {uploading ? <Icon name="loader" size={20} strokeWidth={2} /> : <Icon name="plus" size={24} strokeWidth={2} />}
+            {uploading ? <Loader2 size={20} strokeWidth={2} /> : <Plus size={24} strokeWidth={2} />}
             <span>{uploading ? 'Subiendo…' : 'Más'}</span>
           </button>
         </div>

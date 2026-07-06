@@ -1,6 +1,6 @@
 import { colorByName } from '@/app/lib/format';
 import type { Photo } from '@/app/lib/photo';
-import { Icon } from './icon';
+import { Shirt } from 'lucide-react';
 
 export function coverOf(model: { photos?: Photo[] }): string | null {
   return model.photos?.[0]?.url ?? null;
@@ -45,7 +45,7 @@ export function Swatch({
       {number ? (
         <span className="num">{number}</span>
       ) : (
-        <Icon name="shirt" size={20} strokeWidth={1.6} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />
+        <Shirt size={20} strokeWidth={1.6} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />
       )}
     </div>
   );

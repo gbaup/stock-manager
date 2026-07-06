@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Icon } from './icon';
+import { Check, Plus, ChevronRight, Search, X } from 'lucide-react';
 import { Swatch, coverOf } from './swatch';
 import { matchesModel, type ModelWithStats } from '@/app/lib/domain';
 
@@ -59,7 +59,7 @@ function PpRow({ m, selected, onPick }: { m: ModelWithStats; selected: boolean; 
         <div className="po-sub capitalize">{[m.version, m.season, m.type].filter(Boolean).join(' · ')}</div>
       </div>
       <div className="po-tags">
-        {selected && <Icon name="check" size={17} strokeWidth={2.4} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+        {selected && <Check size={17} strokeWidth={2.4} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
       </div>
     </button>
   );
@@ -101,7 +101,7 @@ function PpCreate({ query, onClick }: { query: string; onClick: () => void }) {
   return (
     <button type="button" className="pp-create" onClick={onClick}>
       <span className="cc-ico">
-        <Icon name="plus" size={16} strokeWidth={2.2} />
+        <Plus size={16} strokeWidth={2.2} />
       </span>
       <span>
         Crear modelo nuevo
@@ -174,7 +174,7 @@ export function ProductPicker({
         }}
       >
         <span className="it-label capitalize">{selected ? ppLabel(selected) : 'Elegí un producto…'}</span>
-        <Icon name="chevR" size={15} strokeWidth={2} style={{ transform: 'rotate(90deg)', flexShrink: 0, color: 'var(--text-faint)' }} />
+        <ChevronRight size={15} strokeWidth={2} style={{ transform: 'rotate(90deg)', flexShrink: 0, color: 'var(--text-faint)' }} />
       </button>
 
       {open &&
@@ -185,7 +185,7 @@ export function ProductPicker({
               <div className="picker-grip" />
               <div className="picker-head">
                 <div className="picker-search">
-                  <Icon name="search" size={18} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                  <Search size={18} strokeWidth={1.8} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
                   <input
                     ref={inputRef}
                     value={q}
@@ -203,7 +203,7 @@ export function ProductPicker({
                         inputRef.current?.focus();
                       }}
                     >
-                      <Icon name="x" size={15} strokeWidth={2} />
+                      <X size={15} strokeWidth={2} />
                     </button>
                   )}
                 </div>

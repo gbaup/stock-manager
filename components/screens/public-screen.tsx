@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Icon } from '@/components/ui/icon';
+import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
 import { fmtSize, fmtType } from '@/app/lib/domain';
 import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
@@ -83,11 +83,11 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
             style={{ position: 'absolute', left: 0, display: 'flex', alignItems: 'center' }}
             onClick={() => router.push('/inventory')}
           >
-            <Icon name="chevL" size={20} /> Atrás
+            <ChevronLeft size={20} strokeWidth={1.8} /> Atrás
           </button>
         )}
         <div className="public-badge">
-          <Icon name="eye" size={14} />
+          <Eye size={14} strokeWidth={1.8} />
           Catálogo público
         </div>
       </div>
@@ -95,7 +95,7 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
         <div className="public-sub">{list.length} modelos disponibles</div>
 
         <div className="search" style={{ marginTop: 14 }}>
-          <Icon name="search" size={19} />
+          <Search size={19} strokeWidth={1.8} />
           <input
             value={query}
             placeholder="Buscar camiseta…"
@@ -103,7 +103,7 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
           />
           {query && (
             <button className="iconbtn plain" style={{ width: 26, height: 26 }} onClick={() => setQuery('')}>
-              <Icon name="x" size={16} />
+              <X size={16} strokeWidth={1.8} />
             </button>
           )}
         </div>
@@ -124,17 +124,17 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
         </div>
         <div className="view-toggle">
           <button className={`view-btn${view === 'grid' ? ' is-active' : ''}`} onClick={() => setViewPersisted('grid')}>
-            <Icon name="grid" size={16} />
+            <LayoutGrid size={16} strokeWidth={1.8} />
           </button>
           <button className={`view-btn${view === 'list' ? ' is-active' : ''}`} onClick={() => setViewPersisted('list')}>
-            <Icon name="list" size={16} />
+            <List size={16} strokeWidth={1.8} />
           </button>
         </div>
         <button
           className={`pub-filter-btn${activeFilters > 0 ? ' has-filters' : ''}`}
           onClick={() => setFiltersOpen((o) => !o)}
         >
-          <Icon name="filter" size={15} />
+          <Filter size={15} strokeWidth={1.8} />
           Filtrar
           {activeFilters > 0 && <span className="filter-count-badge">{activeFilters}</span>}
         </button>
@@ -243,7 +243,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
             fontFamily: 'var(--font-mono)', fontWeight: 800,
             fontSize: 40, opacity: 0.85, position: 'relative', zIndex: 1,
           }}>
-            {model.number || <Icon name="shirt" size={40} strokeWidth={1.3} />}
+            {model.number || <Shirt size={40} strokeWidth={1.3} />}
           </span>
         )}
         {model.photos.length > 1 && (
@@ -276,7 +276,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <Icon name="shirt" size={22} strokeWidth={1.5} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />
+          <Shirt size={22} strokeWidth={1.5} style={{ position: 'relative', zIndex: 1, opacity: 0.85 }} />
         )}
       </div>
       <div className="pub-row-main">
@@ -289,7 +289,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
       {model.photos.length > 1 && (
         <span className="size-chip">📷 {model.photos.length}</span>
       )}
-      <Icon name="chevR" size={18} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+      <ChevronRight size={18} strokeWidth={1.8} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
     </div>
   );
 }
@@ -314,7 +314,7 @@ function GalleryViewer({
     <div className="pub-viewer" onClick={onClose}>
       <div className="viewer-head" onClick={(e) => e.stopPropagation()}>
         <button className="viewer-close" onClick={onClose}>
-          <Icon name="x" size={20} />
+          <X size={20} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -327,17 +327,17 @@ function GalleryViewer({
             width: 200, height: 200, background: c.bg, color: c.fg,
             borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Icon name="shirt" size={72} strokeWidth={1.2} />
+            <Shirt size={72} strokeWidth={1.2} />
           </div>
         )}
         {hasPrev && (
           <button className="viewer-nav prev" onClick={() => setIdx(idx - 1)}>
-            <Icon name="chevL" size={20} />
+            <ChevronLeft size={20} strokeWidth={1.8} />
           </button>
         )}
         {hasNext && (
           <button className="viewer-nav next" onClick={() => setIdx(idx + 1)}>
-            <Icon name="chevR" size={20} />
+            <ChevronRight size={20} strokeWidth={1.8} />
           </button>
         )}
       </div>

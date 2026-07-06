@@ -6,7 +6,7 @@ import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
-import { Icon } from '@/components/ui/icon';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt } from 'lucide-react';
 import { colorByName } from '@/app/lib/format';
 import type { ModelWithStats } from '@/app/lib/domain';
 
@@ -74,11 +74,7 @@ export function InventoryScreen({
                 onClick={() => setLayout(l)}
                 title={l}
               >
-                <Icon
-                  name={l === 'cards' ? 'box' : l === 'rows' ? 'list' : 'grid'}
-                  size={16}
-                  strokeWidth={1.8}
-                />
+                {l === 'cards' ? <Package size={16} strokeWidth={1.8} /> : l === 'rows' ? <List size={16} strokeWidth={1.8} /> : <LayoutGrid size={16} strokeWidth={1.8} />}
               </button>
             ))}
           </div>
@@ -88,7 +84,7 @@ export function InventoryScreen({
       <div className="body">
         <div className="body-pad">
           <div className="search">
-            <Icon name="search" size={19} />
+            <Search size={19} strokeWidth={1.8} />
             <input
               value={query}
               placeholder="Buscar equipo, jugador, color…"
@@ -96,7 +92,7 @@ export function InventoryScreen({
             />
             {query && (
               <button className="iconbtn plain" style={{ width: 26, height: 26 }} onClick={() => setQuery('')}>
-                <Icon name="x" size={16} />
+                <X size={16} strokeWidth={1.8} />
               </button>
             )}
           </div>
@@ -127,7 +123,7 @@ export function InventoryScreen({
       </div>
 
       <button className="fab" onClick={() => router.push('/inventory/new')} aria-label="Agregar modelo">
-        <Icon name="plus" size={26} strokeWidth={2.2} />
+        <Plus size={26} strokeWidth={2.2} />
       </button>
       <BottomNav transitCount={transitCount} />
     </div>
@@ -209,7 +205,7 @@ function VisualGrid({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: str
                 m.number ? (
                   <span className="tile-num">{m.number}</span>
                 ) : (
-                  <Icon name="shirt" size={42} strokeWidth={1.3} style={{ position: 'relative', zIndex: 1, opacity: 0.9 }} />
+                  <Shirt size={42} strokeWidth={1.3} style={{ position: 'relative', zIndex: 1, opacity: 0.9 }} />
                 )
               )}
             </div>

@@ -2,7 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Icon } from './icon';
+import { Check, Shirt, X, Trash2, ArrowLeftRight } from 'lucide-react';
+import type { ComponentType } from 'react';
+
+const ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  check: Check, shirt: Shirt, x: X, trash: Trash2, swap: ArrowLeftRight,
+};
 
 export function Modal({
   icon = 'check',
@@ -40,6 +45,8 @@ export function Modal({
   if (typeof document === 'undefined') return null;
   const host = document.querySelector('.app-shell') ?? document.body;
 
+  const Ico = icon ? ICONS[icon] : null;
+
   return createPortal(
     <div className="modal-scrim" onMouseDown={onCancel}>
       <div
@@ -48,12 +55,12 @@ export function Modal({
         aria-modal="true"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {icon && (
+        {Ico && (
           <div
             className="modal-ico"
             style={tone === 'danger' ? { background: 'var(--danger-soft)', color: 'var(--danger)' } : undefined}
           >
-            <Icon name={icon} size={22} strokeWidth={2} />
+            <Ico size={22} strokeWidth={2} />
           </div>
         )}
         {title && <div className="modal-title">{title}</div>}

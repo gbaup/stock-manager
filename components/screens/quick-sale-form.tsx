@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormHead } from '@/components/ui/chrome';
-import { Icon } from '@/components/ui/icon';
+import { Search, X } from 'lucide-react';
 import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { Field, TextInput, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
@@ -116,7 +116,7 @@ export function QuickSaleForm({
             <>
               <div className="section-label" style={{ marginTop: 6 }}>¿Qué camiseta vendés?</div>
               <div className="search">
-                <Icon name="search" size={19} />
+                <Search size={19} strokeWidth={1.8} />
                 <input
                   value={query}
                   autoFocus
@@ -129,7 +129,7 @@ export function QuickSaleForm({
                     style={{ width: 26, height: 26 }}
                     onClick={() => setQuery('')}
                   >
-                    <Icon name="x" size={16} />
+                    <X size={16} strokeWidth={1.8} />
                   </button>
                 )}
               </div>
