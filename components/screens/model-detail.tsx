@@ -8,7 +8,7 @@ import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { ChevronUp, ChevronDown, Tag as TagIcon, Truck, Package } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
-import { fmtDate, uyu, usd } from '@/app/lib/format';
+import { fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
@@ -27,14 +27,14 @@ export function ModelDetailScreen({
   const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
 
   const sizeStock = sizeStockOf(model);
-  const isKidkit = model.type === 'kidkit';
-  const displaySizes: string[] = isKidkit
-    ? model.availableBySize.map((s) => s.size).sort(compareSizes)
-    : (() => {
+  const usesAdultSizes = ['fan', 'player', 'retro'].includes(model.type ?? '');
+  const displaySizes: string[] = usesAdultSizes
+    ? (() => {
       const core = ['s', 'm', 'l', 'xl'];
       const extended = ['xs', '2xl', '3xl'].filter((s) => (sizeStock[s] ?? 0) > 0);
       return [...core, ...extended].sort(compareSizes);
-    })();
+    })()
+    : model.availableBySize.map((s) => s.size).sort(compareSizes);
 
   return (
     <div className="screen">
@@ -189,7 +189,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
         <div className="event-amt">
           {uyu(s.price)}
           <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
-            +{uyu(s.profit)}
+            {signedUyu(s.profit)}
           </span>
         </div>
       </div>

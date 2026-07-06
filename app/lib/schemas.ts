@@ -14,7 +14,7 @@ const saleFields = {
   date: z.string().min(1, 'Requerido'),
   method: z.string().optional(),
   description: z.string().optional(),
-  collectedByUserId: z.string().uuid('¿Quién cobró?'),
+  collectedByUserId: z.string().uuid().optional(),
 };
 
 export const saleSchema = z.object(saleFields);
@@ -114,7 +114,7 @@ export const modelFormSchema = z.object({
     .min(1, 'Requerido')
     .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
   version: z.string(),
-  type: z.string(),
+  type: z.string().min(1, 'Requerido'),
   sleeve: z.string(),
   color: z.string(),
   number: z.string().optional(),
