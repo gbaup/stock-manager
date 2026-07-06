@@ -8,7 +8,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
-import { Icon } from '@/components/ui/icon';
+import { ChevronRight, Plus, Shirt, X, Truck } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
@@ -189,7 +189,7 @@ export function PurchaseForm({
 
               <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
                 Siguiente: agregar items
-                <Icon name="chevR" size={18} />
+                <ChevronRight size={18} strokeWidth={1.8} />
               </button>
             </>
           ) : (
@@ -217,7 +217,7 @@ export function PurchaseForm({
                 type="button"
                 onClick={() => prepend({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
               >
-                <Icon name="plus" size={19} />Agregar item
+                <Plus size={19} strokeWidth={1.8} />Agregar item
               </button>
 
               <div className="section-label">Items del batch</div>
@@ -245,7 +245,7 @@ export function PurchaseForm({
                             style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }}
                           />
                         ) : (
-                          <div className="item-swatch-empty"><Icon name="shirt" size={16} /></div>
+                          <div className="item-swatch-empty"><Shirt size={16} strokeWidth={1.8} /></div>
                         )}
                         <div className="item-model">
                           <Controller
@@ -265,7 +265,7 @@ export function PurchaseForm({
                           />
                         </div>
                         <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
-                          <Icon name="x" size={17} />
+                          <X size={17} strokeWidth={1.8} />
                         </button>
                       </div>
                       {errors.items?.[index]?.modelId?.message && (
@@ -342,7 +342,7 @@ export function PurchaseForm({
               )}
 
               <div className="callout callout-warn">
-                <Icon name="truck" size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+                <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
               </div>
 

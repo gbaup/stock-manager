@@ -6,7 +6,7 @@ import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormHead } from '@/components/ui/chrome';
 import { Swatch, coverOf } from '@/components/ui/swatch';
-import { Icon } from '@/components/ui/icon';
+import { Package, Check } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, MoneyInput, WeightInput } from '@/components/ui/field';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
@@ -129,7 +129,7 @@ export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users
                 alignItems: 'center',
               }}
             >
-              <Icon name="box" size={16} style={{ flexShrink: 0 }} />
+              <Package size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
               <span>
                 Ya llegaron <strong>{priorCount} de {total}</strong> en {priorShipments}{' '}
                 {priorShipments === 1 ? 'envío' : 'envíos'}. Registrás otro envío.
@@ -154,7 +154,7 @@ export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users
                   className={`pick-item${on ? ' on' : ''}`}
                   onClick={() => toggle(it.id)}
                 >
-                  <span className="pick-box"><Icon name="check" size={14} strokeWidth={2.6} /></span>
+                  <span className="pick-box"><Check size={14} strokeWidth={2.6} /></span>
                   <Swatch
                     color={it.product.color}
                     number={it.product.number}
@@ -230,7 +230,7 @@ export function ArrivalForm({ batch, users, rate }: { batch: BatchSummary; users
           )}
 
           <div className="callout callout-ok">
-            <Icon name="check" size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+            <Check size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>
               Entran <strong>{nPicked} {nPicked === 1 ? 'unidad' : 'unidades'}</strong> al stock.
               {leftover > 0 && <> Quedan <strong>{leftover}</strong> en camino.</>}

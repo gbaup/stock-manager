@@ -1,4 +1,4 @@
-import { Icon } from './icon';
+import { Check } from 'lucide-react';
 
 export function Stepper({ step, labels }: { step: number; labels: string[] }) {
   return (
@@ -23,7 +23,7 @@ export function Stepper({ step, labels }: { step: number; labels: string[] }) {
             )}
             <div className="stepper-item">
               <span className="stepper-dot" style={dotStyle}>
-                {state === 'done' ? <Icon name="check" size={13} strokeWidth={2.4} /> : n}
+                {state === 'done' ? <Check size={13} strokeWidth={2.4} /> : n}
               </span>
               <span className="stepper-lbl" style={lblStyle}>{lbl}</span>
             </div>

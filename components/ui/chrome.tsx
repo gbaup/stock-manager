@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Icon } from './icon';
+import { Home, Package, Truck, Wallet, Eye, ChevronLeft } from 'lucide-react';
+import type { ComponentType } from 'react';
 
 export function TopBar({
   eyebrow,
@@ -32,12 +33,14 @@ export function TopBar({
   );
 }
 
-const NAV_ITEMS = [
-  { id: 'home', label: 'Inicio', icon: 'home' as const, href: '/home' },
-  { id: 'inventory', label: 'Inventario', icon: 'box' as const, href: '/inventory' },
-  { id: 'purchases', label: 'Compras', icon: 'truck' as const, href: '/purchases' },
-  { id: 'saldos', label: 'Saldos', icon: 'wallet' as const, href: '/saldos' },
-  { id: 'public', label: 'Pública', icon: 'eye' as const, href: '/public' },
+type NavIcon = ComponentType<{ size?: number; strokeWidth?: number }>;
+
+const NAV_ITEMS: { id: string; label: string; Icon: NavIcon; href: string }[] = [
+  { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
+  { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
+  { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
+  { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
+  { id: 'public',    label: 'Pública',   Icon: Eye,     href: '/public' },
 ];
 
 export function BottomNavShell({ active = '' }: { active?: string }) {
@@ -45,7 +48,7 @@ export function BottomNavShell({ active = '' }: { active?: string }) {
     <nav className="bottomnav">
       {NAV_ITEMS.map((it) => (
         <button key={it.id} className={`navbtn ${active === it.id ? 'is-active' : ''}`}>
-          <Icon name={it.icon} size={23} strokeWidth={active === it.id ? 2 : 1.7} />
+          <it.Icon size={23} strokeWidth={active === it.id ? 2 : 1.7} />
           {it.label}
         </button>
       ))}
@@ -81,8 +84,7 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
           style={{ textDecoration: 'none' }}
         >
           <div style={{ position: 'relative' }}>
-            <Icon
-              name={it.icon}
+            <it.Icon
               size={23}
               strokeWidth={active === it.id ? 2 : 1.7}
             />
@@ -153,7 +155,7 @@ export function DetailHead({
   return (
     <header className="form-head">
       <button className="link" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Icon name="chevL" size={20} /> Atrás
+        <ChevronLeft size={20} strokeWidth={1.8} /> Atrás
       </button>
       <div className="title capitalize">{title}</div>
       {editHref ? (

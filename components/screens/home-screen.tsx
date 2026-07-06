@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Icon } from '@/components/ui/icon';
+import { ChevronLeft, ChevronRight, Tag as TagIcon, Plus, Shirt } from 'lucide-react';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
@@ -178,7 +178,7 @@ function HomeContent({
                   onClick={() => stepMonth(-1)}
                   aria-label="Mes anterior"
                 >
-                  <Icon name="chevL" size={12} />
+                  <ChevronLeft size={12} strokeWidth={1.8} />
                 </button>
                 <span className="ch-l">
                   Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
@@ -191,7 +191,7 @@ function HomeContent({
                   disabled={!browsingPast}
                   aria-label="Mes siguiente"
                 >
-                  <Icon name="chevR" size={12} />
+                  <ChevronRight size={12} strokeWidth={1.8} />
                 </button>
               </div>
               <span className="ch-n">
@@ -223,14 +223,14 @@ function HomeContent({
 
           <button className="quicksale-cta" onClick={onQuickSale}>
             <span className="qs-ico">
-              <Icon name="tag" size={20} strokeWidth={2} />
+              <TagIcon size={20} strokeWidth={2} />
             </span>
             <span className="qs-tx">
               <span className="qs-t">Registrar una venta</span>
               <span className="qs-s">Buscá la camiseta y cobrás en segundos</span>
             </span>
             <span className="qs-plus">
-              <Icon name="plus" size={20} strokeWidth={2.4} />
+              <Plus size={20} strokeWidth={2.4} />
             </span>
           </button>
 
@@ -314,7 +314,7 @@ function HomeContent({
                       />
                     ) : (
                       <div className="item-swatch-empty" style={{ width: 40, height: 46 }}>
-                        <Icon name="shirt" size={18} />
+                        <Shirt size={18} strokeWidth={1.8} />
                       </div>
                     )}
                     <div className="sale-main">

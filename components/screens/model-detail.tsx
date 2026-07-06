@@ -6,7 +6,7 @@ import { DetailHead, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
-import { Icon } from '@/components/ui/icon';
+import { ChevronUp, ChevronDown, Tag as TagIcon, Truck, Package } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
@@ -97,7 +97,7 @@ export function ModelDetailScreen({
                 onClick={() => setShowSizes((v) => !v)}
               >
                 <div className="section-label">Stock por talle</div>
-                <Icon name={showSizes ? 'chevU' : 'chevD'} size={14} style={{ color: 'var(--text-faint)', marginTop: 13 }} />
+                {showSizes ? <ChevronUp size={14} strokeWidth={1.8} style={{ color: 'var(--text-faint)', marginTop: 13 }} /> : <ChevronDown size={14} strokeWidth={1.8} style={{ color: 'var(--text-faint)', marginTop: 13 }} />}
               </div>
               {showSizes && (
                 <div className="stat-row" style={{ flexWrap: 'wrap' }}>
@@ -121,7 +121,7 @@ export function ModelDetailScreen({
               onClick={() => router.push(`/inventory/${model.id}/sale`)}
               disabled={model.stock === 0}
             >
-              <Icon name="tag" size={18} />Registrar venta
+              <TagIcon size={18} strokeWidth={1.8} />Registrar venta
             </button>
           </div>
 
@@ -173,7 +173,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
     const s = ev.data;
     return (
       <div className="event">
-        <div className="event-ico sale"><Icon name="tag" size={17} /></div>
+        <div className="event-ico sale"><TagIcon size={17} strokeWidth={1.8} /></div>
         <div className="event-main">
           <div className="event-title">
             Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}
@@ -201,7 +201,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
     const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
     return (
       <div className="event">
-        <div className="event-ico transit"><Icon name="truck" size={17} /></div>
+        <div className="event-ico transit"><Truck size={17} strokeWidth={1.8} /></div>
         <div className="event-main">
           <div className="event-title">En camino · {ev.qty} u.</div>
           <div className="event-sub">{meta}</div>
@@ -216,7 +216,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
   const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`].filter(Boolean).join(' · ');
   return (
     <div className="event">
-      <div className="event-ico buy"><Icon name="box" size={17} /></div>
+      <div className="event-ico buy"><Package size={17} strokeWidth={1.8} /></div>
       <div className="event-main">
         <div className="event-title">Recibida · {ev.qty} u.</div>
         <div className="event-sub">{meta}</div>

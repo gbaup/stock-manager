@@ -6,7 +6,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Field } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { Modal } from '@/components/ui/modal';
-import { Icon } from '@/components/ui/icon';
+import { ArrowLeftRight, ChevronRight } from 'lucide-react';
 import { uyu, usd, fmtRate, personInitial, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { UserSummary } from '@/app/lib/domain';
@@ -136,7 +136,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
 
           <div className="conv-flip-row">
             <button type="button" className="conv-swap" onClick={flip} aria-label="Invertir origen y destino">
-              <Icon name="swap" size={18} strokeWidth={2} />
+              <ArrowLeftRight size={18} strokeWidth={2} />
             </button>
           </div>
 
@@ -222,7 +222,7 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
                 <strong className="neg">− {fmtCur(f.fromCur, amount)}</strong>
               </div>
               <div className="cs-arrow">
-                <Icon name="chevR" size={15} style={{ transform: 'rotate(90deg)' }} />
+                <ChevronRight size={15} strokeWidth={1.8} style={{ transform: 'rotate(90deg)' }} />
               </div>
               <div className="cs-row">
                 <span className="cs-acct">
