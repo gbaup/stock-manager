@@ -12,7 +12,7 @@ import { VERSIONS, ITEM_TYPES, SLEEVES, TYPES_WITHOUT_VERSION, TYPES_WITHOUT_SLE
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
-import { modelSchema, type ModelFormValues } from '@/app/lib/schemas';
+import { modelFormSchema, type ModelFormValues } from '@/app/lib/schemas';
 
 export function ModelForm({
   initial,
@@ -35,7 +35,7 @@ export function ModelForm({
     handleSubmit,
     formState: { errors },
   } = useForm<ModelFormValues>({
-    resolver: zodResolver(modelSchema),
+    resolver: zodResolver(modelFormSchema),
     defaultValues: {
       teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : prefillTeamId,
       season: initial?.season ?? '',

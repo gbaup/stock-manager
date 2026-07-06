@@ -106,36 +106,38 @@ export const ajusteSchema = z
 
 export type AjusteFormValues = z.infer<typeof ajusteSchema>;
 
-export const modelSchema = z
-  .object({
-    teamId: z.string().min(1, 'Requerido'),
-    season: z
-      .string()
-      .min(1, 'Requerido')
-      .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
-    version: z.string(),
-    type: z.string(),
-    sleeve: z.string(),
-    color: z.string(),
-    number: z.string().optional(),
-    player: z.string().optional(),
-    description: z.string().optional(),
-    photos: z.array(z.object({
-      url: z.string().min(1),
-      publicId: z.string(),
-    })),
-  })
-  .transform((data) => {
-    const type = (data.type || 'fan').trim().toLowerCase();
-    return {
-      ...data,
-      version: TYPES_WITHOUT_VERSION.has(type) ? null : data.version,
-      sleeve: TYPES_WITHOUT_SLEEVE.has(type) ? null : data.sleeve,
-    };
-  });
+// Validation-only schema: used by the form resolver (no transform, so RHF's TFieldValues matches).
+export const modelFormSchema = z.object({
+  teamId: z.string().min(1, 'Requerido'),
+  season: z
+    .string()
+    .min(1, 'Requerido')
+    .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
+  version: z.string(),
+  type: z.string(),
+  sleeve: z.string(),
+  color: z.string(),
+  number: z.string().optional(),
+  player: z.string().optional(),
+  description: z.string().optional(),
+  photos: z.array(z.object({
+    url: z.string().min(1),
+    publicId: z.string(),
+  })),
+});
 
-// Input type (form values, before the transform) so form components work with plain strings.
-export type ModelFormValues = z.input<typeof modelSchema>;
+export type ModelFormValues = z.infer<typeof modelFormSchema>;
+
+// Action schema: adds the type→field nullification transform on top.
+// Server actions parse with this to get version/sleeve already nullified.
+export const modelSchema = modelFormSchema.transform((data) => {
+  const type = (data.type || 'fan').trim().toLowerCase();
+  return {
+    ...data,
+    version: TYPES_WITHOUT_VERSION.has(type) ? null : data.version,
+    sleeve: TYPES_WITHOUT_SLEEVE.has(type) ? null : data.sleeve,
+  };
+});
 
 const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
