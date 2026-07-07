@@ -16,7 +16,7 @@ const createPurchaseSchema = z.object({
   supplierPayments: z.array(z.object({
     userId: z.string().uuid(),
     amountUsd: z.number().finite().positive(),
-    cardTaxPct: z.number().finite().min(0).optional(),
+    cardTaxPct: z.number().finite().min(0).max(100).optional(),
   })).optional(),
   exchangeRate: z.number().finite().positive(),
   items: z.array(z.object({
@@ -61,7 +61,10 @@ export async function createPurchase(data: {
   // ratio of gross cost (base + all card fees) to base cost. Items with a
   // higher base price bear a proportionally larger share of the tax.
   const totalCardTax = payments.reduce((s, p) => s + p.amountUsd * ((p.cardTaxPct ?? 0) / 100), 0);
-  const grossMultiplier = baseTotal > 0 && totalCardTax > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
+  if (totalCardTax > 0 && baseTotal === 0) {
+    throw new Error('No se puede aplicar recargo de tarjeta cuando el costo base es cero');
+  }
+  const grossMultiplier = totalCardTax > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
   const itemsWithTax = expandedItems.map((it) => ({
     ...it,
     basePriceUsd: Math.round(it.basePriceUsd * grossMultiplier * 10000) / 10000,

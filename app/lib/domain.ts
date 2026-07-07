@@ -167,7 +167,7 @@ export type BatchSummary = {
   shippingPriceUyu: number | null;
   weight: number | null;
   status: PurchaseStatus;
-  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number }>;
+  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number; cardTaxPct: number | null }>;
   shippingPaidByUserId: string | null;
   shippingPaidByAlias: string | null;
   items: ItemInBatch[];

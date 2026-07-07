@@ -73,7 +73,7 @@ export function batchToSummary(
     id: string; purchaseDate: Date; arrivalDate: Date | null;
     supplier: string | null;
     trackingNumber: string | null; description: string | null;
-    supplierPayments: Array<{ userId: string; amountUsd: unknown; user: { alias: string } }>;
+    supplierPayments: Array<{ userId: string; amountUsd: unknown; cardTaxPct: unknown; user: { alias: string } }>;
     shipments: ShipmentInput[];
   },
   items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
@@ -133,6 +133,7 @@ export function batchToSummary(
       userId: p.userId,
       alias: p.user.alias,
       amountUsd: Number(p.amountUsd),
+      cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
     })),
     shippingPaidByUserId,
     shippingPaidByAlias,
