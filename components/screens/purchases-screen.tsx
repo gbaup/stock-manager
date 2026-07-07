@@ -6,22 +6,34 @@ import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
+import { DModal } from '@/components/ui/d-modal';
 import { Plus, Check, ChevronRight } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
-import type { BatchSummary, ShipmentRecord } from '@/app/lib/domain';
+import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
+import type { RateResult } from '@/app/lib/exchange-rate';
+import { PurchaseForm } from '@/components/screens/purchase-form';
+import { ArrivalForm } from '@/components/screens/arrival-form';
 
 export function PurchasesScreen({
   batches,
   transitCount,
+  models,
+  users,
+  rate,
 }: {
   batches: BatchSummary[];
   transitCount: number;
+  models: ModelWithStats[];
+  users: UserSummary[];
+  rate: RateResult;
 }) {
   const router = useRouter();
   const isDesktop = useIsDesktop();
   const [tab, setTab] = useState<'pending' | 'arrived'>('pending');
   const [buySel, setBuySel] = useState<string | null>(null);
+  const [showNewPurchase, setShowNewPurchase] = useState(false);
+  const [showArrival, setShowArrival] = useState(false);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -42,7 +54,7 @@ export function PurchasesScreen({
             <div className="mh-sub">{transitCount} en camino · {arrivedCount} recibidas</div>
           </div>
           <div className="mh-actions">
-            <button className="btn btn-primary" onClick={() => router.push('/purchases/new')}>
+            <button className="btn btn-primary" onClick={() => setShowNewPurchase(true)}>
               Nueva compra
             </button>
           </div>
@@ -77,7 +89,7 @@ export function PurchasesScreen({
             {selBatch ? (
               <BuyDetailPanel
                 batch={selBatch}
-                onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
+                onArrive={() => setShowArrival(true)}
               />
             ) : (
               <div className="detail-empty">
@@ -88,6 +100,17 @@ export function PurchasesScreen({
             )}
           </div>
         </div>
+
+        {showNewPurchase && (
+          <DModal title="Nueva compra" size="lg" onClose={() => setShowNewPurchase(false)}>
+            <PurchaseForm models={models} users={users} rate={rate} onDone={() => setShowNewPurchase(false)} />
+          </DModal>
+        )}
+        {showArrival && selBatch && (
+          <DModal title="Marcar llegada" size="lg" onClose={() => setShowArrival(false)}>
+            <ArrivalForm batch={selBatch} users={users} rate={rate} onDone={() => setShowArrival(false)} />
+          </DModal>
+        )}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />

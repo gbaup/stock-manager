@@ -6,12 +6,15 @@ import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
+import { DModal } from '@/components/ui/d-modal';
 import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
-import type { ModelWithStats, ModelDetail, TimelineEvent } from '@/app/lib/domain';
+import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { fetchModelDetail } from '@/app/actions/read';
+import { ModelForm } from '@/components/screens/model-form';
+import { SaleForm } from '@/components/screens/sale-form';
 
 type Layout = 'cards' | 'rows' | 'grid';
 type Filter = 'all' | 'instock' | 'transit' | 'out';
@@ -19,9 +22,15 @@ type Filter = 'all' | 'instock' | 'transit' | 'out';
 export function InventoryScreen({
   models,
   transitCount,
+  teams,
+  users,
+  usdRate,
 }: {
   models: ModelWithStats[];
   transitCount: number;
+  teams: { id: string; name: string }[];
+  users: UserSummary[];
+  usdRate: number;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -30,6 +39,9 @@ export function InventoryScreen({
   const [invSel, setInvSel] = useState<string | null>(null);
   const [selDetail, setSelDetail] = useState<ModelDetail | null>(null);
   const [detailPending, startDetailTransition] = useTransition();
+  const [showNewModel, setShowNewModel] = useState(false);
+  const [showEditModel, setShowEditModel] = useState(false);
+  const [showSaleModal, setShowSaleModal] = useState(false);
 
   const q = query.trim().toLowerCase();
   let list = models.filter((m) => {
@@ -95,7 +107,7 @@ export function InventoryScreen({
                 : <LayoutGrid size={16} strokeWidth={1.8} />
               }
             </button>
-            <button className="btn btn-primary" onClick={() => router.push('/inventory/new')}>
+            <button className="btn btn-primary" onClick={() => setShowNewModel(true)}>
               Nuevo modelo
             </button>
           </div>
@@ -151,14 +163,30 @@ export function InventoryScreen({
               <ModelDetailPanel
                 model={selDetail}
                 loading={detailPending}
-                onSell={() => router.push(`/inventory/${selDetail.id}/sale`)}
-                onEdit={() => router.push(`/inventory/${selDetail.id}/edit`)}
+                onSell={() => setShowSaleModal(true)}
+                onEdit={() => setShowEditModel(true)}
               />
             ) : (
               <DetailEmpty />
             )}
           </div>
         </div>
+
+        {showNewModel && (
+          <DModal title="Nuevo modelo" size="lg" onClose={() => setShowNewModel(false)}>
+            <ModelForm teams={teams} onDone={() => setShowNewModel(false)} />
+          </DModal>
+        )}
+        {showEditModel && selDetail && (
+          <DModal title="Editar modelo" size="lg" onClose={() => setShowEditModel(false)}>
+            <ModelForm initial={selDetail} teams={teams} onDone={() => setShowEditModel(false)} />
+          </DModal>
+        )}
+        {showSaleModal && selDetail && (
+          <DModal title="Registrar venta" size="md" onClose={() => setShowSaleModal(false)}>
+            <SaleForm model={selDetail} stock={selDetail.stock} usdRate={usdRate} users={users} onDone={() => setShowSaleModal(false)} />
+          </DModal>
+        )}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />

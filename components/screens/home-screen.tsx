@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Tag as TagIcon, Plus, Shirt } from 'lucide-react';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
+import { DModal } from '@/components/ui/d-modal';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { useIsDesktop } from '@/app/lib/hooks';
+import { QuickSaleForm } from '@/components/screens/quick-sale-form';
 
 const PAGE = 8;
 
@@ -92,14 +94,44 @@ export function HomeScreen({
   sales,
   users,
   sessionUserId,
+  usdRate,
 }: {
   models: ModelWithStats[];
   sales: HomeSaleItem[];
   users: UserSummary[];
   sessionUserId: string;
+  usdRate: number;
 }) {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const currentUser = users.find((u) => u.id === sessionUserId) ?? users[0];
+  const [showSaleModal, setShowSaleModal] = useState(false);
+
+  if (isDesktop) {
+    return (
+      <>
+        <HomeContent
+          models={models}
+          sales={sales}
+          users={users}
+          currentUser={currentUser}
+          onQuickSale={() => setShowSaleModal(true)}
+          onOpenModel={(id) => router.push(`/inventory/${id}`)}
+        />
+        {showSaleModal && (
+          <DModal title="Registrar venta" size="md" onClose={() => setShowSaleModal(false)}>
+            <QuickSaleForm
+              models={models}
+              users={users}
+              usdRate={usdRate}
+              sessionUserId={sessionUserId}
+              onDone={() => setShowSaleModal(false)}
+            />
+          </DModal>
+        )}
+      </>
+    );
+  }
 
   return (
     <HomeContent
