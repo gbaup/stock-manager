@@ -41,7 +41,7 @@ type FormState = {
   rate: string;
 };
 
-export function ConversionForm({ users }: { users: UserSummary[] }) {
+export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone?: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState(false);
@@ -94,26 +94,15 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
           toAmount: result,
           date: todayISO(),
         });
+        onDone?.();
       } catch {
         setError('No se pudo registrar. Intentá de nuevo.');
       }
     });
   }
 
-  return (
-    <div className="screen">
-      <FormHead
-        onCancel={() => router.back()}
-        title="Cambiar monedas"
-        onSave={() => canSave && setConfirm(true)}
-        saveLabel="Registrar"
-        canSave={canSave}
-        isSaving={pending}
-        savingLabel="Registrando…"
-      />
-
-      <div className="body">
-        <div className="body-pad-no-nav">
+  const bodyContent = (
+    <div className="body-pad-no-nav">
           <div className="section-label">Origen · de dónde sale</div>
           <div className="field-row">
             <Field label="Socio">
@@ -247,32 +236,50 @@ export function ConversionForm({ users }: { users: UserSummary[] }) {
             {pending ? 'Registrando…' : (sameCur ? 'Registrar transferencia' : 'Registrar cambio')}
           </button>
         </div>
-      </div>
+  );
 
-      {confirm && (
-        <Modal
-          icon="swap"
-          title={sameCur ? '¿Registrar esta transferencia?' : '¿Registrar este cambio?'}
-          confirmLabel="Sí, registrar"
-          cancelLabel="Revisar"
-          onConfirm={() => { setConfirm(false); handleSubmit(); }}
-          onCancel={() => setConfirm(false)}
-        >
-          <span className="modal-strong">{fromAlias}</span>{' '}
-          {sameCur ? 'transfiere' : 'cambia'}{' '}
-          <span className="modal-strong">{fmtCur(f.fromCur, amount)}</span>
-          {sameCur ? (
-            <> a <span className="modal-strong">{toAlias}</span>.</>
-          ) : (
-            <>
-              {' '}→ <span className="modal-strong">{fmtCur(f.toCur, result)}</span>
-              {crossPerson && <> para <span className="modal-strong">{toAlias}</span></>}
-              {' '}(TC <span className="modal-strong">{fmtRate(rate)}</span>).
-            </>
-          )}{' '}
-          Revisá los datos antes de confirmar — esta acción mueve plata entre cuentas.
-        </Modal>
-      )}
+  const confirmModal = confirm ? (
+    <Modal
+      icon="swap"
+      title={sameCur ? '¿Registrar esta transferencia?' : '¿Registrar este cambio?'}
+      confirmLabel="Sí, registrar"
+      cancelLabel="Revisar"
+      onConfirm={() => { setConfirm(false); handleSubmit(); }}
+      onCancel={() => setConfirm(false)}
+    >
+      <span className="modal-strong">{fromAlias}</span>{' '}
+      {sameCur ? 'transfiere' : 'cambia'}{' '}
+      <span className="modal-strong">{fmtCur(f.fromCur, amount)}</span>
+      {sameCur ? (
+        <> a <span className="modal-strong">{toAlias}</span>.</>
+      ) : (
+        <>
+          {' '}→ <span className="modal-strong">{fmtCur(f.toCur, result)}</span>
+          {crossPerson && <> para <span className="modal-strong">{toAlias}</span></>}
+          {' '}(TC <span className="modal-strong">{fmtRate(rate)}</span>).
+        </>
+      )}{' '}
+      Revisá los datos antes de confirmar — esta acción mueve plata entre cuentas.
+    </Modal>
+  ) : null;
+
+  if (onDone) {
+    return <>{bodyContent}{confirmModal}</>;
+  }
+
+  return (
+    <div className="screen">
+      <FormHead
+        onCancel={() => router.back()}
+        title="Cambiar monedas"
+        onSave={() => canSave && setConfirm(true)}
+        saveLabel="Registrar"
+        canSave={canSave}
+        isSaving={pending}
+        savingLabel="Registrando…"
+      />
+      <div className="body">{bodyContent}</div>
+      {confirmModal}
     </div>
   );
 }
