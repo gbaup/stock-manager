@@ -8,6 +8,7 @@ import { Empty } from '@/components/ui/empty';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
+import { useIsDesktop } from '@/app/lib/hooks';
 
 const PAGE = 8;
 
@@ -52,6 +53,36 @@ function Avatar({ name, size }: { name: string; size: number }) {
       aria-hidden
     >
       {name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+function MonthNav({
+  offset,
+  onStep,
+  browsingPast,
+}: {
+  offset: number;
+  onStep: (delta: number) => void;
+  browsingPast: boolean;
+}) {
+  const { label, showYear, year } = monthFromOffset(offset);
+  return (
+    <div className="month-nav">
+      <button className="month-nav-btn" onClick={() => onStep(-1)} aria-label="Mes anterior">
+        <ChevronLeft size={14} strokeWidth={2} />
+      </button>
+      <span className="month-nav-label">
+        {label}{showYear ? ` ${year}` : ''}
+      </span>
+      <button
+        className="month-nav-btn"
+        onClick={() => onStep(1)}
+        disabled={!browsingPast}
+        aria-label="Mes siguiente"
+      >
+        <ChevronRight size={14} strokeWidth={2} />
+      </button>
     </div>
   );
 }
@@ -151,6 +182,206 @@ function HomeContent({
     { label: 'Mes', value: 'mes' },
     { label: 'Todas', value: 'todas' },
   ];
+
+  const totalStock = models.reduce((a, m) => a + m.stock, 0);
+  const modelsWithStock = models.filter((m) => m.stock > 0).length;
+  const transitUnits = models.reduce((a, m) => a + m.inTransit, 0);
+  const avgTicket = monthSales.length > 0 ? monthTotal / monthSales.length : 0;
+
+  const isDesktop = useIsDesktop();
+
+  if (isDesktop) {
+    return (
+      <div className="screen">
+        <header className="main-header">
+          <div className="mh-eyebrow">
+            <span className="brand-dot" />STOCKCONTROL · PANEL
+          </div>
+          <h1 className="mh-title">Hola, {currentUser.alias}</h1>
+          <div className="mh-actions">
+            <MonthNav offset={monthOffset} onStep={stepMonth} browsingPast={browsingPast} />
+            <button className="btn btn-primary" onClick={onQuickSale}>
+              Registrar venta
+            </button>
+          </div>
+        </header>
+
+        <div className="page">
+          <div className="kpi-row">
+            <div className="kpi-card">
+              <div className="kpi-label">Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}</div>
+              <div className="kpi-value">{uyu(monthTotal)}</div>
+              <div className="kpi-sub">
+                {monthSales.length} {monthSales.length === 1 ? 'venta' : 'ventas'}
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Ventas del mes</div>
+              <div className="kpi-value neutral">{monthSales.length}</div>
+              <div className="kpi-sub">
+                Ticket prom. {avgTicket > 0 ? uyu(avgTicket) : '—'}
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Stock disponible</div>
+              <div className="kpi-value neutral">{totalStock}</div>
+              <div className="kpi-sub">
+                {modelsWithStock} {modelsWithStock === 1 ? 'modelo' : 'modelos'} con stock
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">En camino</div>
+              <div className={`kpi-value${transitUnits > 0 ? ' warn' : ' neutral'}`}>
+                {transitUnits}
+              </div>
+              <div className="kpi-sub">
+                {transitUnits === 1 ? 'unidad en tránsito' : 'unidades en tránsito'}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <div className="panel-title">
+                    Ventas de {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+                  </div>
+                </div>
+                <div className="panel-filter-chips">
+                  <button
+                    className={`chip${personFilter === 'all' ? ' is-active' : ''}`}
+                    onClick={() => pickPerson('all')}
+                  >
+                    Todos
+                  </button>
+                  {users.map((u) => (
+                    <button
+                      key={u.id}
+                      className={`chip${personFilter === u.id ? ' is-active' : ''}`}
+                      onClick={() => pickPerson(u.id)}
+                    >
+                      <Avatar name={u.alias} size={16} />
+                      {u.alias}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {list.length === 0 ? (
+                <Empty title="Sin ventas" desc="Probá con otro filtro o navegá a otro mes." icon="tag" />
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="dtable">
+                    <thead>
+                      <tr>
+                        <th>Modelo</th>
+                        <th>Detalle</th>
+                        <th>Cobró</th>
+                        <th>Fecha</th>
+                        <th className="num">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((s) => {
+                        const m = modelById(s.catalogProductId);
+                        return (
+                          <tr
+                            key={s.id}
+                            onClick={() => m && onOpenModel(m.id)}
+                            style={{ cursor: m ? 'pointer' : 'default' }}
+                          >
+                            <td>
+                              <div className="dt-cell-model">
+                                {m ? (
+                                  <Swatch
+                                    color={s.color}
+                                    number={s.number}
+                                    photo={coverOf(m)}
+                                    className="swatch"
+                                  />
+                                ) : (
+                                  <div className="item-swatch-empty" style={{ width: 30, height: 34 }}>
+                                    <Shirt size={14} strokeWidth={1.8} />
+                                  </div>
+                                )}
+                                <div className="dt-cell-main">
+                                  <div className="dt-team capitalize">{s.teamName}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="dt-meta capitalize">
+                                <ColorDot color={s.color} />
+                                {s.version ? ` ${s.version}` : ''}
+                                {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
+                                {s.size ? ` · ${s.size.toUpperCase()}` : ''}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {s.collectedByAlias && (
+                                  <Avatar name={s.collectedByAlias} size={20} />
+                                )}
+                                <span style={{ fontSize: 13 }}>{s.collectedByAlias}</span>
+                              </div>
+                            </td>
+                            <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>
+                              {fmtDate(s.date)}
+                            </td>
+                            <td className="num">
+                              <div style={{ color: 'var(--accent)' }}>{uyu(s.price)}</div>
+                              <div style={{
+                                fontSize: 11,
+                                color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
+                                marginTop: 1,
+                              }}>
+                                {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                                {s.profitPending && (
+                                  <span style={{ opacity: 0.6 }}> · prov.</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="partner-rail">
+              <div className="panel-title" style={{ marginBottom: 4, paddingLeft: 2 }}>
+                Cobrado por socio
+              </div>
+              {users.map((u) => {
+                const amt = byUser[u.id] ?? 0;
+                const pct = monthTotal > 0 ? (amt / monthTotal) * 100 : 0;
+                return (
+                  <div key={u.id} className="partner-rail-card">
+                    <div className="pr-head">
+                      <Avatar name={u.alias} size={32} />
+                      <div className="pr-name">
+                        {u.id === currentUser.id ? `${u.alias} · vos` : u.alias}
+                      </div>
+                    </div>
+                    <div className="pr-amt">{uyu(amt)}</div>
+                    <div className="pr-bar-wrap" style={{ marginTop: 10 }}>
+                      <div className="pr-bar-fill" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              <button className="sale-cta-card" onClick={onQuickSale}>
+                <span className="sale-cta-t">Registrar una venta</span>
+                <span className="sale-cta-s">Buscá la camiseta y cobrás en segundos</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="screen">

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav } from '@/components/ui/chrome';
+import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
@@ -69,6 +69,7 @@ export function PurchasesScreen({
       <button className="fab" onClick={() => router.push('/purchases/new')} aria-label="Registrar compra">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav } from '@/components/ui/chrome';
+import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { Plus, ArrowLeftRight, Check, ChevronRight, Tag as TagIcon, Package, Truck, Receipt } from 'lucide-react';
 import type { ComponentType } from 'react';
@@ -114,6 +114,7 @@ export function SaldosScreen({
       <button className="fab" onClick={() => router.push('/saldos/expense/new')} aria-label="Agregar gasto">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );

@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, Truck, Wallet, Eye, ChevronLeft } from 'lucide-react';
+import { Home, Package, Truck, Wallet, Eye, ChevronLeft, ChevronRight, Shirt } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 export function TopBar({
@@ -140,6 +141,127 @@ export function FormHeadShell({
       <div className="title">{title}</div>
       <button className="link accent" disabled>{saveLabel}</button>
     </header>
+  );
+}
+
+const NAV_GROUPS = [
+  {
+    label: 'GESTIÓN',
+    items: [
+      { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
+      { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
+      { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
+      { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
+    ],
+  },
+  {
+    label: 'DIFUSIÓN',
+    items: [
+      { id: 'public', label: 'Catálogo público', Icon: Eye, href: '/public' },
+    ],
+  },
+];
+
+export function Sidebar({
+  transitCount = 0,
+  currentUserAlias,
+}: {
+  transitCount?: number;
+  currentUserAlias?: string;
+}) {
+  const pathname = usePathname();
+  const [navCompact, setNavCompact] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('nav-compact') === '1';
+  });
+
+  function toggleCompact() {
+    setNavCompact((c) => {
+      const next = !c;
+      localStorage.setItem('nav-compact', next ? '1' : '0');
+      document.documentElement.classList.toggle('nav-compact', next);
+      return next;
+    });
+  }
+
+  const activeId = pathname.startsWith('/home')
+    ? 'home'
+    : pathname.startsWith('/purchases')
+      ? 'purchases'
+      : pathname.startsWith('/saldos')
+        ? 'saldos'
+        : pathname.startsWith('/public')
+          ? 'public'
+          : 'inventory';
+
+  return (
+    <aside className="sidebar">
+      <div className="side-brand">
+        <div className="side-mark">
+          <Shirt size={18} strokeWidth={1.8} />
+        </div>
+        <div className="side-brand-tx">
+          <div className="side-brand-name">StockControl</div>
+          <div className="side-brand-sub">Inventario de camisetas</div>
+        </div>
+      </div>
+
+      <nav className="side-nav">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <div className="side-group-label">{group.label}</div>
+            {group.items.map((item) => {
+              const isActive = activeId === item.id;
+              const badge = item.id === 'purchases' ? transitCount : 0;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  prefetch
+                  className={`side-item${isActive ? ' is-active' : ''}`}
+                  style={{ textDecoration: 'none' }}
+                  title={navCompact ? item.label : undefined}
+                >
+                  <item.Icon size={18} strokeWidth={isActive ? 2 : 1.7} />
+                  <span className="side-item-label">{item.label}</span>
+                  {badge > 0 && (
+                    <span className="side-item-badge">{badge}</span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
+      {currentUserAlias && (
+        <div className="side-foot">
+          <div className="side-session">
+            <div
+              className="avatar"
+              style={{ width: 30, height: 30, fontSize: 13, borderRadius: 9 }}
+            >
+              {currentUserAlias[0].toUpperCase()}
+            </div>
+            <div className="side-session-tx">
+              <div className="side-session-sub">Sesión de</div>
+              <div className="side-session-name">{currentUserAlias}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button
+        className="side-collapse"
+        onClick={toggleCompact}
+        aria-label={navCompact ? 'Expandir menú' : 'Colapsar menú'}
+      >
+        {navCompact
+          ? <ChevronRight size={14} strokeWidth={2} />
+          : <ChevronLeft size={14} strokeWidth={2} />
+        }
+      </button>
+    </aside>
   );
 }
 
