@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation';
 import { getCurrentUserId } from '@/app/lib/auth';
 import { saleSchema, parseOrThrow } from '@/app/lib/schemas';
 import { recordSale, NotEnoughStockError } from '@/app/lib/inventory';
-import { getExchangeRate } from '@/app/lib/exchange-rate';
 import { prisma } from '@/app/lib/prisma';
 
 type SaleInput = {
@@ -25,7 +24,6 @@ async function executeSale(modelId: string, data: SaleInput): Promise<void> {
 
   const qty = parseInt(data.quantity, 10);
   const priceUyu = parseFloat(data.price);
-  const exchangeRate = await getExchangeRate();
   const saleDate = new Date(data.date);
 
   const available = await prisma.inventoryItem.count({
@@ -40,7 +38,6 @@ async function executeSale(modelId: string, data: SaleInput): Promise<void> {
           modelId,
           size: data.size,
           priceUyu,
-          exchangeRate,
           date: saleDate,
           method: data.method?.trim().toLowerCase() || null,
           description: data.description?.trim().toLowerCase() || null,

@@ -17,7 +17,6 @@ export type SaleIntent = {
   // stock but internal sales don't bind to one.
   size: string | null;
   priceUyu: number;
-  exchangeRate: number;
   date: Date;
   method: string | null;
   description: string | null;
