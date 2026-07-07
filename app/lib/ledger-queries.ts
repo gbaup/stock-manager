@@ -92,7 +92,7 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
         arrivalDate: true,
         supplier: true,
         supplierPayments: { select: { userId: true, amountUsd: true, cardTaxPct: true, user: { select: { alias: true } } } },
-        items: { select: { basePriceUsd: true } },
+        _count: { select: { items: true } },
         shipments: {
           select: {
             id: true,
@@ -109,21 +109,28 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
       },
       orderBy: { purchaseDate: 'desc' },
     }),
-    prisma.sale.findMany({
-      select: {
-        id: true,
-        price: true,
-        date: true,
-        collectedByUserId: true,
-        collectedByUser: { select: { alias: true } },
-        item: {
-          select: {
-            product: { select: { team: { select: { name: true } } } },
-          },
-        },
-      },
-      orderBy: { date: 'desc' },
-    }),
+    prisma.$queryRaw<Array<{
+      id: string;
+      price: string;
+      date: Date;
+      collected_by_user_id: string | null;
+      collected_by_alias: string | null;
+      team_name: string;
+    }>>`
+      SELECT
+        s.id,
+        s.price,
+        s.date,
+        s.collected_by_user_id,
+        u.alias  AS collected_by_alias,
+        t.name   AS team_name
+      FROM sales s
+      LEFT JOIN users u  ON s.collected_by_user_id = u.id
+      JOIN inventory_items  ii ON s.inventory_item_id  = ii.id
+      JOIN catalog_products cp ON ii.catalog_product_id = cp.id
+      JOIN teams            t  ON cp.team_id            = t.id
+      ORDER BY s.date DESC
+    `,
     prisma.expense.findMany({ orderBy: { date: 'desc' }, include: { paidByUser: true } }),
     prisma.conversion.findMany({ orderBy: { date: 'desc' }, include: { fromUser: true, toUser: true } }),
     prisma.adjustment.findMany({ orderBy: { date: 'desc' }, include: { user: true } }),
@@ -135,7 +142,7 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
     purchaseDate: toISODate(b.purchaseDate)!,
     arrivalDate: toISODate(b.arrivalDate),
     supplier: b.supplier,
-    quantity: b.items.length,
+    quantity: b._count.items,
     supplierPayments: b.supplierPayments.map((p) => ({
       userId: p.userId,
       alias: p.user.alias,
@@ -160,10 +167,10 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
     id: s.id,
     date: toISODate(s.date)!,
     price: Number(s.price),
-    collectedByUserId: s.collectedByUserId,
-    collectedByAlias: s.collectedByUser?.alias ?? null,
+    collectedByUserId: s.collected_by_user_id,
+    collectedByAlias: s.collected_by_alias,
     quantity: 1,
-    model: s.item.product.team.name,
+    model: s.team_name,
   }));
 
   const movements = buildMovements({
