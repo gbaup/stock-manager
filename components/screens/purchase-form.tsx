@@ -10,7 +10,7 @@ import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
 import { ChevronRight, Plus, Shirt, X, Truck } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
-import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
+import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray, applyCardTax } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
@@ -108,7 +108,7 @@ export function PurchaseForm({
 
   const grossPayments = toSupplierPaymentArray(watchedPayments).map((p) => {
     const pct = parseFloat(watchedCardTaxPcts[p.userId] ?? '') || 0;
-    return { ...p, grossUsd: Math.round(p.amountUsd * (1 + pct / 100) * 100) / 100 };
+    return { ...p, grossUsd: applyCardTax(p.amountUsd, pct) };
   });
   const totalGrossUsd = grossPayments.reduce((s, p) => s + p.grossUsd, 0);
   const hasTax = grossPayments.some((p) => p.grossUsd > p.amountUsd);

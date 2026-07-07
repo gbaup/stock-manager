@@ -1,6 +1,5 @@
 'use server';
 
-import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
@@ -8,7 +7,7 @@ import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
 import { computeShippingPrice } from '@/app/lib/money';
 import { baseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
-import { CACHE_TAGS } from '@/app/lib/cache-tags';
+import { invalidatePurchase } from '@/app/lib/cache-tags';
 
 const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
@@ -89,9 +88,7 @@ export async function createPurchase(data: {
     await addBatchItems(batch.id, itemsWithTax, data.exchangeRate, tx);
   });
 
-  updateTag(CACHE_TAGS.purchases);
-  updateTag(CACHE_TAGS.models);
-  updateTag(CACHE_TAGS.saldos);
+  invalidatePurchase();
   redirect('/purchases');
 }
 
@@ -160,8 +157,6 @@ export async function markArrived(
     }
   });
 
-  updateTag(CACHE_TAGS.purchases);
-  updateTag(CACHE_TAGS.models);
-  updateTag(CACHE_TAGS.saldos);
+  invalidatePurchase();
   redirect('/purchases');
 }

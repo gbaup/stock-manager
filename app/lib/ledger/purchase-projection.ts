@@ -1,4 +1,5 @@
 import type { Movement } from './types';
+import { applyCardTax } from '../domain';
 
 // Structural shape of a batch that this projection needs. Any object that
 // matches it works — BatchSummary (used by purchase listings) is a superset,
@@ -42,8 +43,7 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
 
   for (const p of paying) {
     const splitPct = Math.round((p.amountUsd / totalUsd) * 100);
-    const taxMultiplier = 1 + (p.cardTaxPct ?? 0) / 100;
-    const grossUsd = Math.round(p.amountUsd * taxMultiplier * 100) / 100;
+    const grossUsd = applyCardTax(p.amountUsd, p.cardTaxPct);
     const taxSuffix = p.cardTaxPct && p.cardTaxPct > 0 ? ` +${p.cardTaxPct}%` : '';
     out.push({
       id: `pago-prov-${batch.id}-${p.userId}`,
