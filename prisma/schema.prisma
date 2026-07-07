@@ -13,6 +13,9 @@ model User {
   lastName     String  @map("last_name") @db.VarChar(100)
   email        String  @unique @db.VarChar(100)
   passwordHash String  @map("password_hash") @db.VarChar(255)
+  // WhatsApp allowlist: E.164 digits (no '+'), e.g. "59899123456". Sender phone
+  // matching a User is treated as an admin by the WhatsApp bot.
+  phoneNumber  String? @unique @map("phone_number") @db.VarChar(20)
 
   salesLogged         Sale[]       @relation("SaleLogger")
   salesCollected      Sale[]       @relation("SaleCollector")
@@ -53,10 +56,11 @@ model Batch {
 }
 
 model BatchSupplierPayment {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  batchId   String  @map("batch_id") @db.Uuid
-  userId    String  @map("user_id") @db.Uuid
-  amountUsd Decimal @map("amount_usd") @db.Decimal(10, 2)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  amountUsd   Decimal  @map("amount_usd") @db.Decimal(10, 2)
+  cardTaxPct  Decimal? @map("card_tax_pct") @db.Decimal(5, 2)
 
   batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   user  User  @relation("BatchSupplierPaymentUser", fields: [userId], references: [id])
@@ -228,4 +232,18 @@ model Adjustment {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("adjustments")
+}
+
+// Per-phone WhatsApp bot conversation state. Webhooks are stateless, so the
+// current step and accumulated form data (draft sale / query context) live here,
+// keyed by the sender's WhatsApp number.
+model BotConversation {
+  phone         String   @id @db.VarChar(20)
+  role          String   @db.VarChar(10) // 'admin' | 'public'
+  step          String   @db.VarChar(40) // current state-machine step
+  data          Json     @default("{}") // accumulated fields for the active flow
+  lastMessageId String?  @map("last_message_id") @db.VarChar(128) // dedupe Meta retries
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("bot_conversations")
 }

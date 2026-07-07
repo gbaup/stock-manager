@@ -1,6 +1,5 @@
 'use server';
 
-import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
@@ -8,7 +7,7 @@ import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
 import { computeShippingPrice } from '@/app/lib/money';
 import { baseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
-import { CACHE_TAGS } from '@/app/lib/cache-tags';
+import { invalidatePurchase } from '@/app/lib/cache-tags';
 
 const createPurchaseSchema = z.object({
   purchaseDate: z.string().min(1),
@@ -17,6 +16,7 @@ const createPurchaseSchema = z.object({
   supplierPayments: z.array(z.object({
     userId: z.string().uuid(),
     amountUsd: z.number().finite().positive(),
+    cardTaxPct: z.number().finite().min(0).max(100).optional(),
   })).optional(),
   exchangeRate: z.number().finite().positive(),
   items: z.array(z.object({
@@ -33,7 +33,7 @@ export async function createPurchase(data: {
   purchaseDate: string;
   supplier?: string;
   description?: string;
-  supplierPayments?: { userId: string; amountUsd: number }[];
+  supplierPayments?: { userId: string; amountUsd: number; cardTaxPct?: number }[];
   exchangeRate: number;
   items: PurchaseItem[];
 }) {
@@ -51,9 +51,24 @@ export async function createPurchase(data: {
   // amount is given, all payments together must cover the batch's base cost —
   // the form enforces this too, but re-check here against tampered payloads.
   const payments = (data.supplierPayments ?? []).filter((p) => p.amountUsd > 0);
-  if (reconcileSupplierPayments(payments, baseCostUsd(expandedItems)).status === 'mismatch') {
+  const baseTotal = baseCostUsd(expandedItems);
+  if (reconcileSupplierPayments(payments, baseTotal).status === 'mismatch') {
     throw new Error('Los pagos al proveedor deben sumar el costo base total');
   }
+
+  // Spread card taxes proportionally into each item's base price so profit
+  // calculations reflect the true acquisition cost. The multiplier is the
+  // ratio of gross cost (base + all card fees) to base cost. Items with a
+  // higher base price bear a proportionally larger share of the tax.
+  const totalCardTax = payments.reduce((s, p) => s + p.amountUsd * ((p.cardTaxPct ?? 0) / 100), 0);
+  if (totalCardTax > 0 && baseTotal === 0) {
+    throw new Error('No se puede aplicar recargo de tarjeta cuando el costo base es cero');
+  }
+  const grossMultiplier = totalCardTax > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
+  const itemsWithTax = expandedItems.map((it) => ({
+    ...it,
+    basePriceUsd: Math.round(it.basePriceUsd * grossMultiplier * 10000) / 10000,
+  }));
 
   await prisma.$transaction(async (tx) => {
     const batch = await tx.batch.create({
@@ -61,20 +76,22 @@ export async function createPurchase(data: {
         purchaseDate: new Date(data.purchaseDate),
         supplier: data.supplier?.trim().toLowerCase() || null,
         description: data.description?.trim().toLowerCase() || null,
-        quantity: expandedItems.length,
+        quantity: itemsWithTax.length,
         supplierPayments: {
-          create: payments.map((p) => ({ userId: p.userId, amountUsd: p.amountUsd })),
+          create: payments.map((p) => ({
+            userId: p.userId,
+            amountUsd: p.amountUsd,
+            cardTaxPct: p.cardTaxPct != null && p.cardTaxPct > 0 ? p.cardTaxPct : null,
+          })),
         },
       },
       select: { id: true },
     });
 
-    await addBatchItems(batch.id, expandedItems, data.exchangeRate, tx);
+    await addBatchItems(batch.id, itemsWithTax, data.exchangeRate, tx);
   });
 
-  updateTag(CACHE_TAGS.purchases);
-  updateTag(CACHE_TAGS.models);
-  updateTag(CACHE_TAGS.saldos);
+  invalidatePurchase();
   redirect('/purchases');
 }
 
@@ -143,8 +160,6 @@ export async function markArrived(
     }
   });
 
-  updateTag(CACHE_TAGS.purchases);
-  updateTag(CACHE_TAGS.models);
-  updateTag(CACHE_TAGS.saldos);
+  invalidatePurchase();
   redirect('/purchases');
 }

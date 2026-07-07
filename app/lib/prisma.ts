@@ -7,7 +7,7 @@ const g = globalThis as unknown as { __prisma?: PrismaClient };
 function createClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 1,
+    max: 5,
   });
   return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
