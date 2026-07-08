@@ -123,19 +123,31 @@ export function GastoForm({ users, onDone }: { users: UserSummary[]; onDone?: ()
         </div>
       )}
 
-      <button
-        className="btn btn-primary"
-        style={{ marginTop: 4 }}
-        disabled={pending}
-        onClick={handleSubmit(onSubmit)}
-      >
-        {pending ? 'Registrando…' : 'Registrar gasto'}
-      </button>
+      {!onDone && (
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: 4 }}
+          disabled={pending}
+          onClick={handleSubmit(onSubmit)}
+        >
+          {pending ? 'Registrando…' : 'Registrar gasto'}
+        </button>
+      )}
     </>
   );
 
   if (onDone) {
-    return formFields;
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <div className="dm-foot">
+          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+          <button className="btn btn-primary" disabled={pending} onClick={handleSubmit(onSubmit)}>
+            {pending ? 'Registrando…' : 'Registrar gasto'}
+          </button>
+        </div>
+      </>
+    );
   }
 
   return (

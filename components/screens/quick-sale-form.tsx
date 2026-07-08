@@ -269,21 +269,33 @@ export function QuickSaleForm({
               {saveError}
             </div>
           )}
-          <button
-            className="btn btn-primary"
-            style={{ marginTop: 14 }}
-            disabled={!canSave || pending}
-            onClick={handleSave}
-          >
-            {pending ? 'Registrando…' : 'Registrar venta'}
-          </button>
+          {!onDone && (
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 14 }}
+              disabled={!canSave || pending}
+              onClick={handleSave}
+            >
+              {pending ? 'Registrando…' : 'Registrar venta'}
+            </button>
+          )}
         </>
       )}
     </>
   );
 
   if (onDone) {
-    return formFields;
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <div className="dm-foot">
+          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+          <button className="btn btn-primary" disabled={!canSave || pending} onClick={handleSave}>
+            {pending ? 'Registrando…' : 'Registrar venta'}
+          </button>
+        </div>
+      </>
+    );
   }
 
   return (

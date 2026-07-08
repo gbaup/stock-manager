@@ -189,10 +189,12 @@ export function PurchaseForm({
         El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
       </div>
 
-      <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
-        Siguiente: agregar items
-        <ChevronRight size={18} strokeWidth={1.8} />
-      </button>
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
+          Siguiente: agregar items
+          <ChevronRight size={18} strokeWidth={1.8} />
+        </button>
+      )}
     </>
   );
 
@@ -368,9 +370,11 @@ export function PurchaseForm({
         <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
       </div>
 
-      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
-        {pending ? 'Registrando…' : 'Registrar compra'}
-      </button>
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+          {pending ? 'Registrando…' : 'Registrar compra'}
+        </button>
+      )}
     </>
   );
 
@@ -391,20 +395,28 @@ export function PurchaseForm({
   ) : null;
 
   if (onDone) {
-    if (step === 1) {
-      return <>{step1Body}{confirmModal}</>;
-    }
     return (
       <>
-        <button
-          className="btn btn-secondary"
-          style={{ marginBottom: 12 }}
-          type="button"
-          onClick={() => setStep(1)}
-        >
-          ← Volver
-        </button>
-        {step2Body}
+        <div className="dm-body">
+          {step === 1 ? step1Body : step2Body}
+        </div>
+        <div className="dm-foot">
+          {step === 1 ? (
+            <>
+              <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+              <button className="btn btn-primary" onClick={handleNextStep}>
+                Siguiente <ChevronRight size={16} strokeWidth={1.8} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-secondary" onClick={() => setStep(1)}>← Volver</button>
+              <button className="btn btn-primary" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+                {pending ? 'Registrando…' : 'Registrar compra'}
+              </button>
+            </>
+          )}
+        </div>
         {confirmModal}
       </>
     );

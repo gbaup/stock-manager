@@ -155,14 +155,26 @@ export function SaleForm({ model, stock, usdRate, users, onDone }: { model: Mode
         />
       </Field>
 
-      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-        {pending ? 'Registrando…' : 'Registrar venta'}
-      </button>
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
+          {pending ? 'Registrando…' : 'Registrar venta'}
+        </button>
+      )}
     </>
   );
 
   if (onDone) {
-    return formFields;
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <div className="dm-foot">
+          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+          <button className="btn btn-primary" disabled={pending} onClick={handleSubmit(onSubmit)}>
+            {pending ? 'Registrando…' : 'Registrar venta'}
+          </button>
+        </div>
+      </>
+    );
   }
 
   return (

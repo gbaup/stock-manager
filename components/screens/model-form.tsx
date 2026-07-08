@@ -203,14 +203,26 @@ export function ModelForm({
         />
       </Field>
 
-      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-        {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
-      </button>
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
+          {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
+        </button>
+      )}
     </>
   );
 
   if (onDone) {
-    return formFields;
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <div className="dm-foot">
+          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+          <button className="btn btn-primary" disabled={pending} onClick={handleSubmit(onSubmit)}>
+            {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
+          </button>
+        </div>
+      </>
+    );
   }
 
   return (

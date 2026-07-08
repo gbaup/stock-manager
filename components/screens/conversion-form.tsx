@@ -101,8 +101,8 @@ export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone
     });
   }
 
-  const bodyContent = (
-    <div className="body-pad-no-nav">
+  const bodyFields = (
+    <>
           <div className="section-label">Origen · de dónde sale</div>
           <div className="field-row">
             <Field label="Socio">
@@ -227,15 +227,17 @@ export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone
             <p style={{ color: 'var(--danger)', fontSize: 13, textAlign: 'center', margin: '10px 0 0' }}>{error}</p>
           )}
 
-          <button
-            className="btn btn-primary"
-            style={{ marginTop: 14 }}
-            disabled={!canSave || pending}
-            onClick={() => canSave && setConfirm(true)}
-          >
-            {pending ? 'Registrando…' : (sameCur ? 'Registrar transferencia' : 'Registrar cambio')}
-          </button>
-        </div>
+          {!onDone && (
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 14 }}
+              disabled={!canSave || pending}
+              onClick={() => canSave && setConfirm(true)}
+            >
+              {pending ? 'Registrando…' : (sameCur ? 'Registrar transferencia' : 'Registrar cambio')}
+            </button>
+          )}
+    </>
   );
 
   const confirmModal = confirm ? (
@@ -264,7 +266,18 @@ export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone
   ) : null;
 
   if (onDone) {
-    return <>{bodyContent}{confirmModal}</>;
+    return (
+      <>
+        <div className="dm-body">{bodyFields}</div>
+        <div className="dm-foot">
+          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+          <button className="btn btn-primary" disabled={!canSave || pending} onClick={() => canSave && setConfirm(true)}>
+            {pending ? 'Registrando…' : (sameCur ? 'Registrar transferencia' : 'Registrar cambio')}
+          </button>
+        </div>
+        {confirmModal}
+      </>
+    );
   }
 
   return (
@@ -278,7 +291,9 @@ export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone
         isSaving={pending}
         savingLabel="Registrando…"
       />
-      <div className="body">{bodyContent}</div>
+      <div className="body">
+        <div className="body-pad-no-nav">{bodyFields}</div>
+      </div>
       {confirmModal}
     </div>
   );

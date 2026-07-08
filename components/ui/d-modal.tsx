@@ -56,22 +56,20 @@ export function DModal({
           </button>
         </div>
 
-        <div className="dm-body">{children}</div>
+        {children}
 
-        {(onConfirm || cancelLabel) && (
+        {onConfirm && confirmLabel && (
           <div className="dm-foot">
-            <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={isConfirming}>
+            <button className="btn btn-secondary" onClick={onClose} disabled={isConfirming}>
               {cancelLabel}
             </button>
-            {onConfirm && confirmLabel && (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={onConfirm}
-                disabled={!canConfirm || isConfirming}
-              >
-                {isConfirming ? 'Guardando…' : confirmLabel}
-              </button>
-            )}
+            <button
+              className="btn btn-primary"
+              onClick={onConfirm}
+              disabled={!canConfirm || isConfirming}
+            >
+              {isConfirming ? 'Guardando…' : confirmLabel}
+            </button>
           </div>
         )}
       </div>

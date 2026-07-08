@@ -228,14 +228,16 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
         </span>
       </div>
 
-      <button
-        className="btn btn-primary"
-        style={{ marginTop: 16 }}
-        disabled={pending || !canSave}
-        onClick={handleSubmit(onSubmit)}
-      >
-        {pending ? 'Confirmando…' : leftover > 0 ? 'Confirmar envío parcial' : 'Confirmar llegada'}
-      </button>
+      {!onDone && (
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: 16 }}
+          disabled={pending || !canSave}
+          onClick={handleSubmit(onSubmit)}
+        >
+          {pending ? 'Confirmando…' : leftover > 0 ? 'Confirmar envío parcial' : 'Confirmar llegada'}
+        </button>
+      )}
     </>
   );
 
@@ -256,7 +258,18 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
   ) : null;
 
   if (onDone) {
-    return <>{formFields}{confirmModal}</>;
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <div className="dm-foot">
+          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+          <button className="btn btn-primary" disabled={pending || !canSave} onClick={handleSubmit(onSubmit)}>
+            {pending ? 'Confirmando…' : leftover > 0 ? 'Confirmar envío parcial' : 'Confirmar llegada'}
+          </button>
+        </div>
+        {confirmModal}
+      </>
+    );
   }
 
   return (
