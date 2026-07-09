@@ -43,7 +43,7 @@ export function SaleForm({ model, stock, usdRate, users, onDone }: { model: Mode
 
   function onSubmit(data: SaleFormValues) {
     startTransition(async () => {
-      await createSale(model.id, data);
+      await createSale(model.id, data, { skipRedirect: !!onDone });
       onDone?.();
     });
   }

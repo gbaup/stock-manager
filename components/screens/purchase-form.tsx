@@ -139,7 +139,7 @@ export function PurchaseForm({
             basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
             quantity: it.quantity ?? 1,
           })),
-      });
+      }, { skipRedirect: !!onDone });
       onDone?.();
     });
   }

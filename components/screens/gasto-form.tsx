@@ -46,7 +46,7 @@ export function GastoForm({ users, onDone }: { users: UserSummary[]; onDone?: ()
         currency: data.currency,
         paidByUserId: data.paidByUserId,
         date: data.date,
-      });
+      }, { skipRedirect: !!onDone });
       onDone?.();
     });
   }

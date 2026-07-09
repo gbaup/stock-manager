@@ -85,7 +85,7 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
         shippingPaidByUserId: data.shippingPaidByUserId,
         itemIds: [...picked],
         exchangeRate: rate.value,
-      });
+      }, { skipRedirect: !!onDone });
       onDone?.();
     });
   }

@@ -4318,6 +4318,10 @@ body {
   font-family: var(--font-mono);
   word-break: break-word;
 }
+.sidebar {
+  display: none;
+}
+
 /* ============================================================
    Desktop layer — ≥1024px
    Adds: sidebar shell, main-header, split view, dtable, DModal.

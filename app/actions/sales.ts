@@ -63,7 +63,8 @@ export async function createSaleFromHome(
   // which the caller's try/catch would swallow as a bogus save error.
 }
 
-export async function createSale(modelId: string, data: SaleInput) {
+export async function createSale(modelId: string, data: SaleInput, opts?: { skipRedirect?: boolean }) {
   await executeSale(modelId, data);
+  if (opts?.skipRedirect) return;
   redirect('/');
 }

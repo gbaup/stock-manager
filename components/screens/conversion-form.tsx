@@ -94,7 +94,7 @@ export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone
           rate: sameCur ? 1 : rate,
           toAmount: result,
           date: todayISO(),
-        });
+        }, { skipRedirect: !!onDone });
         onDone?.();
       } catch {
         setError('No se pudo registrar. Intentá de nuevo.');

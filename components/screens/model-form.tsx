@@ -61,19 +61,15 @@ export function ModelForm({
   function onSubmit(data: ModelFormValues) {
     startTransition(async () => {
       const result = initial?.id
-        ? await updateModel(initial.id, data)
-        : await createModel(data, { fromPurchase });
+        ? await updateModel(initial.id, data, { skipRedirect: !!onDone })
+        : await createModel(data, { fromPurchase, skipRedirect: !!onDone });
       if (result?.errors) {
         for (const [field, messages] of Object.entries(result.errors)) {
           setError(field as keyof ModelFormValues, { message: (messages as string[])[0] });
         }
         return;
       }
-      if (onDone) {
-        onDone();
-      } else if (!initial?.id) {
-        // createModel action likely redirects; let the server action handle it
-      }
+      onDone?.();
     });
   }
 
