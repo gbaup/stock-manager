@@ -33,6 +33,8 @@ export function DModal({
     <div className="dm-scrim" onClick={onClose}>
       <div
         className={`dm-card dm-${size}`}
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="dm-head">

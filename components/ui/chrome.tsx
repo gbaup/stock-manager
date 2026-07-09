@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Package, Truck, Wallet, Eye, ChevronLeft, ChevronRight, Shirt } from 'lucide-react';
@@ -167,6 +167,10 @@ export function Sidebar({
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('nav-compact') === '1';
   });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('nav-compact', navCompact);
+  }, [navCompact]);
 
   function toggleCompact() {
     setNavCompact((c) => {
