@@ -18,8 +18,8 @@ When adding a migration: edit `prisma/schema.prisma`, then run `npx prisma migra
 
 **Next.js App Router** with a clear separation between reads and mutations:
 
-- `app/lib/queries.ts` — all read-only DB access (server-side only)
-- `app/actions/` — Server Actions for mutations (each file groups actions by domain: models, sales, purchases, etc.)
+- `app/lib/queries.ts` — all read-only DB access (server-side only). Every actual query lives here, including ones a Client Component needs on demand (not at render time) — never write Prisma calls directly in `app/actions/`.
+- `app/actions/` — Server Actions for mutations (each file groups actions by domain: models, sales, purchases, etc.), plus thin client-read RPC boundaries (e.g. `read.ts`) that a Client Component calls to fetch on demand outside of render. These must delegate to `queries.ts`, not query Prisma directly, and must live in their own file with a file-level `'use server'` directive — Next.js doesn't allow mixing `'use server'` and `'use cache'` functions in one file once a Client Component can reach it.
 - `app/api/` — API Routes for things that need raw HTTP (e.g. `upload/route.ts` for Cloudinary multipart upload)
 - `app/lib/schemas.ts` — Zod schemas shared between server actions and client forms
 - `app/lib/domain.ts` — serialization-safe domain types, domain constants (`PEOPLE`, `SIZES`, `VERSIONS`, etc.), and formatting utilities (`fmtDate`, `uyu`, `usd`)

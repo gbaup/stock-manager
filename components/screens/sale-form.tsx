@@ -16,8 +16,9 @@ import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSale } from '@/app/actions/sales';
 import { coverOf } from '@/components/ui/swatch';
 import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
-export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[] }) {
+export function SaleForm({ model, stock, usdRate, users, onDone }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[]; onDone?: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const sizeStock = sizeStockOf(model);
@@ -42,8 +43,134 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
 
   function onSubmit(data: SaleFormValues) {
     startTransition(async () => {
-      await createSale(model.id, data);
+      await createSale(model.id, data, { skipRedirect: !!onDone });
+      onDone?.();
     });
+  }
+
+  const formFields = (
+    <>
+      <div className="detail-hero" style={{ marginBottom: 4 }}>
+        <Swatch
+          color={model.color}
+          number={model.number}
+          photo={coverOf(model)}
+          style={{ width: 64, height: 74, fontSize: 24 }}
+        />
+        <div>
+          <div className="detail-team" style={{ fontSize: 19 }}>{model.team}</div>
+          <div className="detail-meta">{model.season} · {model.version} · {stock} en stock</div>
+        </div>
+      </div>
+
+      <div className="section-label">Venta</div>
+      <Field label="Talle" error={errors.size?.message}>
+        <Controller
+          name="size"
+          control={control}
+          render={({ field }) => (
+            <SizePicker availableBySize={model.availableBySize} value={field.value} onChange={field.onChange} />
+          )}
+        />
+      </Field>
+
+      <Field label="Precio de venta (UYU)" error={errors.price?.message}>
+        <Controller
+          name="price"
+          control={control}
+          render={({ field }) => (
+            <MoneyInput value={field.value} onChange={field.onChange} placeholder="2200" />
+          )}
+        />
+      </Field>
+      {price > 0 && (
+        <div style={{ fontSize: 12.5, color: 'var(--text-faint)', margin: '-6px 2px 12px', fontFamily: 'var(--font-mono)' }}>
+          ≈ {usd(money.toUsd(price, usdRate))} · total {uyu(price * qty)}
+        </div>
+      )}
+
+      <div className="field-row">
+        <Field label="Cantidad" error={errors.quantity?.message}>
+          <Controller
+            name="quantity"
+            control={control}
+            render={({ field }) => (
+              <TextInput
+                value={field.value}
+                onChange={(v) => field.onChange(v.replace(/[^\d]/g, ''))}
+                mono
+                inputMode="numeric"
+              />
+            )}
+          />
+        </Field>
+        <Field label="Fecha" error={errors.date?.message}>
+          <input className="input mono" type="date" {...register('date')} />
+        </Field>
+      </div>
+
+      <Field label="Método de pago" optional>
+        <Controller
+          name="method"
+          control={control}
+          render={({ field }) => (
+            <SelectInput value={field.value ?? ''} onChange={field.onChange} options={METHODS} placeholder="Elegí un método…" />
+          )}
+        />
+      </Field>
+
+      <div className="section-label">Cobro</div>
+      <Field label="¿Quién cobró?" error={errors.collectedByUserId?.message}>
+        <Controller
+          name="collectedByUserId"
+          control={control}
+          render={({ field }) => (
+            <Segmented
+              options={users.map((u) => u.alias)}
+              value={users.find((u) => u.id === field.value)?.alias ?? ''}
+              onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
+              full
+            />
+          )}
+        />
+      </Field>
+      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
+        Suma al saldo en mano de quien recibe la plata.
+      </div>
+
+      {collectedByAlias && price > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+          <span className="mov-chip pos" style={{ fontSize: 14 }}>
+            {collectedByAlias} cobra {uyu(price * qty)}
+          </span>
+        </div>
+      )}
+
+      <Field label="Descripción" optional>
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <TextAreaInput value={field.value ?? ''} onChange={field.onChange} placeholder="Comprador, notas…" />
+          )}
+        />
+      </Field>
+
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
+          {pending ? 'Registrando…' : 'Registrar venta'}
+        </button>
+      )}
+    </>
+  );
+
+  if (onDone) {
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <ModalFooter pending={pending} onCancel={onDone} onConfirm={handleSubmit(onSubmit)} confirmLabel="Registrar venta" />
+      </>
+    );
   }
 
   return (
@@ -57,115 +184,7 @@ export function SaleForm({ model, stock, usdRate, users }: { model: ModelWithSta
       />
       <div className="body">
         <div className="body-pad">
-          <div className="detail-hero" style={{ marginBottom: 4 }}>
-            <Swatch
-              color={model.color}
-              number={model.number}
-              photo={coverOf(model)}
-              style={{ width: 64, height: 74, fontSize: 24 }}
-            />
-            <div>
-              <div className="detail-team" style={{ fontSize: 19 }}>{model.team}</div>
-              <div className="detail-meta">{model.season} · {model.version} · {stock} en stock</div>
-            </div>
-          </div>
-
-          <div className="section-label">Venta</div>
-          <Field label="Talle" error={errors.size?.message}>
-            <Controller
-              name="size"
-              control={control}
-              render={({ field }) => (
-                <SizePicker availableBySize={model.availableBySize} value={field.value} onChange={field.onChange} />
-              )}
-            />
-          </Field>
-
-          <Field label="Precio de venta (UYU)" error={errors.price?.message}>
-            <Controller
-              name="price"
-              control={control}
-              render={({ field }) => (
-                <MoneyInput value={field.value} onChange={field.onChange} placeholder="2200" />
-              )}
-            />
-          </Field>
-          {price > 0 && (
-            <div style={{ fontSize: 12.5, color: 'var(--text-faint)', margin: '-6px 2px 12px', fontFamily: 'var(--font-mono)' }}>
-              ≈ {usd(money.toUsd(price, usdRate))} · total {uyu(price * qty)}
-            </div>
-          )}
-
-          <div className="field-row">
-            <Field label="Cantidad" error={errors.quantity?.message}>
-              <Controller
-                name="quantity"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    value={field.value}
-                    onChange={(v) => field.onChange(v.replace(/[^\d]/g, ''))}
-                    mono
-                    inputMode="numeric"
-                  />
-                )}
-              />
-            </Field>
-            <Field label="Fecha" error={errors.date?.message}>
-              <input className="input mono" type="date" {...register('date')} />
-            </Field>
-          </div>
-
-          <Field label="Método de pago" optional>
-            <Controller
-              name="method"
-              control={control}
-              render={({ field }) => (
-                <SelectInput value={field.value ?? ''} onChange={field.onChange} options={METHODS} placeholder="Elegí un método…" />
-              )}
-            />
-          </Field>
-
-          <div className="section-label">Cobro</div>
-          <Field label="¿Quién cobró?" error={errors.collectedByUserId?.message}>
-            <Controller
-              name="collectedByUserId"
-              control={control}
-              render={({ field }) => (
-                <Segmented
-                  options={users.map((u) => u.alias)}
-                  value={users.find((u) => u.id === field.value)?.alias ?? ''}
-                  onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
-                  full
-                />
-              )}
-            />
-          </Field>
-          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
-            Suma al saldo en mano de quien recibe la plata.
-          </div>
-
-          {collectedByAlias && price > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <span className="mov-chip pos" style={{ fontSize: 14 }}>
-                {collectedByAlias} cobra {uyu(price * qty)}
-              </span>
-            </div>
-          )}
-
-          <Field label="Descripción" optional>
-            <Controller
-              name="description"
-              control={control}
-              render={({ field }) => (
-                <TextAreaInput value={field.value ?? ''} onChange={field.onChange} placeholder="Comprador, notas…" />
-              )}
-            />
-          </Field>
-
-          <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-            {pending ? 'Registrando…' : 'Registrar venta'}
-          </button>
+          {formFields}
         </div>
       </div>
     </div>

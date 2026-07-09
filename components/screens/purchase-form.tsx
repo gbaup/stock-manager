@@ -19,6 +19,7 @@ import { coverOf } from '@/components/ui/swatch';
 import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
+import { useConfirmGate } from '@/app/lib/hooks';
 
 const DRAFT_KEY = 'purchase-draft';
 
@@ -28,18 +29,18 @@ export function PurchaseForm({
   newModelId,
   users,
   rate,
+  onDone,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
   newModelId?: string;
   users: UserSummary[];
   rate: RateResult;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingData, setPendingData] = useState<PurchaseFormValues | null>(null);
 
   const {
     control,
@@ -138,16 +139,18 @@ export function PurchaseForm({
             basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
             quantity: it.quantity ?? 1,
           })),
-      });
+      }, { skipRedirect: !!onDone });
+      onDone?.();
     });
   }
+
+  const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
 
   function onSubmit(data: PurchaseFormValues) {
     const { status } = reconcileSupplierPayments(toSupplierPaymentArray(data.supplierPayments), totalUsd);
     if (needsSupplierPayer && status === 'empty') {
       // Nobody paid yet — a valid state, but confirm before saving.
-      setPendingData(data);
-      setShowConfirm(true);
+      requestConfirm(data);
       return;
     }
     if (needsSupplierPayer && status === 'mismatch') {
@@ -155,6 +158,265 @@ export function PurchaseForm({
       return;
     }
     doSubmit(data);
+  }
+
+  const step1Body = (
+    <>
+      <div className="section-label">Info del batch</div>
+      <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
+        <input className="input mono" type="date" {...register('purchaseDate')} />
+      </Field>
+
+      <Field label="Proveedor" optional>
+        <Controller
+          name="supplier"
+          control={control}
+          render={({ field }) => (
+            <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
+          )}
+        />
+      </Field>
+      <Field label="Descripción" optional>
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <TextAreaInput value={field.value ?? ''} onChange={field.onChange} placeholder="Notas del pedido…" />
+          )}
+        />
+      </Field>
+      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -2, marginBottom: 4 }}>
+        El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
+      </div>
+
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
+          Siguiente: agregar items
+          <ChevronRight size={18} strokeWidth={1.8} />
+        </button>
+      )}
+    </>
+  );
+
+  const step2Body = (
+    <>
+      {validItems.length > 0 && (
+        <div className="batch-summary">
+          <div className="bs-row">
+            <span>Cantidad</span>
+            <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
+          </div>
+          <div className="bs-row">
+            <span>Costo base total</span>
+            <strong>{usd(totalUsd)}</strong>
+          </div>
+          <div className="bs-row">
+            <span>Tipo de cambio</span>
+            <strong>$U {fmtRate(rate.value)}</strong>
+          </div>
+        </div>
+      )}
+
+      <button
+        className="btn btn-secondary"
+        style={{ marginTop: 12 }}
+        type="button"
+        onClick={() => prepend({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
+      >
+        <Plus size={19} strokeWidth={1.8} />Agregar item
+      </button>
+
+      <div className="section-label">Items del batch</div>
+      {fields.length === 0 && (
+        <Empty title="Sin items todavía" desc="Agregá un item por cada camiseta del pedido." icon="box" />
+      )}
+      {errors.items?.root?.message && (
+        <span className="field-error" style={{ marginBottom: 8, display: 'block' }}>
+          {errors.items.root.message}
+        </span>
+      )}
+      <div className="item-list">
+        {fields.map((field, index) => {
+          const modelId = watchedItems[index]?.modelId;
+          const m = models.find((x) => x.id === modelId);
+          return (
+            <div key={field.id} className="item-card">
+              <div className="item-head">
+                <span className="item-idx">{index + 1}</span>
+                {m ? (
+                  <Swatch
+                    color={m.color}
+                    number={m.number}
+                    photo={coverOf(m)}
+                    style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }}
+                  />
+                ) : (
+                  <div className="item-swatch-empty"><Shirt size={16} strokeWidth={1.8} /></div>
+                )}
+                <div className="item-model">
+                  <Controller
+                    name={`items.${index}.modelId`}
+                    control={control}
+                    render={({ field: f }) => (
+                      <ProductPicker
+                        value={f.value ?? ''}
+                        onChange={f.onChange}
+                        models={models}
+                        recentIds={watchedItems
+                          .map((it, i) => (i !== index ? it.modelId : ''))
+                          .filter(Boolean)}
+                        onRequestCreate={(prefill) => requestCreateModel(index, prefill)}
+                      />
+                    )}
+                  />
+                </div>
+                <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
+                  <X size={17} strokeWidth={1.8} />
+                </button>
+              </div>
+              {errors.items?.[index]?.modelId?.message && (
+                <span className="field-error" style={{ marginTop: 4, display: 'block' }}>
+                  {errors.items[index].modelId.message}
+                </span>
+              )}
+              <div className="field-row" style={{ marginTop: 10 }}>
+                <Field label="Talle" error={errors.items?.[index]?.size?.message}>
+                  <Controller
+                    name={`items.${index}.size`}
+                    control={control}
+                    render={({ field: f }) => (
+                      <SelectInput value={f.value} onChange={f.onChange} options={sizesForType(m?.type)} placeholder="Talle…" />
+                    )}
+                  />
+                </Field>
+                <Field label="Cantidad">
+                  <Controller
+                    name={`items.${index}.quantity`}
+                    control={control}
+                    render={({ field: f }) => (
+                      <input
+                        className="input mono"
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={f.value ?? ''}
+                        onChange={(e) => f.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                        onBlur={(e) => { if (e.target.value === '') f.onChange(1); }}
+                      />
+                    )}
+                  />
+                </Field>
+              </div>
+              <div className="field-row" style={{ marginTop: 6 }}>
+                <Field label="Precio base">
+                  <Controller
+                    name={`items.${index}.basePriceUsd`}
+                    control={control}
+                    render={({ field: f }) => (
+                      <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                    )}
+                  />
+                </Field>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {needsSupplierPayer && (
+        <div style={{ marginTop: 14 }}>
+          <div className="section-label" style={{ margin: '0 0 8px' }}>
+            Pago al proveedor · {usd(totalUsd)}
+          </div>
+          {users.map((u) => (
+            <div key={u.id} className="field-row" style={{ alignItems: 'flex-end', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <Field label={u.alias} optional>
+                  <Controller
+                    name={`supplierPayments.${u.id}` as const}
+                    control={control}
+                    render={({ field: f }) => (
+                      <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                    )}
+                  />
+                </Field>
+              </div>
+              <div style={{ width: 112 }}>
+                <Field label="Recargo tarjeta" optional>
+                  <Controller
+                    name={`supplierCardTaxPcts.${u.id}` as const}
+                    control={control}
+                    render={({ field: f }) => (
+                      <MoneyInput prefix="%" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
+                    )}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
+            {paidSum > 0
+              ? <>
+                  {`Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`}
+                  {hasTax && !payMismatch && ` · Costo real ${usd(totalGrossUsd)}`}
+                </>
+              : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
+          </div>
+        </div>
+      )}
+
+      <div className="callout callout-warn">
+        <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
+      </div>
+
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+          {pending ? 'Registrando…' : 'Registrar compra'}
+        </button>
+      )}
+    </>
+  );
+
+  const confirmModal = showConfirm ? (
+    <Modal
+      icon={null}
+      title="Sin responsable de pago"
+      confirmLabel={pending ? 'Registrando…' : 'Registrar igual'}
+      cancelLabel="Volver"
+      onConfirm={confirm}
+      onCancel={cancel}
+    >
+      El costo no se va a descontar del saldo de nadie. Útil para stock inicial con precios de referencia.
+    </Modal>
+  ) : null;
+
+  if (onDone) {
+    return (
+      <>
+        <div className="dm-body">
+          {step === 1 ? step1Body : step2Body}
+        </div>
+        <div className="dm-foot">
+          {step === 1 ? (
+            <>
+              <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
+              <button className="btn btn-primary" onClick={handleNextStep}>
+                Siguiente <ChevronRight size={16} strokeWidth={1.8} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-secondary" onClick={() => setStep(1)}>← Volver</button>
+              <button className="btn btn-primary" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+                {pending ? 'Registrando…' : 'Registrar compra'}
+              </button>
+            </>
+          )}
+        </div>
+        {confirmModal}
+      </>
+    );
   }
 
   return (
@@ -171,234 +433,10 @@ export function PurchaseForm({
 
       <div className="body">
         <div className="body-pad">
-          {step === 1 ? (
-            <>
-              <div className="section-label">Info del batch</div>
-              <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
-                <input className="input mono" type="date" {...register('purchaseDate')} />
-              </Field>
-
-              <Field label="Proveedor" optional>
-                <Controller
-                  name="supplier"
-                  control={control}
-                  render={({ field }) => (
-                    <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
-                  )}
-                />
-              </Field>
-              <Field label="Descripción" optional>
-                <Controller
-                  name="description"
-                  control={control}
-                  render={({ field }) => (
-                    <TextAreaInput value={field.value ?? ''} onChange={field.onChange} placeholder="Notas del pedido…" />
-                  )}
-                />
-              </Field>
-              <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -2, marginBottom: 4 }}>
-                El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
-              </div>
-
-              <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
-                Siguiente: agregar items
-                <ChevronRight size={18} strokeWidth={1.8} />
-              </button>
-            </>
-          ) : (
-            <>
-              {validItems.length > 0 && (
-                <div className="batch-summary">
-                  <div className="bs-row">
-                    <span>Cantidad</span>
-                    <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
-                  </div>
-                  <div className="bs-row">
-                    <span>Costo base total</span>
-                    <strong>{usd(totalUsd)}</strong>
-                  </div>
-                  <div className="bs-row">
-                    <span>Tipo de cambio</span>
-                    <strong>$U {fmtRate(rate.value)}</strong>
-                  </div>
-                </div>
-              )}
-
-              <button
-                className="btn btn-secondary"
-                style={{ marginTop: 12 }}
-                type="button"
-                onClick={() => prepend({ modelId: '', size: '', basePriceUsd: '', quantity: 1 })}
-              >
-                <Plus size={19} strokeWidth={1.8} />Agregar item
-              </button>
-
-              <div className="section-label">Items del batch</div>
-              {fields.length === 0 && (
-                <Empty title="Sin items todavía" desc="Agregá un item por cada camiseta del pedido." icon="box" />
-              )}
-              {errors.items?.root?.message && (
-                <span className="field-error" style={{ marginBottom: 8, display: 'block' }}>
-                  {errors.items.root.message}
-                </span>
-              )}
-              <div className="item-list">
-                {fields.map((field, index) => {
-                  const modelId = watchedItems[index]?.modelId;
-                  const m = models.find((x) => x.id === modelId);
-                  return (
-                    <div key={field.id} className="item-card">
-                      <div className="item-head">
-                        <span className="item-idx">{index + 1}</span>
-                        {m ? (
-                          <Swatch
-                            color={m.color}
-                            number={m.number}
-                            photo={coverOf(m)}
-                            style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }}
-                          />
-                        ) : (
-                          <div className="item-swatch-empty"><Shirt size={16} strokeWidth={1.8} /></div>
-                        )}
-                        <div className="item-model">
-                          <Controller
-                            name={`items.${index}.modelId`}
-                            control={control}
-                            render={({ field: f }) => (
-                              <ProductPicker
-                                value={f.value ?? ''}
-                                onChange={f.onChange}
-                                models={models}
-                                recentIds={watchedItems
-                                  .map((it, i) => (i !== index ? it.modelId : ''))
-                                  .filter(Boolean)}
-                                onRequestCreate={(prefill) => requestCreateModel(index, prefill)}
-                              />
-                            )}
-                          />
-                        </div>
-                        <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
-                          <X size={17} strokeWidth={1.8} />
-                        </button>
-                      </div>
-                      {errors.items?.[index]?.modelId?.message && (
-                        <span className="field-error" style={{ marginTop: 4, display: 'block' }}>
-                          {errors.items[index].modelId.message}
-                        </span>
-                      )}
-                      <div className="field-row" style={{ marginTop: 10 }}>
-                        <Field label="Talle" error={errors.items?.[index]?.size?.message}>
-                          <Controller
-                            name={`items.${index}.size`}
-                            control={control}
-                            render={({ field: f }) => (
-                              <SelectInput value={f.value} onChange={f.onChange} options={sizesForType(m?.type)} placeholder="Talle…" />
-                            )}
-                          />
-                        </Field>
-                        <Field label="Cantidad">
-                          <Controller
-                            name={`items.${index}.quantity`}
-                            control={control}
-                            render={({ field: f }) => (
-                              <input
-                                className="input mono"
-                                type="number"
-                                min={1}
-                                inputMode="numeric"
-                                value={f.value ?? ''}
-                                onChange={(e) => f.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
-                                onBlur={(e) => { if (e.target.value === '') f.onChange(1); }}
-                              />
-                            )}
-                          />
-                        </Field>
-                      </div>
-                      <div className="field-row" style={{ marginTop: 6 }}>
-                        <Field label="Precio base">
-                          <Controller
-                            name={`items.${index}.basePriceUsd`}
-                            control={control}
-                            render={({ field: f }) => (
-                              <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                            )}
-                          />
-                        </Field>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {needsSupplierPayer && (
-                <div style={{ marginTop: 14 }}>
-                  <div className="section-label" style={{ margin: '0 0 8px' }}>
-                    Pago al proveedor · {usd(totalUsd)}
-                  </div>
-                  {users.map((u) => (
-                    <div key={u.id} className="field-row" style={{ alignItems: 'flex-end', gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <Field label={u.alias} optional>
-                          <Controller
-                            name={`supplierPayments.${u.id}` as const}
-                            control={control}
-                            render={({ field: f }) => (
-                              <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                            )}
-                          />
-                        </Field>
-                      </div>
-                      <div style={{ width: 112 }}>
-                        <Field label="Recargo tarjeta" optional>
-                          <Controller
-                            name={`supplierCardTaxPcts.${u.id}` as const}
-                            control={control}
-                            render={({ field: f }) => (
-                              <MoneyInput prefix="%" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                            )}
-                          />
-                        </Field>
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
-                    {paidSum > 0
-                      ? <>
-                          {`Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`}
-                          {hasTax && !payMismatch && ` · Costo real ${usd(totalGrossUsd)}`}
-                        </>
-                      : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
-                  </div>
-                </div>
-              )}
-
-              <div className="callout callout-warn">
-                <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
-              </div>
-
-              <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
-                {pending ? 'Registrando…' : 'Registrar compra'}
-              </button>
-            </>
-          )}
+          {step === 1 ? step1Body : step2Body}
         </div>
       </div>
-      {showConfirm && (
-        <Modal
-          icon={null}
-          title="Sin responsable de pago"
-          confirmLabel={pending ? 'Registrando…' : 'Registrar igual'}
-          cancelLabel="Volver"
-          onConfirm={() => {
-            setShowConfirm(false);
-            if (pendingData) doSubmit(pendingData);
-          }}
-          onCancel={() => { setShowConfirm(false); setPendingData(null); }}
-        >
-          El costo no se va a descontar del saldo de nadie. Útil para stock inicial con precios de referencia.
-        </Modal>
-      )}
+      {confirmModal}
     </div>
   );
 }

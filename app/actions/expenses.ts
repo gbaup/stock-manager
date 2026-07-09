@@ -6,13 +6,16 @@ import { prisma } from '@/app/lib/prisma';
 import { gastoSchema, parseOrThrow } from '@/app/lib/schemas';
 import { getCurrentUserId } from '@/app/lib/auth';
 
-export async function createExpense(data: {
-  title: string;
-  amount: string;
-  currency: string;
-  paidByUserId: string;
-  date: string;
-}) {
+export async function createExpense(
+  data: {
+    title: string;
+    amount: string;
+    currency: string;
+    paidByUserId: string;
+    date: string;
+  },
+  opts?: { skipRedirect?: boolean },
+) {
   parseOrThrow(gastoSchema, data);
 
   const userId = await getCurrentUserId();
@@ -30,5 +33,6 @@ export async function createExpense(data: {
   });
 
   updateTag('saldos');
+  if (opts?.skipRedirect) return;
   redirect('/saldos');
 }

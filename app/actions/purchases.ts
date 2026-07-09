@@ -36,7 +36,7 @@ export async function createPurchase(data: {
   supplierPayments?: { userId: string; amountUsd: number; cardTaxPct?: number }[];
   exchangeRate: number;
   items: PurchaseItem[];
-}) {
+}, opts?: { skipRedirect?: boolean }) {
   parseOrThrow(createPurchaseSchema, data);
 
   const expandedItems = data.items.flatMap((it) =>
@@ -92,6 +92,7 @@ export async function createPurchase(data: {
   });
 
   invalidatePurchase();
+  if (opts?.skipRedirect) return;
   redirect('/purchases');
 }
 
@@ -109,7 +110,8 @@ export async function markArrived(
     shippingPaidByUserId?: string;
     itemIds: string[];
     exchangeRate: number;
-  }
+  },
+  opts?: { skipRedirect?: boolean },
 ) {
   const { exchangeRate, ...rest } = data;
   if (!arrivalSchema.safeParse(rest).success) throw new Error('Invalid arrival data');
@@ -161,5 +163,6 @@ export async function markArrived(
   });
 
   invalidatePurchase();
+  if (opts?.skipRedirect) return;
   redirect('/purchases');
 }

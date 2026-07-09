@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DetailHead, BottomNav } from '@/components/ui/chrome';
+import { DetailHead, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
@@ -163,12 +163,13 @@ export function ModelDetailScreen({
           )}
         </div>
       </div>
+      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );
 }
 
-function EventRow({ ev }: { ev: TimelineEvent }) {
+export function EventRow({ ev }: { ev: TimelineEvent }) {
   if (ev.type === 'sale') {
     const s = ev.data;
     return (

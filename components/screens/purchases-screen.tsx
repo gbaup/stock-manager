@@ -2,23 +2,38 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav } from '@/components/ui/chrome';
+import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
+import { DModal } from '@/components/ui/d-modal';
 import { Plus, Check, ChevronRight } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
-import type { BatchSummary, ShipmentRecord } from '@/app/lib/domain';
+import { useIsDesktop } from '@/app/lib/hooks';
+import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
+import type { RateResult } from '@/app/lib/exchange-rate';
+import { PurchaseForm } from '@/components/screens/purchase-form';
+import { ArrivalForm } from '@/components/screens/arrival-form';
 
 export function PurchasesScreen({
   batches,
   transitCount,
+  models,
+  users,
+  rate,
 }: {
   batches: BatchSummary[];
   transitCount: number;
+  models: ModelWithStats[];
+  users: UserSummary[];
+  rate: RateResult;
 }) {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const [tab, setTab] = useState<'pending' | 'arrived'>('pending');
+  const [buySel, setBuySel] = useState<string | null>(null);
+  const [showNewPurchase, setShowNewPurchase] = useState(false);
+  const [showArrival, setShowArrival] = useState(false);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -28,6 +43,80 @@ export function PurchasesScreen({
       ? sorted.filter((b) => b.status !== 'arrived')
       : sorted.filter((b) => b.status === 'arrived');
   const arrivedCount = batches.filter((b) => b.status === 'arrived').length;
+
+  if (isDesktop) {
+    const selBatch = batches.find((b) => b.id === buySel) ?? null;
+    return (
+      <div className="screen">
+        <header className="main-header">
+          <div className="mh-left">
+            <div className="mh-title">Compras</div>
+            <div className="mh-sub">{transitCount} en camino · {arrivedCount} recibidas</div>
+          </div>
+          <div className="mh-actions">
+            <button className="btn btn-primary" onClick={() => setShowNewPurchase(true)}>
+              Nueva compra
+            </button>
+          </div>
+        </header>
+
+        <div className="split">
+          <div className="split-list">
+            <div className="split-list-tools">
+              <div className="seg" style={{ marginTop: 0 }}>
+                <button className={tab === 'pending' ? 'is-active' : ''} onClick={() => setTab('pending')}>
+                  En camino ({transitCount})
+                </button>
+                <button className={tab === 'arrived' ? 'is-active' : ''} onClick={() => setTab('arrived')}>
+                  Recibidas
+                </button>
+              </div>
+            </div>
+            <div className="split-scroll">
+              {list.length === 0 ? (
+                <Empty
+                  icon="truck"
+                  title={tab === 'pending' ? 'Nada en camino' : 'Sin compras recibidas'}
+                  desc={tab === 'pending' ? 'Todas las compras llegaron.' : ''}
+                />
+              ) : (
+                <BuyTable list={list} selected={buySel} onOpen={setBuySel} />
+              )}
+            </div>
+          </div>
+
+          <div className="split-detail">
+            {selBatch ? (
+              <BuyDetailPanel
+                batch={selBatch}
+                onArrive={() => setShowArrival(true)}
+              />
+            ) : (
+              <div className="detail-empty">
+                <div className="detail-empty-ico">📦</div>
+                <div className="detail-empty-t">Elegí un pedido</div>
+                <div className="detail-empty-s">Seleccioná una compra para ver sus detalles, items y envíos.</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {showNewPurchase && (
+          <DModal title="Nueva compra" size="lg" onClose={() => setShowNewPurchase(false)}>
+            <PurchaseForm models={models} users={users} rate={rate} onDone={() => setShowNewPurchase(false)} />
+          </DModal>
+        )}
+        {showArrival && selBatch && (
+          <DModal title="Marcar llegada" size="lg" onClose={() => setShowArrival(false)}>
+            <ArrivalForm batch={selBatch} users={users} rate={rate} onDone={() => setShowArrival(false)} />
+          </DModal>
+        )}
+
+        <Sidebar transitCount={transitCount} />
+        <BottomNav transitCount={transitCount} />
+      </div>
+    );
+  }
 
   return (
     <div className="screen">
@@ -69,6 +158,7 @@ export function PurchasesScreen({
       <button className="fab" onClick={() => router.push('/purchases/new')} aria-label="Registrar compra">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );
@@ -175,5 +265,202 @@ function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
         <div className="ship-meta">{meta || 'sin datos de envío'}</div>
       </div>
     </div>
+  );
+}
+
+function BuyTable({
+  list,
+  selected,
+  onOpen,
+}: {
+  list: BatchSummary[];
+  selected: string | null;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <table className="dtable">
+      <thead>
+        <tr>
+          <th>Pedido</th>
+          <th className="num">Items</th>
+          <th>Fecha</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {list.map((b) => {
+          const uniqueProducts = Array.from(
+            new Map(b.items.map((i) => [i.catalogProductId, i.product])).values()
+          );
+          const qty = b.items.length;
+          const single = uniqueProducts.length === 1 ? uniqueProducts[0] : null;
+          const isPartial = b.status === 'partial';
+          const title = single
+            ? `${single.team} · ${single.version}`
+            : `${uniqueProducts.length} modelos`;
+          const sub = single ? (b.supplier || b.description || '') : (b.description || '');
+          const tag =
+            b.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
+            b.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
+            <Tag kind="ok">recibida</Tag>;
+          return (
+            <tr
+              key={b.id}
+              className={selected === b.id ? 'is-selected' : ''}
+              onClick={() => onOpen(b.id)}
+            >
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="sw-stack">
+                    {uniqueProducts.slice(0, 3).map((m, i) => (
+                      <Swatch
+                        key={m.id}
+                        color={m.color}
+                        number={m.number}
+                        className="swatch"
+                        style={{ zIndex: 3 - i }}
+                      />
+                    ))}
+                    {uniqueProducts.length > 3 && (
+                      <span className="sw-stack-more">+{uniqueProducts.length - 3}</span>
+                    )}
+                  </div>
+                  <div className="dt-cell-main">
+                    <div className="dt-team capitalize">{title}</div>
+                    {sub && <div className="dt-meta capitalize">{sub}</div>}
+                  </div>
+                </div>
+              </td>
+              <td className="num">{isPartial ? `${b.arrivedQuantity ?? 0}/${qty}` : qty}</td>
+              <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>{fmtDate(b.purchaseDate)}</td>
+              <td>{tag}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function BuyDetailPanel({
+  batch,
+  onArrive,
+}: {
+  batch: BatchSummary;
+  onArrive: (id: string) => void;
+}) {
+  const isArrived = batch.status === 'arrived';
+  const isPartial = batch.status === 'partial';
+  const qty = batch.items.length;
+  const totalShipUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
+  const totalCostUsd = batch.items.reduce((s, i) => s + ((i as BatchSummary['items'][number] & { basePriceUsd?: number }).basePriceUsd ?? 0), 0);
+
+  const tag =
+    batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
+    batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
+    <Tag kind="ok">recibida</Tag>;
+
+  const groupMap = new Map<string, { product: BatchSummary['items'][number]['product']; size: string; count: number }>();
+  batch.items.forEach((item) => {
+    const key = `${item.catalogProductId}-${item.size}`;
+    const existing = groupMap.get(key) ?? { product: item.product, size: item.size, count: 0 };
+    existing.count++;
+    groupMap.set(key, existing);
+  });
+
+  return (
+    <>
+      <div className="pd-head">
+        <div>
+          <div className="pd-title">Pedido {fmtDate(batch.purchaseDate)}</div>
+          <div style={{ marginTop: 6 }}>{tag}</div>
+          {batch.supplier && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+              Proveedor: <span className="capitalize">{batch.supplier}</span>
+            </div>
+          )}
+        </div>
+        {!isArrived && (
+          <button
+            className="btn btn-primary"
+            style={{ height: 34, fontSize: 13 }}
+            onClick={() => onArrive(batch.id)}
+          >
+            <Check size={14} strokeWidth={2} />
+            {isPartial ? 'Llegó más' : 'Marcar llegada'}
+          </button>
+        )}
+      </div>
+
+      <div className="pd-body">
+        <div className="pd-statgrid">
+          <div className="d-stat">
+            <div className="v">{isPartial ? `${batch.arrivedQuantity ?? 0}/${qty}` : qty}</div>
+            <div className="l">Items</div>
+          </div>
+          <div className="d-stat">
+            <div className="v" style={{ fontSize: 15 }}>{fmtDate(batch.purchaseDate)}</div>
+            <div className="l">Pedido</div>
+          </div>
+          {totalCostUsd > 0 && (
+            <div className="d-stat">
+              <div className="v" style={{ fontSize: 16 }}>{usd(totalCostUsd)}</div>
+              <div className="l">Costo base</div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+          Items del pedido
+        </div>
+        <table className="dtable" style={{ fontSize: 13, marginBottom: 16 }}>
+          <thead>
+            <tr>
+              <th>Modelo</th>
+              <th>Talle</th>
+              <th className="num">Cant.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from(groupMap.values()).map((g, i) => (
+              <tr key={i}>
+                <td className="capitalize dt-team">{g.product.team} · {g.product.version}</td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{g.size.toUpperCase()}</td>
+                <td className="num">{g.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {batch.shipments.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+              Envíos ({batch.shipments.length})
+              {totalShipUsd > 0 && (
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginLeft: 8, fontWeight: 500, textTransform: 'none' }}>
+                  {usd(totalShipUsd)} total
+                </span>
+              )}
+            </div>
+            {batch.shipments.map((sh, i) => {
+              const n = sh.itemIds.length;
+              const meta = [
+                sh.trackingNumber,
+                sh.shippingPriceUsd && sh.shippingPriceUsd > 0 ? `envío ${usd(sh.shippingPriceUsd)}` : null,
+                sh.shippingPaidByAlias ? `pagó ${sh.shippingPaidByAlias}` : null,
+              ].filter(Boolean).join(' · ');
+              return (
+                <div key={sh.id} className="ship-card">
+                  <div className="ship-card-head">
+                    #{i + 1} · {fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}
+                  </div>
+                  {meta && <div className="ship-card-meta">{meta}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

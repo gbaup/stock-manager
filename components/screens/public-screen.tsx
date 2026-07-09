@@ -7,6 +7,7 @@ import { Empty } from '@/components/ui/empty';
 import { fmtSize, fmtType } from '@/app/lib/domain';
 import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
 import { colorByName } from '@/app/lib/format';
+import { useIsDesktop } from '@/app/lib/hooks';
 import type { ModelMeta } from '@/app/lib/domain';
 
 type PublicModel = ModelMeta & { stock: number };
@@ -25,6 +26,7 @@ function SizeChips({ sizes }: { sizes: string[] }) {
 
 export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[]; today: string; loggedIn: boolean }) {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'team' | 'newest'>('team');
   const [view, setView] = useState<View>(() => {
@@ -73,6 +75,178 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
     setFilterVersions([]);
   }
 
+
+  if (isDesktop) {
+    const filterPanel = filtersOpen ? (
+      <div className="pub-filters">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>Filtrar por</span>
+          {activeFilters > 0 && (
+            <button className="pub-filter-clear" onClick={clearFilters}>
+              Limpiar filtros ({activeFilters})
+            </button>
+          )}
+        </div>
+        {allTypes.length > 0 && (
+          <div className="pub-filter-group">
+            <div className="pub-filter-label">Tipo</div>
+            <div className="multi-chips">
+              {allTypes.map((t) => (
+                <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
+                  onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{fmtType(t)}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {allSizes.length > 0 && (
+          <div className="pub-filter-group">
+            <div className="pub-filter-label">Talle</div>
+            <div className="multi-chips">
+              {allSizes.map((s) => (
+                <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
+                  onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{fmtSize(s)}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {allVersions.length > 0 && (
+          <div className="pub-filter-group">
+            <div className="pub-filter-label">Versión</div>
+            <div className="multi-chips">
+              {allVersions.map((v) => (
+                <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
+                  onClick={() => toggleFilter(filterVersions, setFilterVersions, v)}>{v}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    ) : null;
+
+    return (
+      <div className="screen" style={{ marginLeft: 0, background: 'var(--bg)' }}>
+        <header style={{
+          display: 'flex', alignItems: 'center', gap: 16,
+          padding: '0 28px', height: 'var(--header-h)',
+          borderBottom: '1px solid var(--border)', flexShrink: 0,
+          background: 'var(--surface)',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              RetroPilchas
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1.1 }}>
+              Catálogo público
+            </div>
+          </div>
+          {loggedIn && (
+            <button className="btn btn-secondary" style={{ height: 32, fontSize: 13 }} onClick={() => router.push('/inventory')}>
+              <ChevronLeft size={16} strokeWidth={1.8} /> Volver
+            </button>
+          )}
+          <div className="public-strip">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+            Vista de acceso libre
+          </div>
+        </header>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '14px 0' }}>
+            <div className="search" style={{ flex: 1 }}>
+              <Search size={19} strokeWidth={1.8} />
+              <input value={query} placeholder="Buscar camiseta…" onChange={(e) => setQuery(e.target.value)} />
+              {query && (
+                <button className="iconbtn plain" style={{ width: 26, height: 26 }} onClick={() => setQuery('')}>
+                  <X size={16} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {([{ id: 'team', label: 'Equipo' }, { id: 'newest', label: 'Más nuevas' }] as const).map(({ id, label }) => (
+                <button key={id} className={`chip${sort === id ? ' is-active' : ''}`} style={{ height: 30, fontSize: 13 }} onClick={() => setSort(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button className={`pub-filter-btn${activeFilters > 0 ? ' has-filters' : ''}`} onClick={() => setFiltersOpen((o) => !o)}>
+              <Filter size={15} strokeWidth={1.8} />
+              Filtrar
+              {activeFilters > 0 && <span className="filter-count-badge">{activeFilters}</span>}
+            </button>
+          </div>
+
+          {filterPanel}
+
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>Camisetas disponibles</div>
+            <div style={{ fontSize: 13, color: 'var(--text-faint)' }}>
+              {list.length} {list.length === 1 ? 'modelo' : 'modelos'} · al {today}
+            </div>
+          </div>
+
+          {list.length === 0 ? (
+            <Empty icon="search" title="Sin resultados" desc={activeFilters > 0 ? 'Probá quitando algún filtro.' : 'Volvé a consultar más tarde.'} />
+          ) : (
+            <table className="dtable">
+              <thead>
+                <tr>
+                  <th>Equipo</th>
+                  <th>Temporada</th>
+                  <th>Versión / Color</th>
+                  <th>Talles</th>
+                  <th className="num">Stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((m) => {
+                  const c = colorByName(m.color);
+                  const cover = m.photos[0]?.url ?? null;
+                  return (
+                    <tr key={m.id} style={{ cursor: 'pointer' }} onClick={() => setViewer({ model: m, idx: 0 })}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{
+                            width: 30, height: 36, borderRadius: 6, flexShrink: 0,
+                            background: c.bg, color: c.fg, overflow: 'hidden',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-mono)',
+                          }}>
+                            {cover
+                              // eslint-disable-next-line @next/next/no-img-element
+                              ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : (m.number || <Shirt size={16} strokeWidth={1.5} />)
+                            }
+                          </div>
+                          <div>
+                            <div className="dt-team capitalize">{m.team}</div>
+                            {m.player && <div className="dt-meta capitalize">{m.player}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>{m.season}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }} className="capitalize">
+                        {m.version}{m.color ? ` · ${m.color}` : ''}
+                      </td>
+                      <td><SizeChips sizes={m.sizes} /></td>
+                      <td className="num"><span className="stock-pill">{m.stock}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          <div style={{ fontSize: 12, color: 'var(--text-faint)', textAlign: 'center', marginTop: 24 }}>
+            Stock actualizado al {today}
+          </div>
+        </div>
+
+        {viewer && (
+          <GalleryViewer model={viewer.model} startIdx={viewer.idx} onClose={() => setViewer(null)} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="screen" style={{ background: 'var(--bg)' }}>
