@@ -4327,7 +4327,7 @@ body {
 @media (min-width: 1024px) {
   :root {
     --side-w: 240px;
-    --header-h: 56px;
+    --header-h: 68px;
     --rail-w: 340px;
     --dm-sm: 440px;
     --dm-md: 560px;
@@ -4364,9 +4364,9 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 18px 14px 14px;
+    padding: 0 14px;
     border-bottom: 1px solid var(--border-soft);
-    min-height: var(--header-h);
+    height: var(--header-h);
   }
 
   .side-mark {
@@ -4541,9 +4541,9 @@ body {
   }
 
   .side-collapse {
-    position: absolute;
-    right: -15px;
-    top: calc(var(--header-h) / 2 - 15px);
+    position: fixed;
+    left: calc(var(--side-w) - 15px);
+    top: calc(var(--header-h) - 15px);
     width: 30px;
     height: 30px;
     border-radius: 50%;
@@ -4555,8 +4555,8 @@ body {
     justify-content: center;
     cursor: pointer;
     color: var(--text-faint);
-    z-index: 10;
-    transition: background 0.12s, color 0.12s;
+    z-index: 30;
+    transition: left 0.2s ease, background 0.12s, color 0.12s;
   }
 
   .side-collapse:hover {
@@ -4598,13 +4598,10 @@ body {
     align-items: center;
     gap: 12px;
     padding: 0 24px;
-    background: color-mix(in oklch, var(--bg) 82%, transparent);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    background: var(--bg);
     border-bottom: 1px solid var(--border-soft);
     position: relative;
     z-index: 6;
-    flex-shrink: 0;
   }
 
   .mh-eyebrow {
