@@ -15,12 +15,12 @@ import type { RateResult } from '@/app/lib/exchange-rate';
 import { markArrived } from '@/app/actions/purchases';
 import { arrivalSchema, type ArrivalFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
+import { ModalFooter } from '@/components/ui/modal-footer';
+import { useConfirmGate } from '@/app/lib/hooks';
 
 export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummary; users: UserSummary[]; rate: RateResult; onDone?: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingData, setPendingData] = useState<ArrivalFormValues | null>(null);
 
   // Items still pending (no shipment yet). Order is the order from the batch
   // listing — the user picks among these.
@@ -90,11 +90,12 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
     });
   }
 
+  const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
+
   function onSubmit(data: ArrivalFormValues) {
     const payload: ArrivalFormValues = { ...data, itemIds: [...picked] };
     if (hasShip && !payload.shippingPaidByUserId) {
-      setPendingData(payload);
-      setShowConfirm(true);
+      requestConfirm(payload);
       return;
     }
     doSubmit(payload);
@@ -247,11 +248,8 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
       title="Sin responsable de envío"
       confirmLabel={pending ? 'Guardando…' : 'Confirmar igual'}
       cancelLabel="Volver"
-      onConfirm={() => {
-        setShowConfirm(false);
-        if (pendingData) doSubmit(pendingData);
-      }}
-      onCancel={() => { setShowConfirm(false); setPendingData(null); }}
+      onConfirm={confirm}
+      onCancel={cancel}
     >
       El costo del envío no se va a descontar del saldo de nadie.
     </Modal>
@@ -261,12 +259,14 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
     return (
       <>
         <div className="dm-body">{formFields}</div>
-        <div className="dm-foot">
-          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-          <button className="btn btn-primary" disabled={pending || !canSave} onClick={handleSubmit(onSubmit)}>
-            {pending ? 'Confirmando…' : leftover > 0 ? 'Confirmar envío parcial' : 'Confirmar llegada'}
-          </button>
-        </div>
+        <ModalFooter
+          pending={pending}
+          canSave={canSave}
+          onCancel={onDone}
+          onConfirm={handleSubmit(onSubmit)}
+          confirmLabel={leftover > 0 ? 'Confirmar envío parcial' : 'Confirmar llegada'}
+          pendingLabel="Confirmando…"
+        />
         {confirmModal}
       </>
     );

@@ -11,6 +11,7 @@ import { uyu, usd, fmtRate, personInitial, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import type { UserSummary } from '@/app/lib/domain';
 import { createConversion } from '@/app/actions/conversions';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
 type Cur = 'UYU' | 'USD';
 
@@ -269,12 +270,13 @@ export function ConversionForm({ users, onDone }: { users: UserSummary[]; onDone
     return (
       <>
         <div className="dm-body">{bodyFields}</div>
-        <div className="dm-foot">
-          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-          <button className="btn btn-primary" disabled={!canSave || pending} onClick={() => canSave && setConfirm(true)}>
-            {pending ? 'Registrando…' : (sameCur ? 'Registrar transferencia' : 'Registrar cambio')}
-          </button>
-        </div>
+        <ModalFooter
+          pending={pending}
+          canSave={canSave}
+          onCancel={onDone}
+          onConfirm={() => canSave && setConfirm(true)}
+          confirmLabel={sameCur ? 'Registrar transferencia' : 'Registrar cambio'}
+        />
         {confirmModal}
       </>
     );

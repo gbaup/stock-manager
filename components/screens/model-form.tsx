@@ -13,6 +13,7 @@ import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
 import { modelFormSchema, type ModelFormValues } from '@/app/lib/schemas';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
 export function ModelForm({
   initial,
@@ -215,12 +216,13 @@ export function ModelForm({
     return (
       <>
         <div className="dm-body">{formFields}</div>
-        <div className="dm-foot">
-          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-          <button className="btn btn-primary" disabled={pending} onClick={handleSubmit(onSubmit)}>
-            {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
-          </button>
-        </div>
+        <ModalFooter
+          pending={pending}
+          onCancel={onDone}
+          onConfirm={handleSubmit(onSubmit)}
+          confirmLabel={initial ? 'Guardar cambios' : 'Crear modelo'}
+          pendingLabel={initial ? 'Guardando…' : 'Creando…'}
+        />
       </>
     );
   }

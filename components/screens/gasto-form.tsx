@@ -11,6 +11,7 @@ import { todayISO, uyu, usd } from '@/app/lib/format';
 import type { UserSummary } from '@/app/lib/domain';
 import { createExpense } from '@/app/actions/expenses';
 import { gastoSchema, type GastoFormValues } from '@/app/lib/schemas';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
 export function GastoForm({ users, onDone }: { users: UserSummary[]; onDone?: () => void }) {
   const router = useRouter();
@@ -140,12 +141,7 @@ export function GastoForm({ users, onDone }: { users: UserSummary[]; onDone?: ()
     return (
       <>
         <div className="dm-body">{formFields}</div>
-        <div className="dm-foot">
-          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-          <button className="btn btn-primary" disabled={pending} onClick={handleSubmit(onSubmit)}>
-            {pending ? 'Registrando…' : 'Registrar gasto'}
-          </button>
-        </div>
+        <ModalFooter pending={pending} onCancel={onDone} onConfirm={handleSubmit(onSubmit)} confirmLabel="Registrar gasto" />
       </>
     );
   }

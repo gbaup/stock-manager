@@ -14,6 +14,7 @@ import { money } from '@/app/lib/money';
 import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
 export function QuickSaleForm({
   models,
@@ -288,12 +289,7 @@ export function QuickSaleForm({
     return (
       <>
         <div className="dm-body">{formFields}</div>
-        <div className="dm-foot">
-          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-          <button className="btn btn-primary" disabled={!canSave || pending} onClick={handleSave}>
-            {pending ? 'Registrando…' : 'Registrar venta'}
-          </button>
-        </div>
+        <ModalFooter pending={pending} canSave={canSave} onCancel={onDone} onConfirm={handleSave} confirmLabel="Registrar venta" />
       </>
     );
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 function subscribe(callback: () => void) {
   const mq = window.matchMedia('(min-width: 1024px)');
@@ -18,4 +18,26 @@ function getServerSnapshot() {
 
 export function useIsDesktop() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+export function useConfirmGate<T>(doSubmit: (data: T) => void) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingData, setPendingData] = useState<T | null>(null);
+
+  function requestConfirm(data: T) {
+    setPendingData(data);
+    setShowConfirm(true);
+  }
+
+  function confirm() {
+    setShowConfirm(false);
+    if (pendingData) doSubmit(pendingData);
+  }
+
+  function cancel() {
+    setShowConfirm(false);
+    setPendingData(null);
+  }
+
+  return { showConfirm, requestConfirm, confirm, cancel };
 }

@@ -36,13 +36,34 @@ export function TopBar({
 
 type NavIcon = ComponentType<{ size?: number; strokeWidth?: number }>;
 
-const NAV_ITEMS: { id: string; label: string; Icon: NavIcon; href: string }[] = [
-  { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
-  { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
-  { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
-  { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
-  { id: 'public',    label: 'Pública',   Icon: Eye,     href: '/public' },
+type NavItem = { id: string; label: string; shortLabel?: string; Icon: NavIcon; href: string };
+
+// Single source of truth for app navigation. Grouped for the desktop sidebar;
+// BottomNav flattens it for mobile. shortLabel overrides label where mobile's
+// tighter width needs a shorter form (see 'public' below).
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'GESTIÓN',
+    items: [
+      { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
+      { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
+      { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
+      { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
+    ],
+  },
+  {
+    label: 'DIFUSIÓN',
+    items: [
+      { id: 'public', label: 'Catálogo público', shortLabel: 'Pública', Icon: Eye, href: '/public' },
+    ],
+  },
 ];
+
+const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+
+function activeNavId(pathname: string) {
+  return NAV_ITEMS.find((it) => pathname.startsWith(it.href))?.id ?? 'inventory';
+}
 
 export function BottomNavShell({ active = '' }: { active?: string }) {
   return (
@@ -50,7 +71,7 @@ export function BottomNavShell({ active = '' }: { active?: string }) {
       {NAV_ITEMS.map((it) => (
         <button key={it.id} className={`navbtn ${active === it.id ? 'is-active' : ''}`}>
           <it.Icon size={23} strokeWidth={active === it.id ? 2 : 1.7} />
-          {it.label}
+          {it.shortLabel ?? it.label}
         </button>
       ))}
     </nav>
@@ -59,43 +80,33 @@ export function BottomNavShell({ active = '' }: { active?: string }) {
 
 export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
   const pathname = usePathname();
-
-  const active = pathname.startsWith('/home')
-    ? 'home'
-    : pathname.startsWith('/purchases')
-      ? 'purchases'
-      : pathname.startsWith('/saldos')
-        ? 'saldos'
-        : pathname.startsWith('/public')
-          ? 'public'
-          : 'inventory';
-
-  const items = NAV_ITEMS.map((it) =>
-    it.id === 'purchases' ? { ...it, badge: transitCount } : { ...it, badge: undefined }
-  );
+  const active = activeNavId(pathname);
 
   return (
     <nav className="bottomnav">
-      {items.map((it) => (
-        <Link
-          key={it.id}
-          href={it.href}
-          prefetch
-          className={`navbtn ${active === it.id ? 'is-active' : ''}`}
-          style={{ textDecoration: 'none' }}
-        >
-          <div style={{ position: 'relative' }}>
-            <it.Icon
-              size={23}
-              strokeWidth={active === it.id ? 2 : 1.7}
-            />
-            {(it.badge ?? 0) > 0 && (
-              <span className="badge-dot">{it.badge}</span>
-            )}
-          </div>
-          {it.label}
-        </Link>
-      ))}
+      {NAV_ITEMS.map((it) => {
+        const badge = it.id === 'purchases' ? transitCount : 0;
+        return (
+          <Link
+            key={it.id}
+            href={it.href}
+            prefetch
+            className={`navbtn ${active === it.id ? 'is-active' : ''}`}
+            style={{ textDecoration: 'none' }}
+          >
+            <div style={{ position: 'relative' }}>
+              <it.Icon
+                size={23}
+                strokeWidth={active === it.id ? 2 : 1.7}
+              />
+              {badge > 0 && (
+                <span className="badge-dot">{badge}</span>
+              )}
+            </div>
+            {it.shortLabel ?? it.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
@@ -144,24 +155,6 @@ export function FormHeadShell({
   );
 }
 
-const NAV_GROUPS = [
-  {
-    label: 'GESTIÓN',
-    items: [
-      { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
-      { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
-      { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
-      { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
-    ],
-  },
-  {
-    label: 'DIFUSIÓN',
-    items: [
-      { id: 'public', label: 'Catálogo público', Icon: Eye, href: '/public' },
-    ],
-  },
-];
-
 export function Sidebar({
   transitCount = 0,
   currentUserAlias,
@@ -184,15 +177,7 @@ export function Sidebar({
     });
   }
 
-  const activeId = pathname.startsWith('/home')
-    ? 'home'
-    : pathname.startsWith('/purchases')
-      ? 'purchases'
-      : pathname.startsWith('/saldos')
-        ? 'saldos'
-        : pathname.startsWith('/public')
-          ? 'public'
-          : 'inventory';
+  const activeId = activeNavId(pathname);
 
   return (
     <aside className="sidebar">

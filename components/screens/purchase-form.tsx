@@ -19,6 +19,7 @@ import { coverOf } from '@/components/ui/swatch';
 import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
+import { useConfirmGate } from '@/app/lib/hooks';
 
 const DRAFT_KEY = 'purchase-draft';
 
@@ -40,8 +41,6 @@ export function PurchaseForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingData, setPendingData] = useState<PurchaseFormValues | null>(null);
 
   const {
     control,
@@ -145,12 +144,13 @@ export function PurchaseForm({
     });
   }
 
+  const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
+
   function onSubmit(data: PurchaseFormValues) {
     const { status } = reconcileSupplierPayments(toSupplierPaymentArray(data.supplierPayments), totalUsd);
     if (needsSupplierPayer && status === 'empty') {
       // Nobody paid yet — a valid state, but confirm before saving.
-      setPendingData(data);
-      setShowConfirm(true);
+      requestConfirm(data);
       return;
     }
     if (needsSupplierPayer && status === 'mismatch') {
@@ -384,11 +384,8 @@ export function PurchaseForm({
       title="Sin responsable de pago"
       confirmLabel={pending ? 'Registrando…' : 'Registrar igual'}
       cancelLabel="Volver"
-      onConfirm={() => {
-        setShowConfirm(false);
-        if (pendingData) doSubmit(pendingData);
-      }}
-      onCancel={() => { setShowConfirm(false); setPendingData(null); }}
+      onConfirm={confirm}
+      onCancel={cancel}
     >
       El costo no se va a descontar del saldo de nadie. Útil para stock inicial con precios de referencia.
     </Modal>

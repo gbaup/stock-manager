@@ -12,11 +12,6 @@ export function DModal({
   sub,
   iconNode,
   onClose,
-  confirmLabel,
-  cancelLabel = 'Cancelar',
-  onConfirm,
-  canConfirm = true,
-  isConfirming = false,
   children,
 }: {
   size?: DModalSize;
@@ -24,11 +19,6 @@ export function DModal({
   sub?: string;
   iconNode?: React.ReactNode;
   onClose: () => void;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm?: () => void;
-  canConfirm?: boolean;
-  isConfirming?: boolean;
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -57,21 +47,6 @@ export function DModal({
         </div>
 
         {children}
-
-        {onConfirm && confirmLabel && (
-          <div className="dm-foot">
-            <button className="btn btn-secondary" onClick={onClose} disabled={isConfirming}>
-              {cancelLabel}
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={onConfirm}
-              disabled={!canConfirm || isConfirming}
-            >
-              {isConfirming ? 'Guardando…' : confirmLabel}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

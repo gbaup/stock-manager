@@ -16,6 +16,7 @@ import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSale } from '@/app/actions/sales';
 import { coverOf } from '@/components/ui/swatch';
 import { makeSaleSchema, type SaleFormValues } from '@/app/lib/schemas';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
 export function SaleForm({ model, stock, usdRate, users, onDone }: { model: ModelWithStats; stock: number; usdRate: number; users: UserSummary[]; onDone?: () => void }) {
   const router = useRouter();
@@ -167,12 +168,7 @@ export function SaleForm({ model, stock, usdRate, users, onDone }: { model: Mode
     return (
       <>
         <div className="dm-body">{formFields}</div>
-        <div className="dm-foot">
-          <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-          <button className="btn btn-primary" disabled={pending} onClick={handleSubmit(onSubmit)}>
-            {pending ? 'Registrando…' : 'Registrar venta'}
-          </button>
-        </div>
+        <ModalFooter pending={pending} onCancel={onDone} onConfirm={handleSubmit(onSubmit)} confirmLabel="Registrar venta" />
       </>
     );
   }
