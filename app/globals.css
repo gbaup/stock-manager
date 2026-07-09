@@ -4676,7 +4676,7 @@ body {
     flex: 1;
     display: grid;
     grid-template-columns: 1fr var(--rail-w);
-    min-height: 0;
+    min-height: calc(100dvh - var(--header-h));
     overflow: hidden;
   }
 
@@ -4709,6 +4709,8 @@ body {
 
   .split-detail {
     background: var(--surface-2);
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
@@ -4725,8 +4727,10 @@ body {
   .dtable thead th {
     position: sticky;
     top: 0;
+    height: 36px;
+    box-sizing: border-box;
     background: var(--surface-2);
-    z-index: 2;
+    z-index: 3;
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -4754,6 +4758,48 @@ body {
   .dtable tbody tr:hover { background: var(--surface-2); }
 
   .dtable tbody tr.is-selected { background: var(--accent-soft); }
+
+  .dtable tbody tr.is-out { opacity: 0.55; }
+
+  /* ---- dtable team group header ---- */
+  .dtable-group td {
+    position: sticky;
+    top: 36px;
+    z-index: 2;
+    background: var(--surface-3);
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+  }
+
+  .dtable-group:hover td { background: var(--surface-2); }
+
+  .dtable-group-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dtable-group-chevron {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--text-faint);
+  }
+
+  .dtable-group-name {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .dtable-group-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-left: auto;
+  }
 
   .dtable tbody td {
     padding: 11px 14px;
@@ -4934,7 +4980,7 @@ body {
   /* ---- 2-col grid (home body) ---- */
   .grid-2 {
     display: grid;
-    grid-template-columns: 1.7fr 1fr;
+    grid-template-columns: 3fr 1fr;
     gap: 16px;
   }
 
@@ -5065,7 +5111,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    flex: 1;
     min-height: 300px;
     padding: 32px;
     text-align: center;
@@ -5384,6 +5430,10 @@ body {
     line-height: 1;
   }
 
+  .dbal-amt.pos  { color: var(--accent); }
+  .dbal-amt.neg  { color: var(--danger); }
+  .dbal-amt.zero { color: var(--text-faint); }
+
   .dbal-break {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -5458,6 +5508,10 @@ body {
     letter-spacing: -0.03em;
     color: var(--text);
   }
+
+  .dsettle-biz-amt.pos  { color: var(--accent); }
+  .dsettle-biz-amt.neg  { color: var(--danger); }
+  .dsettle-biz-amt.zero { color: var(--text-faint); }
 
   /* ---- ledger table helpers ---- */
   .ledger-dot {

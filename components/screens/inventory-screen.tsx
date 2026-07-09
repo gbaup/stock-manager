@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
-import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck } from 'lucide-react';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ChevronDown, ChevronRight } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
@@ -42,6 +42,24 @@ export function InventoryScreen({
   const [showNewModel, setShowNewModel] = useState(false);
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      return new Set(JSON.parse(localStorage.getItem('inv-collapsed-teams') ?? '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+
+  function toggleTeam(team: string) {
+    setCollapsedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(team)) next.delete(team);
+      else next.add(team);
+      localStorage.setItem('inv-collapsed-teams', JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   const q = query.trim().toLowerCase();
   let list = models.filter((m) => {
@@ -59,6 +77,12 @@ export function InventoryScreen({
   list = [...list].sort((a, b) => {
     if (a.stock > 0 !== b.stock > 0) return a.stock > 0 ? -1 : 1;
     return a.team.localeCompare(b.team);
+  });
+
+  const groupedList = [...list].sort((a, b) => {
+    if (a.team !== b.team) return a.team.localeCompare(b.team);
+    if (a.stock > 0 !== b.stock > 0) return a.stock > 0 ? -1 : 1;
+    return a.season.localeCompare(b.season);
   });
 
   const counts = {
@@ -153,7 +177,13 @@ export function InventoryScreen({
               ) : layout === 'grid' ? (
                 <VisualGrid list={list} onOpen={selectModel} selected={invSel} />
               ) : (
-                <InvTable list={list} onOpen={selectModel} selected={invSel} />
+                <InvTable
+                  list={groupedList}
+                  onOpen={selectModel}
+                  selected={invSel}
+                  collapsedTeams={collapsedTeams}
+                  onToggleTeam={toggleTeam}
+                />
               )}
             </div>
           </div>
@@ -324,11 +354,81 @@ function InvTable({
   list,
   onOpen,
   selected,
+  collapsedTeams,
+  onToggleTeam,
 }: {
   list: ModelWithStats[];
   onOpen: (id: string) => void;
   selected?: string | null;
+  collapsedTeams: Set<string>;
+  onToggleTeam: (team: string) => void;
 }) {
+  const teamCounts = new Map<string, number>();
+  list.forEach((m) => teamCounts.set(m.team, (teamCounts.get(m.team) ?? 0) + 1));
+
+  const rows: ReactNode[] = [];
+  let currentTeam: string | null = null;
+
+  list.forEach((m) => {
+    if (m.team !== currentTeam) {
+      currentTeam = m.team;
+      const collapsed = collapsedTeams.has(m.team);
+      rows.push(
+        <tr key={`group-${m.team}`} className="dtable-group" onClick={() => onToggleTeam(m.team)}>
+          <td colSpan={4}>
+            <div className="dtable-group-inner">
+              <span className="dtable-group-chevron">
+                {collapsed ? <ChevronRight size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
+              </span>
+              <span className="dtable-group-name capitalize">{m.team}</span>
+              <span className="dtable-group-count">{teamCounts.get(m.team)}</span>
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    if (collapsedTeams.has(m.team)) return;
+
+    rows.push(
+      <tr
+        key={m.id}
+        className={`${selected === m.id ? 'is-selected' : ''}${m.stock === 0 ? ' is-out' : ''}`}
+        onClick={() => onOpen(m.id)}
+      >
+        <td>
+          <div className="dt-cell-model">
+            <Swatch
+              color={m.color}
+              number={m.number}
+              photo={coverOf(m)}
+              className="swatch"
+            />
+            <div className="dt-cell-main">
+              <div className="dt-team capitalize">{m.team}</div>
+              <div className="dt-meta capitalize">
+                {m.version}
+                {m.color ? ` · ${m.color}` : ''}
+                {m.player ? ` · ${m.player}` : ''}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{m.season}</td>
+        <td className="num">
+          {m.inTransit > 0 ? (
+            <span className="transit-pill">+{m.inTransit}</span>
+          ) : (
+            <span style={{ color: 'var(--text-faint)' }}>—</span>
+          )}
+        </td>
+        <td className="num">
+          <span className={`stock-pill${m.stock === 0 ? ' zero' : ''}`}>{m.stock}</span>
+        </td>
+      </tr>
+    );
+  });
+
   return (
     <table className="dtable">
       <thead>
@@ -339,45 +439,7 @@ function InvTable({
           <th className="num">Stock</th>
         </tr>
       </thead>
-      <tbody>
-        {list.map((m) => (
-          <tr
-            key={m.id}
-            className={selected === m.id ? 'is-selected' : ''}
-            onClick={() => onOpen(m.id)}
-          >
-            <td>
-              <div className="dt-cell-model">
-                <Swatch
-                  color={m.color}
-                  number={m.number}
-                  photo={coverOf(m)}
-                  className="swatch"
-                />
-                <div className="dt-cell-main">
-                  <div className="dt-team capitalize">{m.team}</div>
-                  <div className="dt-meta capitalize">
-                    {m.version}
-                    {m.color ? ` · ${m.color}` : ''}
-                    {m.player ? ` · ${m.player}` : ''}
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{m.season}</td>
-            <td className="num">
-              {m.inTransit > 0 ? (
-                <span className="transit-pill">+{m.inTransit}</span>
-              ) : (
-                <span style={{ color: 'var(--text-faint)' }}>—</span>
-              )}
-            </td>
-            <td className="num">
-              <span className={`stock-pill${m.stock === 0 ? ' zero' : ''}`}>{m.stock}</span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
+      <tbody>{rows}</tbody>
     </table>
   );
 }
