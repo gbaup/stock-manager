@@ -42,21 +42,21 @@ export function InventoryScreen({
   const [showNewModel, setShowNewModel] = useState(false);
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
-  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(() => {
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
     try {
-      return new Set(JSON.parse(localStorage.getItem('inv-collapsed-teams') ?? '[]'));
+      return new Set(JSON.parse(localStorage.getItem('inv-expanded-teams') ?? '[]'));
     } catch {
       return new Set();
     }
   });
 
   function toggleTeam(team: string) {
-    setCollapsedTeams((prev) => {
+    setExpandedTeams((prev) => {
       const next = new Set(prev);
       if (next.has(team)) next.delete(team);
       else next.add(team);
-      localStorage.setItem('inv-collapsed-teams', JSON.stringify([...next]));
+      localStorage.setItem('inv-expanded-teams', JSON.stringify([...next]));
       return next;
     });
   }
@@ -181,7 +181,7 @@ export function InventoryScreen({
                   list={groupedList}
                   onOpen={selectModel}
                   selected={invSel}
-                  collapsedTeams={collapsedTeams}
+                  expandedTeams={expandedTeams}
                   onToggleTeam={toggleTeam}
                 />
               )}
@@ -354,13 +354,13 @@ function InvTable({
   list,
   onOpen,
   selected,
-  collapsedTeams,
+  expandedTeams,
   onToggleTeam,
 }: {
   list: ModelWithStats[];
   onOpen: (id: string) => void;
   selected?: string | null;
-  collapsedTeams: Set<string>;
+  expandedTeams: Set<string>;
   onToggleTeam: (team: string) => void;
 }) {
   const teamCounts = new Map<string, number>();
@@ -372,7 +372,7 @@ function InvTable({
   list.forEach((m) => {
     if (m.team !== currentTeam) {
       currentTeam = m.team;
-      const collapsed = collapsedTeams.has(m.team);
+      const collapsed = !expandedTeams.has(m.team);
       rows.push(
         <tr key={`group-${m.team}`} className="dtable-group" onClick={() => onToggleTeam(m.team)}>
           <td colSpan={4}>
@@ -388,7 +388,7 @@ function InvTable({
       );
     }
 
-    if (collapsedTeams.has(m.team)) return;
+    if (!expandedTeams.has(m.team)) return;
 
     rows.push(
       <tr
