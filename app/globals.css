@@ -79,7 +79,7 @@ body {
 .app-shell {
   position: relative;
   width: 100%;
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -4680,8 +4680,13 @@ body {
     flex: 1;
     display: grid;
     grid-template-columns: 1fr var(--rail-w);
+    grid-template-rows: minmax(0, 1fr);
     min-height: calc(100dvh - var(--header-h));
     overflow: hidden;
+  }
+
+  .split-purchases {
+    --rail-w: 420px;
   }
 
   .split-list {

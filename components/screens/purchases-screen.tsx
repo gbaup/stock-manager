@@ -60,7 +60,7 @@ export function PurchasesScreen({
           </div>
         </header>
 
-        <div className="split">
+        <div className="split split-purchases">
           <div className="split-list">
             <div className="split-list-tools">
               <div className="seg" style={{ marginTop: 0 }}>
