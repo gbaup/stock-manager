@@ -4755,15 +4755,15 @@ body {
 
   .panel-scroll .panel-head { flex-shrink: 0; }
 
-  .dtable-scroll {
+  .panel-body-scroll {
     flex: 1;
     min-height: 0;
     overflow: auto;
   }
 
-  .dtable-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-  .dtable-scroll::-webkit-scrollbar-track { background: transparent; }
-  .dtable-scroll::-webkit-scrollbar-thumb {
+  .panel-body-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .panel-body-scroll::-webkit-scrollbar-track { background: transparent; }
+  .panel-body-scroll::-webkit-scrollbar-thumb {
     background: var(--border-strong);
     border-radius: 3px;
   }

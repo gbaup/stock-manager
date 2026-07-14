@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Tag as TagIcon, Plus, Shirt } from 'lucide-r
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
+import { FixedPage } from '@/components/ui/fixed-page';
+import { ScrollPanel } from '@/components/ui/scroll-panel';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
@@ -238,7 +240,7 @@ function HomeContent({
           </div>
         </header>
 
-        <div className="page page-fixed">
+        <FixedPage>
           <div className="kpi-row shrink-0">
             <div className="kpi-card">
               <div className="kpi-label">Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}</div>
@@ -272,37 +274,39 @@ function HomeContent({
             </div>
           </div>
 
-          <div className="grid-2 flex-fill">
-            <div className="panel panel-scroll">
-              <div className="panel-head">
-                <div>
-                  <div className="panel-title">
-                    Ventas de {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+          <FixedPage.Fill className="grid-2">
+            <ScrollPanel
+              head={(
+                <>
+                  <div>
+                    <div className="panel-title">
+                      Ventas de {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+                    </div>
                   </div>
-                </div>
-                <div className="panel-filter-chips">
-                  <button
-                    className={`chip${personFilter === 'all' ? ' is-active' : ''}`}
-                    onClick={() => pickPerson('all')}
-                  >
-                    Todos
-                  </button>
-                  {users.map((u) => (
+                  <div className="panel-filter-chips">
                     <button
-                      key={u.id}
-                      className={`chip${personFilter === u.id ? ' is-active' : ''}`}
-                      onClick={() => pickPerson(u.id)}
+                      className={`chip${personFilter === 'all' ? ' is-active' : ''}`}
+                      onClick={() => pickPerson('all')}
                     >
-                      <Avatar name={u.alias} size={16} />
-                      {u.alias}
+                      Todos
                     </button>
-                  ))}
-                </div>
-              </div>
+                    {users.map((u) => (
+                      <button
+                        key={u.id}
+                        className={`chip${personFilter === u.id ? ' is-active' : ''}`}
+                        onClick={() => pickPerson(u.id)}
+                      >
+                        <Avatar name={u.alias} size={16} />
+                        {u.alias}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            >
               {list.length === 0 ? (
                 <Empty title="Sin ventas" desc="Probá con otro filtro o navegá a otro mes." icon="tag" />
               ) : (
-                <div className="dtable-scroll">
                   <table className="dtable">
                     <thead>
                       <tr>
@@ -379,9 +383,8 @@ function HomeContent({
                       })}
                     </tbody>
                   </table>
-                </div>
               )}
-            </div>
+            </ScrollPanel>
 
             <div className="partner-rail scroll-y">
               <div className="panel-title" style={{ marginBottom: 4, paddingLeft: 2 }}>
@@ -410,8 +413,8 @@ function HomeContent({
                 <span className="sale-cta-s">Buscá la camiseta y cobrás en segundos</span>
               </button>
             </div>
-          </div>
-        </div>
+          </FixedPage.Fill>
+        </FixedPage>
       </div>
     );
   }
