@@ -338,6 +338,7 @@ function HomeContent({
                                 )}
                                 <div className="dt-cell-main">
                                   <div className="dt-team capitalize">{s.teamName}</div>
+                                  {m?.season && <div className="dt-meta capitalize">{m.season}</div>}
                                 </div>
                               </div>
                             </td>
