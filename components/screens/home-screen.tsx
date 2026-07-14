@@ -238,7 +238,7 @@ function HomeContent({
           </div>
         </header>
 
-        <div className="page">
+        <div className="page page-home">
           <div className="kpi-row">
             <div className="kpi-card">
               <div className="kpi-label">Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}</div>
@@ -273,7 +273,7 @@ function HomeContent({
           </div>
 
           <div className="grid-2">
-            <div className="panel">
+            <div className="panel home-sales-panel">
               <div className="panel-head">
                 <div>
                   <div className="panel-title">
@@ -302,7 +302,7 @@ function HomeContent({
               {list.length === 0 ? (
                 <Empty title="Sin ventas" desc="Probá con otro filtro o navegá a otro mes." icon="tag" />
               ) : (
-                <div style={{ overflowX: 'auto' }}>
+                <div className="dtable-scroll">
                   <table className="dtable">
                     <thead>
                       <tr>
