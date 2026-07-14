@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
+import { WhatsAppButton } from '@/components/ui/whatsapp-button';
 import { fmtSize, fmtType } from '@/app/lib/domain';
 import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
 import { colorByName } from '@/app/lib/format';
@@ -24,7 +25,15 @@ function SizeChips({ sizes }: { sizes: string[] }) {
   );
 }
 
-export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[]; today: string; loggedIn: boolean }) {
+export function PublicScreen({
+  models, today, loggedIn, whatsappNumber, whatsappMessage,
+}: {
+  models: PublicModel[];
+  today: string;
+  loggedIn: boolean;
+  whatsappNumber?: string;
+  whatsappMessage?: string;
+}) {
   const router = useRouter();
   const isDesktop = useIsDesktop();
   const [query, setQuery] = useState('');
@@ -244,6 +253,8 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
         {viewer && (
           <GalleryViewer model={viewer.model} startIdx={viewer.idx} onClose={() => setViewer(null)} />
         )}
+
+        {whatsappNumber && <WhatsAppButton phone={whatsappNumber} message={whatsappMessage} />}
       </div>
     );
   }
@@ -399,6 +410,8 @@ export function PublicScreen({ models, today, loggedIn }: { models: PublicModel[
           onClose={() => setViewer(null)}
         />
       )}
+
+      {whatsappNumber && <WhatsAppButton phone={whatsappNumber} message={whatsappMessage} />}
     </div>
   );
 }

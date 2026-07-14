@@ -631,6 +631,28 @@ body {
   transform: scale(0.92);
 }
 
+/* ---------- WhatsApp FAB (public catalog) ---------- */
+.wa-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--safe-bottom) + 16px);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  z-index: 20;
+  background: #25D366;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(37, 211, 102, 0.38), 0 2px 6px rgba(20, 28, 40, 0.12);
+  transition: transform .12s;
+}
+
+.wa-fab:active {
+  transform: scale(0.92);
+}
+
 /* ---------- bottom nav ---------- */
 .bottomnav {
   position: fixed;
