@@ -61,6 +61,8 @@ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
 SHOW_ALL_MODELS   # optional, temporary. "true" = public catalog shows ALL models, not just in-stock ones (sizes hidden). Unset/false = normal behavior.
+WHATSAPP_NUMBER   # optional. Digits-only international phone number (e.g. 59899123456) for the floating WhatsApp button on the public catalog. Unset = button hidden.
+WHATSAPP_MESSAGE  # optional. Pre-filled chat text for the WhatsApp button. Unset = chat opens with no pre-filled text.
 ```
 
 ## Conventions

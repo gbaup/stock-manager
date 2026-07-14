@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
@@ -110,6 +110,18 @@ export function InventoryScreen({
   }
 
   const isDesktop = useIsDesktop();
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    const params = new URLSearchParams(window.location.search);
+    const modelId = params.get('model');
+    if (!modelId) return;
+    selectModel(modelId);
+    params.delete('model');
+    const qs = params.toString();
+    window.history.replaceState(null, '', qs ? `/inventory?${qs}` : '/inventory');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDesktop]);
 
   if (isDesktop) {
     return (

@@ -473,7 +473,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
         },
       },
     },
-    orderBy: { date: 'desc' },
+    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
   });
   return sales.map((s) => {
     // Landed cost of the sold unit: base price + equal-split shipping share

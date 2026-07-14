@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Tag as TagIcon, Plus, Shirt } from 'lucide-r
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
+import { FixedPage } from '@/components/ui/fixed-page';
+import { ScrollPanel } from '@/components/ui/scroll-panel';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
@@ -116,7 +118,9 @@ export function HomeScreen({
           users={users}
           currentUser={currentUser}
           onQuickSale={() => setShowSaleModal(true)}
-          onOpenModel={(id) => router.push(`/inventory/${id}`)}
+          // Desktop uses a one-time query param consumed by InventoryScreen's split view;
+          // mobile (below) navigates to a dedicated /inventory/:id detail route instead.
+          onOpenModel={(id) => router.push(`/inventory?model=${id}`)}
         />
         {showSaleModal && (
           <DModal title="Registrar venta" size="md" onClose={() => setShowSaleModal(false)}>
@@ -238,8 +242,8 @@ function HomeContent({
           </div>
         </header>
 
-        <div className="page">
-          <div className="kpi-row">
+        <FixedPage>
+          <div className="kpi-row shrink-0">
             <div className="kpi-card">
               <div className="kpi-label">Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}</div>
               <div className="kpi-value">{uyu(monthTotal)}</div>
@@ -272,117 +276,119 @@ function HomeContent({
             </div>
           </div>
 
-          <div className="grid-2">
-            <div className="panel">
-              <div className="panel-head">
-                <div>
-                  <div className="panel-title">
-                    Ventas de {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+          <FixedPage.Fill className="grid-2">
+            <ScrollPanel
+              head={(
+                <>
+                  <div>
+                    <div className="panel-title">
+                      Ventas de {sel.label}{sel.showYear ? ` ${sel.year}` : ''}
+                    </div>
                   </div>
-                </div>
-                <div className="panel-filter-chips">
-                  <button
-                    className={`chip${personFilter === 'all' ? ' is-active' : ''}`}
-                    onClick={() => pickPerson('all')}
-                  >
-                    Todos
-                  </button>
-                  {users.map((u) => (
+                  <div className="panel-filter-chips">
                     <button
-                      key={u.id}
-                      className={`chip${personFilter === u.id ? ' is-active' : ''}`}
-                      onClick={() => pickPerson(u.id)}
+                      className={`chip${personFilter === 'all' ? ' is-active' : ''}`}
+                      onClick={() => pickPerson('all')}
                     >
-                      <Avatar name={u.alias} size={16} />
-                      {u.alias}
+                      Todos
                     </button>
-                  ))}
-                </div>
-              </div>
+                    {users.map((u) => (
+                      <button
+                        key={u.id}
+                        className={`chip${personFilter === u.id ? ' is-active' : ''}`}
+                        onClick={() => pickPerson(u.id)}
+                      >
+                        <Avatar name={u.alias} size={16} />
+                        {u.alias}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            >
               {list.length === 0 ? (
                 <Empty title="Sin ventas" desc="Probá con otro filtro o navegá a otro mes." icon="tag" />
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="dtable">
-                    <thead>
-                      <tr>
-                        <th>Modelo</th>
-                        <th>Detalle</th>
-                        <th>Cobró</th>
-                        <th>Fecha</th>
-                        <th className="num">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map((s) => {
-                        const m = modelById(s.catalogProductId);
-                        return (
-                          <tr
-                            key={s.id}
-                            onClick={() => m && onOpenModel(m.id)}
-                            style={{ cursor: m ? 'pointer' : 'default' }}
-                          >
-                            <td>
-                              <div className="dt-cell-model">
-                                {m ? (
-                                  <Swatch
-                                    color={s.color}
-                                    number={s.number}
-                                    photo={coverOf(m)}
-                                    className="swatch"
-                                  />
-                                ) : (
-                                  <div className="item-swatch-empty" style={{ width: 30, height: 34 }}>
-                                    <Shirt size={14} strokeWidth={1.8} />
-                                  </div>
-                                )}
-                                <div className="dt-cell-main">
-                                  <div className="dt-team capitalize">{s.teamName}</div>
+                <table className="dtable">
+                  <thead>
+                    <tr>
+                      <th>Modelo</th>
+                      <th>Detalle</th>
+                      <th>Cobró</th>
+                      <th>Fecha</th>
+                      <th className="num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.map((s) => {
+                      const m = modelById(s.catalogProductId);
+                      return (
+                        <tr
+                          key={s.id}
+                          onClick={() => m && onOpenModel(m.id)}
+                          style={{ cursor: m ? 'pointer' : 'default' }}
+                        >
+                          <td>
+                            <div className="dt-cell-model">
+                              {m ? (
+                                <Swatch
+                                  color={s.color}
+                                  number={s.number}
+                                  photo={coverOf(m)}
+                                  className="swatch"
+                                />
+                              ) : (
+                                <div className="item-swatch-empty" style={{ width: 30, height: 34 }}>
+                                  <Shirt size={14} strokeWidth={1.8} />
                                 </div>
+                              )}
+                              <div className="dt-cell-main">
+                                <div className="dt-team capitalize">{s.teamName}</div>
+                                {m?.season && <div className="dt-meta capitalize">{m.season}</div>}
                               </div>
-                            </td>
-                            <td>
-                              <div className="dt-meta capitalize">
-                                <ColorDot color={s.color} />
-                                {s.version ? ` ${s.version}` : ''}
-                                {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
-                                {s.size ? ` · ${s.size.toUpperCase()}` : ''}
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {s.collectedByAlias && (
-                                  <Avatar name={s.collectedByAlias} size={20} />
-                                )}
-                                <span style={{ fontSize: 13 }}>{s.collectedByAlias}</span>
-                              </div>
-                            </td>
-                            <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>
-                              {fmtDate(s.date)}
-                            </td>
-                            <td className="num">
-                              <div style={{ color: 'var(--accent)' }}>{uyu(s.price)}</div>
-                              <div style={{
-                                fontSize: 11,
-                                color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
-                                marginTop: 1,
-                              }}>
-                                {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
-                                {s.profitPending && (
-                                  <span style={{ opacity: 0.6 }}> · prov.</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="dt-meta capitalize">
+                              <ColorDot color={s.color} />
+                              {s.version ? ` ${s.version}` : ''}
+                              {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
+                              {s.size ? ` · ${s.size.toUpperCase()}` : ''}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {s.collectedByAlias && (
+                                <Avatar name={s.collectedByAlias} size={20} />
+                              )}
+                              <span style={{ fontSize: 13 }}>{s.collectedByAlias}</span>
+                            </div>
+                          </td>
+                          <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>
+                            {fmtDate(s.date)}
+                          </td>
+                          <td className="num">
+                            <div style={{ color: 'var(--accent)' }}>{uyu(s.price)}</div>
+                            <div style={{
+                              fontSize: 11,
+                              color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
+                              marginTop: 1,
+                            }}>
+                              {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                              {s.profitPending && (
+                                <span style={{ opacity: 0.6 }}> · prov.</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
-            </div>
+            </ScrollPanel>
 
-            <div className="partner-rail">
+            <div className="partner-rail scroll-y">
               <div className="panel-title" style={{ marginBottom: 4, paddingLeft: 2 }}>
                 Cobrado por socio
               </div>
@@ -409,8 +415,8 @@ function HomeContent({
                 <span className="sale-cta-s">Buscá la camiseta y cobrás en segundos</span>
               </button>
             </div>
-          </div>
-        </div>
+          </FixedPage.Fill>
+        </FixedPage>
       </div>
     );
   }

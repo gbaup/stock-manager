@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
+import { FixedPage } from '@/components/ui/fixed-page';
+import { ScrollPanel } from '@/components/ui/scroll-panel';
 import { Plus, ArrowLeftRight, Check, ChevronRight, Tag as TagIcon, Package, Truck, Receipt } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Segmented } from '@/components/ui/segmented';
@@ -112,8 +114,8 @@ export function SaldosScreen({
           </div>
         </header>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
-          <div className="bal-grid">
+        <FixedPage>
+          <div className="bal-grid shrink-0">
             {users.map((user) => {
               const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
               const showUsd = hasUsdActivity(b);
@@ -176,45 +178,50 @@ export function SaldosScreen({
             </div>
           </div>
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 16, flex: 1 }}>Libro de movimientos</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {KIND_FILTERS.map((kf) => (
-                  <button
-                    key={kf.id}
-                    className={`chip${kindFilter === kf.id ? ' is-active' : ''}`}
-                    style={{ height: 28, fontSize: 12 }}
-                    onClick={() => setKindFilter(kf.id)}
-                  >
-                    {kf.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {ledgerMoves.length === 0 ? (
-              <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
-            ) : (
-              <table className="dtable">
-                <thead>
-                  <tr>
-                    <th>Concepto</th>
-                    <th>Tipo</th>
-                    <th>Socio</th>
-                    <th>Fecha</th>
-                    <th className="num">Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledgerMoves.map((m) => (
-                    <DesktopLedgerRow key={m.id} m={m} />
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+          <FixedPage.Fill>
+            <ScrollPanel
+              head={(
+                <>
+                  <div>
+                    <div className="panel-title">Libro de movimientos</div>
+                  </div>
+                  <div className="panel-filter-chips">
+                    {KIND_FILTERS.map((kf) => (
+                      <button
+                        key={kf.id}
+                        className={`chip${kindFilter === kf.id ? ' is-active' : ''}`}
+                        onClick={() => setKindFilter(kf.id)}
+                      >
+                        {kf.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            >
+              {ledgerMoves.length === 0 ? (
+                <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
+              ) : (
+                <table className="dtable">
+                  <thead>
+                    <tr>
+                      <th>Concepto</th>
+                      <th>Tipo</th>
+                      <th>Socio</th>
+                      <th>Fecha</th>
+                      <th className="num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerMoves.map((m) => (
+                      <DesktopLedgerRow key={m.id} m={m} />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </ScrollPanel>
+          </FixedPage.Fill>
+        </FixedPage>
 
         {showGasto && (
           <DModal title="Nuevo gasto" size="sm" onClose={() => setShowGasto(false)}>

@@ -79,7 +79,7 @@ body {
 .app-shell {
   position: relative;
   width: 100%;
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -628,6 +628,28 @@ body {
 }
 
 .fab:active {
+  transform: scale(0.92);
+}
+
+/* ---------- WhatsApp FAB (public catalog) ---------- */
+.wa-fab {
+  position: fixed;
+  right: 24px;
+  bottom: calc(var(--safe-bottom) + 24px);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  z-index: 20;
+  background: #25D366;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.45), 0 2px 8px rgba(20, 28, 40, 0.18);
+  transition: transform .12s;
+}
+
+.wa-fab:active {
   transform: scale(0.92);
 }
 
@@ -1640,9 +1662,10 @@ body {
 
 /* ---- sheet (overlay sobre la pantalla) ---- */
 .picker-scrim {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 110;
+  /* z-index must stay above .modal-scrim (210) — ProductPicker opens from inside a DModal-wrapped form (see purchase-form.tsx) */
+  z-index: 300;
   background: color-mix(in oklch, var(--text) 36%, transparent);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
@@ -3444,9 +3467,10 @@ body {
 
 /* modal (confirmation dialog) */
 .modal-scrim {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 100;
+  /* z-index must stay below .picker-scrim (300) — ProductPicker can open above a DModal-wrapped form (see purchase-form.tsx) */
+  z-index: 210;
   background: color-mix(in oklch, var(--text) 36%, transparent);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
@@ -4675,13 +4699,37 @@ body {
     border-radius: 3px;
   }
 
+  /* ---- fixed page: no page-level scroll; a child panel scrolls internally instead ---- */
+  .page.page-fixed {
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-fixed .shrink-0 { flex-shrink: 0; }
+
+  .page-fixed .flex-fill {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .scroll-y {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   /* ---- split view ---- */
   .split {
     flex: 1;
     display: grid;
     grid-template-columns: 1fr var(--rail-w);
+    grid-template-rows: minmax(0, 1fr);
     min-height: calc(100dvh - var(--header-h));
     overflow: hidden;
+  }
+
+  .split-purchases {
+    --rail-w: 420px;
   }
 
   .split-list {
@@ -4721,6 +4769,28 @@ body {
   }
 
   .split-detail::-webkit-scrollbar { width: 0; }
+
+  /* ---- scrollable panel: header stays put, only the body scrolls ---- */
+  .panel-scroll {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .panel-scroll .panel-head { flex-shrink: 0; }
+
+  .panel-body-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .panel-body-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .panel-body-scroll::-webkit-scrollbar-track { background: transparent; }
+  .panel-body-scroll::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 3px;
+  }
 
   /* ---- dtable ---- */
   .dtable {
