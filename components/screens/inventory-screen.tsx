@@ -113,10 +113,13 @@ export function InventoryScreen({
 
   useEffect(() => {
     if (!isDesktop) return;
-    const modelId = new URLSearchParams(window.location.search).get('model');
+    const params = new URLSearchParams(window.location.search);
+    const modelId = params.get('model');
     if (!modelId) return;
     selectModel(modelId);
-    window.history.replaceState(null, '', '/inventory');
+    params.delete('model');
+    const qs = params.toString();
+    window.history.replaceState(null, '', qs ? `/inventory?${qs}` : '/inventory');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop]);
 

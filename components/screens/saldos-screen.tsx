@@ -178,48 +178,49 @@ export function SaldosScreen({
             </div>
           </div>
 
-          <ScrollPanel
-            className="flex-fill"
-            head={(
-              <>
-                <div>
-                  <div className="panel-title">Libro de movimientos</div>
-                </div>
-                <div className="panel-filter-chips">
-                  {KIND_FILTERS.map((kf) => (
-                    <button
-                      key={kf.id}
-                      className={`chip${kindFilter === kf.id ? ' is-active' : ''}`}
-                      onClick={() => setKindFilter(kf.id)}
-                    >
-                      {kf.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          >
-            {ledgerMoves.length === 0 ? (
-              <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
-            ) : (
-              <table className="dtable">
-                <thead>
-                  <tr>
-                    <th>Concepto</th>
-                    <th>Tipo</th>
-                    <th>Socio</th>
-                    <th>Fecha</th>
-                    <th className="num">Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledgerMoves.map((m) => (
-                    <DesktopLedgerRow key={m.id} m={m} />
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </ScrollPanel>
+          <FixedPage.Fill>
+            <ScrollPanel
+              head={(
+                <>
+                  <div>
+                    <div className="panel-title">Libro de movimientos</div>
+                  </div>
+                  <div className="panel-filter-chips">
+                    {KIND_FILTERS.map((kf) => (
+                      <button
+                        key={kf.id}
+                        className={`chip${kindFilter === kf.id ? ' is-active' : ''}`}
+                        onClick={() => setKindFilter(kf.id)}
+                      >
+                        {kf.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            >
+              {ledgerMoves.length === 0 ? (
+                <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
+              ) : (
+                <table className="dtable">
+                  <thead>
+                    <tr>
+                      <th>Concepto</th>
+                      <th>Tipo</th>
+                      <th>Socio</th>
+                      <th>Fecha</th>
+                      <th className="num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerMoves.map((m) => (
+                      <DesktopLedgerRow key={m.id} m={m} />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </ScrollPanel>
+          </FixedPage.Fill>
         </FixedPage>
 
         {showGasto && (

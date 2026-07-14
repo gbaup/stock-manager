@@ -1642,6 +1642,7 @@ body {
 .picker-scrim {
   position: fixed;
   inset: 0;
+  /* z-index must stay above .modal-scrim (210) — ProductPicker opens from inside a DModal-wrapped form (see purchase-form.tsx) */
   z-index: 300;
   background: color-mix(in oklch, var(--text) 36%, transparent);
   backdrop-filter: blur(2px);
@@ -3446,6 +3447,7 @@ body {
 .modal-scrim {
   position: fixed;
   inset: 0;
+  /* z-index must stay below .picker-scrim (300) — ProductPicker can open above a DModal-wrapped form (see purchase-form.tsx) */
   z-index: 210;
   background: color-mix(in oklch, var(--text) 36%, transparent);
   backdrop-filter: blur(2px);

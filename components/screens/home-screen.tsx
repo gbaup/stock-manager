@@ -118,6 +118,8 @@ export function HomeScreen({
           users={users}
           currentUser={currentUser}
           onQuickSale={() => setShowSaleModal(true)}
+          // Desktop uses a one-time query param consumed by InventoryScreen's split view;
+          // mobile (below) navigates to a dedicated /inventory/:id detail route instead.
           onOpenModel={(id) => router.push(`/inventory?model=${id}`)}
         />
         {showSaleModal && (
