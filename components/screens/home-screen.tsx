@@ -116,7 +116,7 @@ export function HomeScreen({
           users={users}
           currentUser={currentUser}
           onQuickSale={() => setShowSaleModal(true)}
-          onOpenModel={(id) => router.push(`/inventory/${id}`)}
+          onOpenModel={(id) => router.push(`/inventory?model=${id}`)}
         />
         {showSaleModal && (
           <DModal title="Registrar venta" size="md" onClose={() => setShowSaleModal(false)}>
