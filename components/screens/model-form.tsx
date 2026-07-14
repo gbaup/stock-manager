@@ -8,22 +8,25 @@ import { FormHead } from '@/components/ui/chrome';
 import { Field, TextInput, SelectInput, TextAreaInput, ColorPicker, TeamCombobox } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { PhotoGallery } from '@/components/ui/photo-gallery';
-import { VERSIONS, ITEM_TYPES, SLEEVES, fmtType, fmtVersion, fmtSleeve } from '@/app/lib/domain';
+import { VERSIONS, ITEM_TYPES, SLEEVES, TYPES_WITHOUT_VERSION, TYPES_WITHOUT_SLEEVE, fmtType, fmtVersion, fmtSleeve } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { createModel, updateModel } from '@/app/actions/models';
 import { createTeam } from '@/app/actions/teams';
-import { modelSchema, type ModelFormValues } from '@/app/lib/schemas';
+import { modelFormSchema, type ModelFormValues } from '@/app/lib/schemas';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
 export function ModelForm({
   initial,
   teams,
   prefillTeam,
   fromPurchase,
+  onDone,
 }: {
   initial?: ModelWithStats | null;
   teams: { id: string; name: string }[];
   prefillTeam?: string;
   fromPurchase?: boolean;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -33,9 +36,10 @@ export function ModelForm({
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<ModelFormValues>({
-    resolver: zodResolver(modelSchema),
+    resolver: zodResolver(modelFormSchema),
     defaultValues: {
       teamId: initial ? (teams.find((t) => t.name === initial.team)?.id ?? '') : prefillTeamId,
       season: initial?.season ?? '',
@@ -56,12 +60,167 @@ export function ModelForm({
 
   function onSubmit(data: ModelFormValues) {
     startTransition(async () => {
-      if (initial?.id) {
-        await updateModel(initial.id, data);
-      } else {
-        await createModel(data, { fromPurchase });
+      const result = initial?.id
+        ? await updateModel(initial.id, data, { skipRedirect: !!onDone })
+        : await createModel(data, { fromPurchase, skipRedirect: !!onDone });
+      if (result?.errors) {
+        for (const [field, messages] of Object.entries(result.errors)) {
+          setError(field as keyof ModelFormValues, { message: (messages as string[])[0] });
+        }
+        return;
       }
+      onDone?.();
     });
+  }
+
+  const formFields = (
+    <>
+      <Controller
+        name="photos"
+        control={control}
+        render={({ field }) => (
+          <PhotoGallery
+            photos={field.value}
+            color={color}
+            number={number ?? ''}
+            onChange={field.onChange}
+          />
+        )}
+      />
+
+      <div className="section-label">Identificación</div>
+      <Field label="Equipo" error={errors.teamId?.message}>
+        <Controller
+          name="teamId"
+          control={control}
+          render={({ field }) => (
+            <TeamCombobox
+              value={field.value}
+              onChange={field.onChange}
+              teams={teams}
+              onCreateTeam={createTeam}
+            />
+          )}
+        />
+      </Field>
+      <Field label="Temporada" error={errors.season?.message}>
+        <Controller
+          name="season"
+          control={control}
+          render={({ field }) => (
+            <TextInput value={field.value} onChange={field.onChange} placeholder="2025/26" mono />
+          )}
+        />
+      </Field>
+      <div className="field-row">
+        <div style={{ flex: '0 0 calc(50% - 5.5px)', minWidth: 0 }}>
+          <Field label="Tipo">
+            <Controller
+              name="type"
+              control={control}
+              render={({ field }) => (
+                <SelectInput value={field.value} onChange={field.onChange} options={ITEM_TYPES} renderLabel={fmtType} />
+              )}
+            />
+          </Field>
+        </div>
+        {!TYPES_WITHOUT_VERSION.has(type) && (
+          <Field label="Versión">
+            <Controller
+              name="version"
+              control={control}
+              render={({ field }) => (
+                <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} renderLabel={fmtVersion} />
+              )}
+            />
+          </Field>
+        )}
+      </div>
+      {!TYPES_WITHOUT_SLEEVE.has(type) && (
+        <Field label="Manga">
+          <Controller
+            name="sleeve"
+            control={control}
+            render={({ field }) => (
+              <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} renderLabel={fmtSleeve} full />
+            )}
+          />
+        </Field>
+      )}
+
+      <div className="section-label">Apariencia</div>
+      <Field label="Color principal">
+        <Controller
+          name="color"
+          control={control}
+          render={({ field }) => (
+            <ColorPicker value={field.value} onChange={field.onChange} />
+          )}
+        />
+      </Field>
+      <div className="field-row">
+        <Field label="Número" optional>
+          <Controller
+            name="number"
+            control={control}
+            render={({ field }) => (
+              <TextInput
+                value={field.value ?? ''}
+                onChange={(v) => field.onChange(v.replace(/[^\d]/g, '').slice(0, 2))}
+                placeholder="10"
+                mono
+                inputMode="numeric"
+              />
+            )}
+          />
+        </Field>
+        <Field label="Jugador" optional>
+          <Controller
+            name="player"
+            control={control}
+            render={({ field }) => (
+              <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Messi" />
+            )}
+          />
+        </Field>
+      </div>
+
+      <div className="section-label">Notas</div>
+      <Field label="Descripción" optional>
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <TextAreaInput
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              placeholder="Detalles, edición especial, observaciones…"
+            />
+          )}
+        />
+      </Field>
+
+      {!onDone && (
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
+          {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
+        </button>
+      )}
+    </>
+  );
+
+  if (onDone) {
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <ModalFooter
+          pending={pending}
+          onCancel={onDone}
+          onConfirm={handleSubmit(onSubmit)}
+          confirmLabel={initial ? 'Guardar cambios' : 'Crear modelo'}
+          pendingLabel={initial ? 'Guardando…' : 'Creando…'}
+        />
+      </>
+    );
   }
 
   return (
@@ -76,130 +235,7 @@ export function ModelForm({
       />
       <div className="body">
         <div className="body-pad">
-          <Controller
-            name="photos"
-            control={control}
-            render={({ field }) => (
-              <PhotoGallery
-                photos={field.value}
-                color={color}
-                number={number ?? ''}
-                onChange={field.onChange}
-              />
-            )}
-          />
-
-          <div className="section-label">Identificación</div>
-          <Field label="Equipo" error={errors.teamId?.message}>
-            <Controller
-              name="teamId"
-              control={control}
-              render={({ field }) => (
-                <TeamCombobox
-                  value={field.value}
-                  onChange={field.onChange}
-                  teams={teams}
-                  onCreateTeam={createTeam}
-                />
-              )}
-            />
-          </Field>
-          <div className="field-row">
-            <Field label="Temporada" error={errors.season?.message}>
-              <Controller
-                name="season"
-                control={control}
-                render={({ field }) => (
-                  <TextInput value={field.value} onChange={field.onChange} placeholder="2025/26" mono />
-                )}
-              />
-            </Field>
-            <Field label="Versión">
-              <Controller
-                name="version"
-                control={control}
-                render={({ field }) => (
-                  <SelectInput value={field.value} onChange={field.onChange} options={VERSIONS} renderLabel={fmtVersion} />
-                )}
-              />
-            </Field>
-          </div>
-          <Field label="Tipo">
-            <Controller
-              name="type"
-              control={control}
-              render={({ field }) => (
-                <Segmented options={ITEM_TYPES} value={field.value} onChange={field.onChange} renderLabel={fmtType} full />
-              )}
-            />
-          </Field>
-          {type !== 'short' && (
-            <Field label="Manga">
-              <Controller
-                name="sleeve"
-                control={control}
-                render={({ field }) => (
-                  <Segmented options={SLEEVES} value={field.value} onChange={field.onChange} renderLabel={fmtSleeve} full />
-                )}
-              />
-            </Field>
-          )}
-
-          <div className="section-label">Apariencia</div>
-          <Field label="Color principal">
-            <Controller
-              name="color"
-              control={control}
-              render={({ field }) => (
-                <ColorPicker value={field.value} onChange={field.onChange} />
-              )}
-            />
-          </Field>
-          <div className="field-row">
-            <Field label="Número" optional>
-              <Controller
-                name="number"
-                control={control}
-                render={({ field }) => (
-                  <TextInput
-                    value={field.value ?? ''}
-                    onChange={(v) => field.onChange(v.replace(/[^\d]/g, '').slice(0, 2))}
-                    placeholder="10"
-                    mono
-                    inputMode="numeric"
-                  />
-                )}
-              />
-            </Field>
-            <Field label="Jugador" optional>
-              <Controller
-                name="player"
-                control={control}
-                render={({ field }) => (
-                  <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Messi" />
-                )}
-              />
-            </Field>
-          </div>
-
-          <div className="section-label">Notas</div>
-          <Field label="Descripción" optional>
-            <Controller
-              name="description"
-              control={control}
-              render={({ field }) => (
-                <TextAreaInput
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  placeholder="Detalles, edición especial, observaciones…"
-                />
-              )}
-            />
-          </Field>
-
-          <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
-            {pending ? (initial ? 'Guardando…' : 'Creando…') : (initial ? 'Guardar cambios' : 'Crear modelo')}
-          </button>
+          {formFields}
         </div>
       </div>
     </div>

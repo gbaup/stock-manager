@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useId } from 'react';
 import { JERSEY_COLORS } from '@/app/lib/domain';
-import { Icon } from './icon';
+import { X, Check, Plus, Scale } from 'lucide-react';
 import { Modal } from './modal';
 
 export function Field({
@@ -271,7 +271,7 @@ export function TeamCombobox({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { onChange(''); setQuery(''); openMenu(); }}
           >
-            <Icon name="x" size={16} strokeWidth={2} />
+            <X size={16} strokeWidth={2} />
           </button>
         )}
         {open && (matches.length > 0 || showCreate) && (
@@ -288,7 +288,7 @@ export function TeamCombobox({
                 >
                   <span className="combo-team capitalize">{t.name}</span>
                   {(t.count ?? 0) > 0 && <span className="combo-count">{t.count}</span>}
-                  {isExact && <Icon name="check" size={16} strokeWidth={2.2} className="combo-check" />}
+                  {isExact && <Check size={16} strokeWidth={2.2} className="combo-check" />}
                 </button>
               );
             })}
@@ -301,7 +301,7 @@ export function TeamCombobox({
                   onMouseEnter={() => setHi(matches.length)}
                   onClick={askCreate}
                 >
-                  <span className="cc-ico"><Icon name="plus" size={16} strokeWidth={2.2} /></span>
+                  <span className="cc-ico"><Plus size={16} strokeWidth={2.2} /></span>
                   <span>Crear equipo <strong>«{q}»</strong></span>
                 </button>
               </>
@@ -339,7 +339,7 @@ export function WeightInput({
 }) {
   return (
     <div className="input-prefix">
-      <span className="pfx"><Icon name="scale" size={15} /></span>
+      <span className="pfx"><Scale size={15} strokeWidth={1.8} /></span>
       <input
         className="input mono"
         inputMode="decimal"

@@ -1,3 +1,5 @@
+import { updateTag } from 'next/cache';
+
 export const CACHE_TAGS = {
   users: 'users',
   teams: 'teams',
@@ -8,3 +10,14 @@ export const CACHE_TAGS = {
 } as const;
 
 export type CacheTag = typeof CACHE_TAGS[keyof typeof CACHE_TAGS];
+
+export function invalidatePurchase() {
+  updateTag(CACHE_TAGS.purchases);
+  updateTag(CACHE_TAGS.models);
+  updateTag(CACHE_TAGS.saldos);
+}
+
+export function invalidateSale() {
+  updateTag(CACHE_TAGS.models);
+  updateTag(CACHE_TAGS.saldos);
+}

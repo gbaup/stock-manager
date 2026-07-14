@@ -1,7 +1,6 @@
-import { updateTag } from 'next/cache';
 import { prisma } from './prisma';
 import { money } from './money';
-import { CACHE_TAGS } from './cache-tags';
+import { invalidateSale } from './cache-tags';
 import { compareSizes } from './domain';
 
 // Narrow write interface: only the inventoryItem delegate is needed.
@@ -12,12 +11,8 @@ export type StockCount = { available: number; inTransit: number; sold: number };
 
 export type SaleIntent = {
   modelId: string;
-  // If null, the seam picks the oldest available item across any size.
-  // The sale form today doesn't capture size; public listings show per-size
-  // stock but internal sales don't bind to one.
-  size: string | null;
+  size: string;
   priceUyu: number;
-  exchangeRate: number;
   date: Date;
   method: string | null;
   description: string | null;
@@ -118,24 +113,17 @@ export async function availableSizesByModel(
   return result;
 }
 
-// Inserts new items into an existing Batch. All start as `status: 'available'`
-// with `shipmentId: null` (in-transit). They become stock once linked to a
-// Shipment via markArrived. The Shipment seam decides what "arrived" means.
-// Both currencies are stored: USD is the supplier price, UYU is derived at
-// purchase time using the supplied exchange rate (snapshotted on the batch).
-//
-// Accepts an optional `db` so callers (notably the Purchase action) can
-// compose this write with a sibling `batch.create` inside one transaction.
-// When `db` is omitted, runs standalone and invalidates the models cache.
+// Inserts new items into an existing Batch inside a transaction. All start as
+// `status: 'available'` with `shipmentId: null` (in-transit). Both currencies
+// are stored: USD is the supplier price, UYU is derived at purchase time.
 export async function addBatchItems(
   batchId: string,
   items: NewBatchItem[],
   exchangeRate: number,
-  db?: InventoryWriter,
+  db: InventoryWriter,
 ): Promise<void> {
   if (items.length === 0) return;
-  const client = db ?? prisma;
-  await client.inventoryItem.createMany({
+  await db.inventoryItem.createMany({
     data: items.map((it) => ({
       batchId,
       catalogProductId: it.modelId,
@@ -145,7 +133,6 @@ export async function addBatchItems(
       status: 'available',
     })),
   });
-  if (!db) updateTag(CACHE_TAGS.models);
 }
 
 // Atomic sale: picks the oldest available item in an arrived batch, flips it
@@ -158,7 +145,7 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
     const candidate = await tx.inventoryItem.findFirst({
       where: {
         catalogProductId: intent.modelId,
-        ...(intent.size ? { size: intent.size } : {}),
+        size: intent.size,
         status: 'available',
         shipmentId: { not: null },
       },
@@ -190,8 +177,7 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
     return sale.id;
   });
 
-  updateTag(CACHE_TAGS.models);
-  updateTag(CACHE_TAGS.saldos);
+  invalidateSale();
   return { saleId };
 }
 
