@@ -238,8 +238,8 @@ function HomeContent({
           </div>
         </header>
 
-        <div className="page page-home">
-          <div className="kpi-row">
+        <div className="page page-fixed">
+          <div className="kpi-row shrink-0">
             <div className="kpi-card">
               <div className="kpi-label">Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}</div>
               <div className="kpi-value">{uyu(monthTotal)}</div>
@@ -272,8 +272,8 @@ function HomeContent({
             </div>
           </div>
 
-          <div className="grid-2">
-            <div className="panel home-sales-panel">
+          <div className="grid-2 flex-fill">
+            <div className="panel panel-scroll">
               <div className="panel-head">
                 <div>
                   <div className="panel-title">
@@ -383,7 +383,7 @@ function HomeContent({
               )}
             </div>
 
-            <div className="partner-rail">
+            <div className="partner-rail scroll-y">
               <div className="panel-title" style={{ marginBottom: 4, paddingLeft: 2 }}>
                 Cobrado por socio
               </div>

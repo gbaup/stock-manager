@@ -4675,21 +4675,21 @@ body {
     border-radius: 3px;
   }
 
-  /* ---- home page: no page-level scroll, only the sales table scrolls ---- */
-  .page.page-home {
+  /* ---- fixed page: no page-level scroll; a child panel scrolls internally instead ---- */
+  .page.page-fixed {
     overflow-y: hidden;
     display: flex;
     flex-direction: column;
   }
 
-  .page-home .kpi-row { flex-shrink: 0; }
+  .page-fixed .shrink-0 { flex-shrink: 0; }
 
-  .page-home .grid-2 {
+  .page-fixed .flex-fill {
     flex: 1;
     min-height: 0;
   }
 
-  .page-home .partner-rail {
+  .scroll-y {
     min-height: 0;
     overflow-y: auto;
   }
@@ -4746,14 +4746,14 @@ body {
 
   .split-detail::-webkit-scrollbar { width: 0; }
 
-  /* ---- home sales panel: header stays put, only the table body scrolls ---- */
-  .home-sales-panel {
+  /* ---- scrollable panel: header stays put, only the body scrolls ---- */
+  .panel-scroll {
     display: flex;
     flex-direction: column;
     min-height: 0;
   }
 
-  .home-sales-panel .panel-head { flex-shrink: 0; }
+  .panel-scroll .panel-head { flex-shrink: 0; }
 
   .dtable-scroll {
     flex: 1;

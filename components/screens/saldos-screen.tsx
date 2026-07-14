@@ -112,8 +112,8 @@ export function SaldosScreen({
           </div>
         </header>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
-          <div className="bal-grid">
+        <div className="page page-fixed">
+          <div className="bal-grid shrink-0">
             {users.map((user) => {
               const b = balances[user.alias] ?? { uyu: 0, usd: 0, inUyu: 0, outUyu: 0, inUsd: 0, outUsd: 0 };
               const showUsd = hasUsdActivity(b);
@@ -176,15 +176,16 @@ export function SaldosScreen({
             </div>
           </div>
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 16, flex: 1 }}>Libro de movimientos</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="panel panel-scroll flex-fill">
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">Libro de movimientos</div>
+              </div>
+              <div className="panel-filter-chips">
                 {KIND_FILTERS.map((kf) => (
                   <button
                     key={kf.id}
                     className={`chip${kindFilter === kf.id ? ' is-active' : ''}`}
-                    style={{ height: 28, fontSize: 12 }}
                     onClick={() => setKindFilter(kf.id)}
                   >
                     {kf.label}
@@ -196,22 +197,24 @@ export function SaldosScreen({
             {ledgerMoves.length === 0 ? (
               <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
             ) : (
-              <table className="dtable">
-                <thead>
-                  <tr>
-                    <th>Concepto</th>
-                    <th>Tipo</th>
-                    <th>Socio</th>
-                    <th>Fecha</th>
-                    <th className="num">Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledgerMoves.map((m) => (
-                    <DesktopLedgerRow key={m.id} m={m} />
-                  ))}
-                </tbody>
-              </table>
+              <div className="dtable-scroll">
+                <table className="dtable">
+                  <thead>
+                    <tr>
+                      <th>Concepto</th>
+                      <th>Tipo</th>
+                      <th>Socio</th>
+                      <th>Fecha</th>
+                      <th className="num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerMoves.map((m) => (
+                      <DesktopLedgerRow key={m.id} m={m} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
