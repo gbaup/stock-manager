@@ -307,82 +307,82 @@ function HomeContent({
               {list.length === 0 ? (
                 <Empty title="Sin ventas" desc="Probá con otro filtro o navegá a otro mes." icon="tag" />
               ) : (
-                  <table className="dtable">
-                    <thead>
-                      <tr>
-                        <th>Modelo</th>
-                        <th>Detalle</th>
-                        <th>Cobró</th>
-                        <th>Fecha</th>
-                        <th className="num">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map((s) => {
-                        const m = modelById(s.catalogProductId);
-                        return (
-                          <tr
-                            key={s.id}
-                            onClick={() => m && onOpenModel(m.id)}
-                            style={{ cursor: m ? 'pointer' : 'default' }}
-                          >
-                            <td>
-                              <div className="dt-cell-model">
-                                {m ? (
-                                  <Swatch
-                                    color={s.color}
-                                    number={s.number}
-                                    photo={coverOf(m)}
-                                    className="swatch"
-                                  />
-                                ) : (
-                                  <div className="item-swatch-empty" style={{ width: 30, height: 34 }}>
-                                    <Shirt size={14} strokeWidth={1.8} />
-                                  </div>
-                                )}
-                                <div className="dt-cell-main">
-                                  <div className="dt-team capitalize">{s.teamName}</div>
-                                  {m?.season && <div className="dt-meta capitalize">{m.season}</div>}
+                <table className="dtable">
+                  <thead>
+                    <tr>
+                      <th>Modelo</th>
+                      <th>Detalle</th>
+                      <th>Cobró</th>
+                      <th>Fecha</th>
+                      <th className="num">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.map((s) => {
+                      const m = modelById(s.catalogProductId);
+                      return (
+                        <tr
+                          key={s.id}
+                          onClick={() => m && onOpenModel(m.id)}
+                          style={{ cursor: m ? 'pointer' : 'default' }}
+                        >
+                          <td>
+                            <div className="dt-cell-model">
+                              {m ? (
+                                <Swatch
+                                  color={s.color}
+                                  number={s.number}
+                                  photo={coverOf(m)}
+                                  className="swatch"
+                                />
+                              ) : (
+                                <div className="item-swatch-empty" style={{ width: 30, height: 34 }}>
+                                  <Shirt size={14} strokeWidth={1.8} />
                                 </div>
+                              )}
+                              <div className="dt-cell-main">
+                                <div className="dt-team capitalize">{s.teamName}</div>
+                                {m?.season && <div className="dt-meta capitalize">{m.season}</div>}
                               </div>
-                            </td>
-                            <td>
-                              <div className="dt-meta capitalize">
-                                <ColorDot color={s.color} />
-                                {s.version ? ` ${s.version}` : ''}
-                                {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
-                                {s.size ? ` · ${s.size.toUpperCase()}` : ''}
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {s.collectedByAlias && (
-                                  <Avatar name={s.collectedByAlias} size={20} />
-                                )}
-                                <span style={{ fontSize: 13 }}>{s.collectedByAlias}</span>
-                              </div>
-                            </td>
-                            <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>
-                              {fmtDate(s.date)}
-                            </td>
-                            <td className="num">
-                              <div style={{ color: 'var(--accent)' }}>{uyu(s.price)}</div>
-                              <div style={{
-                                fontSize: 11,
-                                color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
-                                marginTop: 1,
-                              }}>
-                                {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
-                                {s.profitPending && (
-                                  <span style={{ opacity: 0.6 }}> · prov.</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="dt-meta capitalize">
+                              <ColorDot color={s.color} />
+                              {s.version ? ` ${s.version}` : ''}
+                              {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
+                              {s.size ? ` · ${s.size.toUpperCase()}` : ''}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {s.collectedByAlias && (
+                                <Avatar name={s.collectedByAlias} size={20} />
+                              )}
+                              <span style={{ fontSize: 13 }}>{s.collectedByAlias}</span>
+                            </div>
+                          </td>
+                          <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>
+                            {fmtDate(s.date)}
+                          </td>
+                          <td className="num">
+                            <div style={{ color: 'var(--accent)' }}>{uyu(s.price)}</div>
+                            <div style={{
+                              fontSize: 11,
+                              color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
+                              marginTop: 1,
+                            }}>
+                              {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                              {s.profitPending && (
+                                <span style={{ opacity: 0.6 }}> · prov.</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
             </ScrollPanel>
 
