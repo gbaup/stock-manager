@@ -1,7 +1,7 @@
 import { prisma } from './prisma';
 import { money } from './money';
 import { invalidateSale } from './cache-tags';
-import { compareSizes } from './domain';
+import { compareSizes, SALE_STATUS } from './domain';
 
 // Narrow write interfaces: only the delegates each helper needs.
 // Both the top-level PrismaClient and a TransactionClient satisfy these.
@@ -189,14 +189,43 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
   return { saleId };
 }
 
+// Edits an active sale's details (price, date, method, collector). Details
+// only — the unit behind the sale stays; changing model or size goes through
+// swapSaleItem. Lives here (not in the action) so Inventory stays the single
+// owner of every Sale write — see ADR 0003.
+export async function updateSaleDetails(
+  saleId: string,
+  details: {
+    priceUyu: number;
+    date: Date;
+    method: string | null;
+    description: string | null;
+    collectedByUserId: string | null;
+  },
+): Promise<void> {
+  const { count } = await prisma.sale.updateMany({
+    where: { id: saleId, status: SALE_STATUS.active },
+    data: {
+      price: details.priceUyu,
+      date: details.date,
+      method: details.method,
+      description: details.description,
+      collectedByUserId: details.collectedByUserId,
+    },
+  });
+  if (count === 0) throw new Error('La venta no existe o fue anulada');
+
+  invalidateSale();
+}
+
 // Cancels a sale keeping the row as history (status 'cancelled') and returns
 // its unit to stock. The item keeps its shipment and createdAt, so it re-enters
 // the FIFO queue in its original slot and shipping shares are untouched.
 export async function cancelSale(saleId: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const { count } = await tx.sale.updateMany({
-      where: { id: saleId, status: 'active' },
-      data: { status: 'cancelled', cancelledAt: new Date() },
+      where: { id: saleId, status: SALE_STATUS.active },
+      data: { status: SALE_STATUS.cancelled, cancelledAt: new Date() },
     });
     if (count === 0) throw new Error('La venta ya fue anulada');
 
@@ -226,7 +255,7 @@ export async function swapSaleItem(
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const sale = await tx.sale.findFirst({
-      where: { id: saleId, status: 'active' },
+      where: { id: saleId, status: SALE_STATUS.active },
       select: { inventoryItemId: true },
     });
     if (!sale) throw new Error('La venta no existe o fue anulada');

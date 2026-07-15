@@ -175,7 +175,18 @@ export type BatchSummary = {
   shippingPaidByAlias: string | null;
   items: ItemInBatch[];
   shipments: ShipmentRecord[];
+  // Optimistic-lock token for the edit flow: every mutation that can change
+  // the batch (metadata edits, item changes, shipments arriving) bumps it.
+  // The edit form echoes it back and updatePurchase rejects a stale token.
+  updatedAt: string;
 };
+
+// A Sale is soft-deleted: cancelling keeps the row as history under status
+// 'cancelled' while the unit returns to stock. Every read that feeds money
+// math (saldos, profit, revenue) must count ACTIVE sales only — filter
+// through these constants, never a raw string. See CONTEXT.md "Sale".
+export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
+export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 
 export type SaleRecord = {
   id: string;
@@ -250,31 +261,6 @@ export function toSupplierPaymentArray(
   return Object.entries(dict ?? {})
     .map(([userId, v]) => ({ userId, amountUsd: parseFloat(v ?? '') || 0 }))
     .filter((p) => p.amountUsd > 0);
-}
-
-// Applies a card tax percentage to a USD amount, returning the gross cost.
-// pct is a whole-number percentage (e.g. 5 means 5%). Returns amount unchanged when pct is 0 or absent.
-export function applyCardTax(amountUsd: number, pct: number | null | undefined): number {
-  return Math.round(amountUsd * (1 + (pct ?? 0) / 100) * 100) / 100;
-}
-
-// Card taxes are never stored on items — they're baked into basePriceUsd at
-// purchase time via this multiplier: the ratio of gross cost (base + all card
-// fees) to base cost. Because payments must sum to the base cost, the
-// multiplier is exactly recoverable from the stored payment rows, which lets
-// the purchase edit flow reconstruct pre-tax prices without a schema change.
-export function grossMultiplier(
-  payments: { amountUsd: number; cardTaxPct?: number | null }[],
-): number {
-  const paid = payments.filter((p) => p.amountUsd > 0);
-  const baseTotal = paid.reduce((s, p) => s + p.amountUsd, 0);
-  const totalCardTax = paid.reduce((s, p) => s + p.amountUsd * ((p.cardTaxPct ?? 0) / 100), 0);
-  return totalCardTax > 0 && baseTotal > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
-}
-
-// Reconstructs the supplier (pre-tax) price from a stored taxed price.
-export function preTaxPriceUsd(storedPriceUsd: number, multiplier: number): number {
-  return Math.round((storedPriceUsd / multiplier) * 100) / 100;
 }
 
 export type ExpenseRecord = {

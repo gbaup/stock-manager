@@ -9,9 +9,8 @@ import {
 import {
   recordSale, NotEnoughStockError,
   cancelSale as cancelSaleInventory,
-  swapSaleItem,
+  updateSaleDetails, swapSaleItem,
 } from '@/app/lib/inventory';
-import { invalidateSale } from '@/app/lib/cache-tags';
 import { prisma } from '@/app/lib/prisma';
 
 type SaleInput = {
@@ -83,19 +82,13 @@ export async function updateSale(saleId: string, data: SaleEditFormValues) {
 
   parseOrThrow(saleEditSchema, data);
 
-  const { count } = await prisma.sale.updateMany({
-    where: { id: saleId, status: 'active' },
-    data: {
-      price: parseFloat(data.price),
-      date: new Date(data.date),
-      method: data.method?.trim().toLowerCase() || null,
-      description: data.description?.trim().toLowerCase() || null,
-      collectedByUserId: data.collectedByUserId || null,
-    },
+  await updateSaleDetails(saleId, {
+    priceUyu: parseFloat(data.price),
+    date: new Date(data.date),
+    method: data.method?.trim().toLowerCase() || null,
+    description: data.description?.trim().toLowerCase() || null,
+    collectedByUserId: data.collectedByUserId || null,
   });
-  if (count === 0) throw new Error('La venta no existe o fue anulada');
-
-  invalidateSale();
 }
 
 export async function cancelSale(saleId: string) {

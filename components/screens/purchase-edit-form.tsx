@@ -11,8 +11,8 @@ import { Plus, Shirt, X, Lock, Trash2 } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import {
   sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray,
-  grossMultiplier, preTaxPriceUsd,
 } from '@/app/lib/domain';
+import { unbakeBatch } from '@/app/lib/pricing';
 import { usd } from '@/app/lib/format';
 import type { BatchSummary, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
@@ -24,22 +24,20 @@ import { ModalFooter } from '@/components/ui/modal-footer';
 import { useConfirmGate } from '@/app/lib/hooks';
 
 // Collapses per-unit rows into quantity lines the form can edit. Prices shown
-// are PRE-TAX (the supplier's price): stored prices carry the card-tax bake-in,
-// which the server re-applies from the edited payments on save.
+// are PRE-TAX (the supplier's price): stored prices carry the card-surcharge
+// bake-in, which the server re-applies from the edited payments on save.
 function toQuantityLines(
-  items: BatchSummary['items'],
-  gOld: number,
+  items: Array<BatchSummary['items'][number] & { preTaxPriceUsd: number }>,
 ): PurchaseEditFormValues['items'] {
   const lines = new Map<string, { modelId: string; size: string; basePriceUsd: string; quantity: number }>();
   for (const it of items) {
-    const preTax = preTaxPriceUsd(it.basePriceUsd, gOld);
-    const key = `${it.catalogProductId}::${it.size}::${preTax}`;
+    const key = `${it.catalogProductId}::${it.size}::${it.preTaxPriceUsd}`;
     const line = lines.get(key);
     if (line) line.quantity += 1;
     else lines.set(key, {
       modelId: it.catalogProductId,
       size: it.size,
-      basePriceUsd: preTax > 0 ? String(preTax) : '',
+      basePriceUsd: it.preTaxPriceUsd > 0 ? String(it.preTaxPriceUsd) : '',
       quantity: 1,
     });
   }
@@ -66,18 +64,13 @@ export function PurchaseEditForm({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const gOld = grossMultiplier(batch.supplierPayments);
-  const editableItems = batch.items.filter((i) => i.shipmentId === null);
-  const lockedItems = batch.items.filter((i) => i.shipmentId !== null);
-  const lockedPreTaxTotal = lockedItems.reduce((s, i) => s + preTaxPriceUsd(i.basePriceUsd, gOld), 0);
+  // Pre-tax view of the batch (card surcharges reversed out — see pricing.ts).
+  // New/edited items get their UYU cost from the batch's implied exchange
+  // rate on save, falling back to the live rate.
+  const { editable: editableItems, locked: lockedItems, lockedPreTaxTotal, impliedRate } =
+    unbakeBatch(batch.items, batch.supplierPayments);
   const canDelete = batch.arrivedQuantity === 0;
-
-  // The batch's implicit exchange rate (UYU/USD of any item), falling back to
-  // the live rate. New/edited items get their UYU cost from this on save.
-  const rateSource = batch.items.find((i) => i.basePriceUyu != null && i.basePriceUyu > 0 && i.basePriceUsd > 0);
-  const defaultRate = rateSource
-    ? Math.round((rateSource.basePriceUyu! / rateSource.basePriceUsd) * 100) / 100
-    : rate.value;
+  const defaultRate = impliedRate ?? rate.value;
 
   const {
     control,
@@ -98,7 +91,7 @@ export function PurchaseEditForm({
           .filter((p) => p.cardTaxPct != null && p.cardTaxPct > 0)
           .map((p) => [p.userId, String(p.cardTaxPct)]),
       ),
-      items: toQuantityLines(editableItems, gOld),
+      items: toQuantityLines(editableItems),
       exchangeRate: String(defaultRate),
     },
   });
@@ -141,7 +134,7 @@ export function PurchaseEditForm({
               basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
               quantity: it.quantity ?? 1,
             })),
-          expectedEditableItemIds: editableItems.map((i) => i.id),
+          expectedUpdatedAt: batch.updatedAt,
         }, { skipRedirect: true });
         // Redirect client-side: a server-side redirect would throw NEXT_REDIRECT
         // into this try/catch and read as a bogus save error.

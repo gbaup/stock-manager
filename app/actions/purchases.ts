@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
 import { computeShippingPrice } from '@/app/lib/money';
-import { baseCostUsd, reconcileSupplierPayments, grossMultiplier, preTaxPriceUsd } from '@/app/lib/domain';
+import { baseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
+import { bakeCardTaxIntoItems, unbakeBatch } from '@/app/lib/pricing';
 import { invalidatePurchase } from '@/app/lib/cache-tags';
 
 const purchaseItemInput = z.object({
@@ -33,11 +34,11 @@ const createPurchaseSchema = purchaseBaseSchema.extend({
 });
 
 // On edit, `items` is the desired EDITABLE (unshipped) set with PRE-TAX prices;
-// it may be empty when only locked items remain. `expectedEditableItemIds` is
-// the editable set the form loaded, used to detect concurrent changes.
+// it may be empty when only locked items remain. `expectedUpdatedAt` is the
+// batch's optimistic-lock token as the form loaded it (BatchSummary.updatedAt).
 const updatePurchaseSchema = purchaseBaseSchema.extend({
   items: z.array(purchaseItemInput),
-  expectedEditableItemIds: z.array(z.string().uuid()),
+  expectedUpdatedAt: z.string().min(1),
 });
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number; quantity?: number };
@@ -51,23 +52,6 @@ function expandItems(items: PurchaseItem[]) {
       basePriceUsd: it.basePriceUsd,
     }))
   );
-}
-
-// Bakes the payments' card taxes into each unit's base price (see
-// grossMultiplier in domain.ts for how the edit flow reverses this).
-function bakeCardTaxIntoItems(
-  items: { modelId: string; size: string; basePriceUsd: number }[],
-  payments: { amountUsd: number; cardTaxPct?: number }[],
-  baseTotal: number,
-) {
-  const g = grossMultiplier(payments);
-  if (g > 1 && baseTotal === 0) {
-    throw new Error('No se puede aplicar recargo de tarjeta cuando el costo base es cero');
-  }
-  return items.map((it) => ({
-    ...it,
-    basePriceUsd: Math.round(it.basePriceUsd * g * 10000) / 10000,
-  }));
 }
 
 export async function createPurchase(data: {
@@ -136,7 +120,7 @@ export async function updatePurchase(batchId: string, data: {
   supplierPayments?: { userId: string; amountUsd: number; cardTaxPct?: number }[];
   exchangeRate: number;
   items: PurchaseItem[];
-  expectedEditableItemIds: string[];
+  expectedUpdatedAt: string;
 }, opts?: { skipRedirect?: boolean }) {
   parseOrThrow(updatePurchaseSchema, data);
 
@@ -147,18 +131,19 @@ export async function updatePurchase(batchId: string, data: {
     const batch = await tx.batch.findUnique({
       where: { id: batchId },
       select: {
+        updatedAt: true,
         supplierPayments: { select: { amountUsd: true, cardTaxPct: true } },
         items: { select: { id: true, shipmentId: true, basePriceUsd: true } },
       },
     });
     if (!batch) throw new Error('La compra no existe');
 
-    // Concurrency guard: if someone marked items as arrived since the form
-    // loaded, the editable set changed and this edit was built on stale data.
-    const editableIds = new Set(batch.items.filter((i) => i.shipmentId === null).map((i) => i.id));
-    const expectedIds = new Set(data.expectedEditableItemIds);
-    const sameSet = editableIds.size === expectedIds.size && [...editableIds].every((id) => expectedIds.has(id));
-    if (!sameSet) throw new Error('La compra cambió — actualizá la página antes de editar');
+    // Optimistic lock: every mutation that can change this batch (metadata
+    // edits, item changes, shipments arriving — see markArrived) bumps
+    // updatedAt, so a stale token means the edit was built on old data.
+    if (batch.updatedAt.toISOString() !== data.expectedUpdatedAt) {
+      throw new Error('La compra cambió — actualizá la página antes de editar');
+    }
 
     const lockedItems = batch.items.filter((i) => i.shipmentId !== null);
     if (lockedItems.length + expandedItems.length === 0) {
@@ -167,12 +152,12 @@ export async function updatePurchase(batchId: string, data: {
 
     // Locked items keep their stored taxed prices, but the payment-sum rule
     // applies to the whole batch in pre-tax terms, so undo their old bake-in.
-    const gOld = grossMultiplier(batch.supplierPayments.map((p) => ({
-      amountUsd: Number(p.amountUsd),
-      cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
-    })));
-    const lockedPreTaxTotal = lockedItems.reduce(
-      (s, i) => s + preTaxPriceUsd(Number(i.basePriceUsd), gOld), 0,
+    const { lockedPreTaxTotal } = unbakeBatch(
+      batch.items.map((i) => ({ shipmentId: i.shipmentId, basePriceUsd: Number(i.basePriceUsd) })),
+      batch.supplierPayments.map((p) => ({
+        amountUsd: Number(p.amountUsd),
+        cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
+      })),
     );
     const baseTotal = lockedPreTaxTotal + baseCostUsd(expandedItems);
     if (reconcileSupplierPayments(payments, baseTotal).status === 'mismatch') {
@@ -299,17 +284,17 @@ export async function markArrived(
       data: { shipmentId: shipment.id },
     });
 
-    // Once every item is on a shipment, stamp the legacy arrivalDate column
-    // for backwards-compat with the few places that still query it.
+    // Touch the batch on EVERY shipment: updatedAt is the optimistic-lock
+    // token updatePurchase checks, so any arrival must move it — not just the
+    // last one. The legacy arrivalDate stamp (kept for backwards-compat with
+    // the few places that still query it) only lands when nothing is pending.
     const pending = await tx.inventoryItem.count({
       where: { batchId, shipmentId: null },
     });
-    if (pending === 0) {
-      await tx.batch.update({
-        where: { id: batchId },
-        data: { arrivalDate: new Date(data.arrivalDate) },
-      });
-    }
+    await tx.batch.update({
+      where: { id: batchId },
+      data: pending === 0 ? { arrivalDate: new Date(data.arrivalDate) } : { updatedAt: new Date() },
+    });
   });
 
   invalidatePurchase();

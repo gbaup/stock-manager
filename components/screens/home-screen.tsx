@@ -11,6 +11,7 @@ import { SaleEditForm } from '@/components/screens/sale-edit-form';
 import { FixedPage } from '@/components/ui/fixed-page';
 import { ScrollPanel } from '@/components/ui/scroll-panel';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
+import { SALE_STATUS } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { useIsDesktop } from '@/app/lib/hooks';
@@ -194,7 +195,7 @@ function HomeContent({
 
   // Cancelled sales stay visible in the list as history, but every aggregate
   // (totals, profit, per-partner split, avg ticket) counts active sales only.
-  const activeSales = sales.filter((s) => s.status === 'active');
+  const activeSales = sales.filter((s) => s.status === SALE_STATUS.active);
   const monthSales = activeSales.filter((s) => inSelectedMonth(s.date));
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
   const monthProfit = monthSales.reduce((a, s) => a + s.profit, 0);
@@ -340,7 +341,7 @@ function HomeContent({
                   <tbody>
                     {list.map((s) => {
                       const m = modelById(s.catalogProductId);
-                      const cancelled = s.status === 'cancelled';
+                      const cancelled = s.status === SALE_STATUS.cancelled;
                       return (
                         <tr
                           key={s.id}
@@ -608,7 +609,7 @@ function HomeContent({
             <div className="sales-list">
               {shown.map((s) => {
                 const m = modelById(s.catalogProductId);
-                const cancelled = s.status === 'cancelled';
+                const cancelled = s.status === SALE_STATUS.cancelled;
                 return (
                   <div
                     key={s.id}

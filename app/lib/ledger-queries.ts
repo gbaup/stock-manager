@@ -1,6 +1,7 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import { CACHE_TAGS } from './cache-tags';
+import { SALE_STATUS } from './domain';
 import type { ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from './domain';
 import {
   buildMovements,
@@ -129,7 +130,7 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
       JOIN inventory_items  ii ON s.inventory_item_id  = ii.id
       JOIN catalog_products cp ON ii.catalog_product_id = cp.id
       JOIN teams            t  ON cp.team_id            = t.id
-      WHERE s.status = 'active'
+      WHERE s.status = ${SALE_STATUS.active}
       ORDER BY s.date DESC
     `,
     prisma.expense.findMany({ orderBy: { date: 'desc' }, include: { paidByUser: true } }),

@@ -4,11 +4,11 @@ import { fmtDate } from './format';
 import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
-import { shippingShareUyu, derivePurchaseStatus } from './domain';
+import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, TimelineEvent, SaleRecord, UserSummary,
-  ShipmentRecord,
+  ShipmentRecord, SaleStatus,
 } from './domain';
 
 export type HomeSaleItem = {
@@ -26,7 +26,7 @@ export type HomeSaleItem = {
   date: string;
   method: string | null;
   description: string | null;
-  status: 'active' | 'cancelled';
+  status: SaleStatus;
   collectedByUserId: string | null;
   collectedByAlias: string | null;
 };
@@ -73,7 +73,7 @@ type ShipmentInput = {
 
 export function batchToSummary(
   b: {
-    id: string; purchaseDate: Date; arrivalDate: Date | null;
+    id: string; purchaseDate: Date; arrivalDate: Date | null; updatedAt: Date;
     supplier: string | null;
     trackingNumber: string | null; description: string | null;
     supplierPayments: Array<{ userId: string; amountUsd: unknown; cardTaxPct: unknown; user: { alias: string } }>;
@@ -150,6 +150,7 @@ export function batchToSummary(
       product: productMeta(i.product),
     })),
     shipments,
+    updatedAt: b.updatedAt.toISOString(),
   };
 }
 
@@ -215,7 +216,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
           // Only the active sale matters for stats/timeline; cancelled sales
           // stay in the DB as history but the item is back in stock.
           sales: {
-            where: { status: 'active' },
+            where: { status: SALE_STATUS.active },
             select: {
               id: true, price: true, date: true, method: true,
               description: true, userId: true,
@@ -518,7 +519,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       date: toISODate(s.date)!,
       method: s.method,
       description: s.description,
-      status: s.status as 'active' | 'cancelled',
+      status: s.status as SaleStatus,
       collectedByUserId: s.collectedByUserId,
       collectedByAlias: s.collectedByUser?.alias ?? null,
     };
