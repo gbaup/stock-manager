@@ -129,6 +129,7 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
       JOIN inventory_items  ii ON s.inventory_item_id  = ii.id
       JOIN catalog_products cp ON ii.catalog_product_id = cp.id
       JOIN teams            t  ON cp.team_id            = t.id
+      WHERE s.status = 'active'
       ORDER BY s.date DESC
     `,
     prisma.expense.findMany({ orderBy: { date: 'desc' }, include: { paidByUser: true } }),

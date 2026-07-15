@@ -24,6 +24,9 @@ export type HomeSaleItem = {
   profit: number;
   profitPending: boolean;
   date: string;
+  method: string | null;
+  description: string | null;
+  status: 'active' | 'cancelled';
   collectedByUserId: string | null;
   collectedByAlias: string | null;
 };
@@ -76,7 +79,7 @@ export function batchToSummary(
     supplierPayments: Array<{ userId: string; amountUsd: unknown; cardTaxPct: unknown; user: { alias: string } }>;
     shipments: ShipmentInput[];
   },
-  items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
+  items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; basePriceUyu?: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
 ): BatchSummary {
   // Map shipment -> items received via that shipment.
   const itemsByShipment = new Map<string, string[]>();
@@ -142,6 +145,7 @@ export function batchToSummary(
       catalogProductId: i.catalogProductId,
       size: i.size,
       basePriceUsd: Number(i.basePriceUsd),
+      basePriceUyu: i.basePriceUyu != null ? Number(i.basePriceUyu) : null,
       shipmentId: i.shipmentId,
       product: productMeta(i.product),
     })),
@@ -208,7 +212,10 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
               },
             },
           },
-          sale: {
+          // Only the active sale matters for stats/timeline; cancelled sales
+          // stay in the DB as history but the item is back in stock.
+          sales: {
+            where: { status: 'active' },
             select: {
               id: true, price: true, date: true, method: true,
               description: true, userId: true,
@@ -235,9 +242,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     }
   }
   const availableBySize = [...sizeCounts].map(([size, count]) => ({ size, count }));
-  const soldItems = p.items.filter((i) => i.sale !== null);
+  // The include above filters to active sales, so sales[0] is the item's
+  // current sale (or undefined for available / cancelled-and-restocked items).
+  const soldItems = p.items.filter((i) => i.sales.length > 0);
   const sold = soldItems.length;
-  const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);
+  const revenue = soldItems.reduce((s, i) => s + Number(i.sales[0].price), 0);
 
   // Group items by batch so we can build a BatchSummary per batch even when
   // only a subset of the items belong to this model.
@@ -319,9 +328,9 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   // Group sales by (date, collectedByUserId, size) so each collector gets their
   // own event per day, split by size — sizes now carry distinct cost/profit.
-  const saleByKey = new Map<string, { size: string; price: number; profit: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
+  const saleByKey = new Map<string, { size: string; price: number; profit: number; qty: number; s: typeof soldItems[0]['sales'][0]; dateKey: string }>();
   for (const item of soldItems) {
-    const s = item.sale!;
+    const s = item.sales[0];
     const dateKey = toISODate(s.date)!;
     const key = `${dateKey}::${s.collectedByUserId ?? ''}::${item.size}`;
     const saleProfit = Number(s.price) - itemCostUyu(item);
@@ -337,16 +346,16 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   for (const [, { size, price, profit: eventProfit, qty, s, dateKey }] of saleByKey) {
     const saleData: SaleRecord = {
-      id: s!.id,
+      id: s.id,
       catalogProductId: id,
       size,
       price,
       quantity: qty,
       date: dateKey,
-      method: s!.method,
-      description: s!.description,
-      collectedByUserId: s!.collectedByUserId,
-      collectedByAlias: s!.collectedByUser?.alias ?? null,
+      method: s.method,
+      description: s.description,
+      collectedByUserId: s.collectedByUserId,
+      collectedByAlias: s.collectedByUser?.alias ?? null,
       profit: eventProfit,
     };
     events.push({ type: 'sale', date: dateKey, data: saleData, qty });
@@ -448,6 +457,9 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       id: true,
       price: true,
       date: true,
+      method: true,
+      description: true,
+      status: true,
       collectedByUserId: true,
       collectedByUser: { select: { alias: true } },
       item: {
@@ -504,6 +516,9 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       profit: Number(s.price) - cost,
       profitPending,
       date: toISODate(s.date)!,
+      method: s.method,
+      description: s.description,
+      status: s.status as 'active' | 'cancelled',
       collectedByUserId: s.collectedByUserId,
       collectedByAlias: s.collectedByUser?.alias ?? null,
     };

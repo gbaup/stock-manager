@@ -7,12 +7,13 @@ import { Swatch } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
-import { Plus, Check, ChevronRight } from 'lucide-react';
+import { Plus, Check, ChevronRight, Pencil } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
 import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { PurchaseForm } from '@/components/screens/purchase-form';
+import { PurchaseEditForm } from '@/components/screens/purchase-edit-form';
 import { ArrivalForm } from '@/components/screens/arrival-form';
 
 export function PurchasesScreen({
@@ -34,6 +35,7 @@ export function PurchasesScreen({
   const [buySel, setBuySel] = useState<string | null>(null);
   const [showNewPurchase, setShowNewPurchase] = useState(false);
   const [showArrival, setShowArrival] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -90,6 +92,7 @@ export function PurchasesScreen({
               <BuyDetailPanel
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
+                onEdit={() => setShowEdit(true)}
               />
             ) : (
               <div className="detail-empty">
@@ -109,6 +112,17 @@ export function PurchasesScreen({
         {showArrival && selBatch && (
           <DModal title="Marcar llegada" size="lg" onClose={() => setShowArrival(false)}>
             <ArrivalForm batch={selBatch} users={users} rate={rate} onDone={() => setShowArrival(false)} />
+          </DModal>
+        )}
+        {showEdit && selBatch && (
+          <DModal title="Editar compra" size="lg" onClose={() => setShowEdit(false)}>
+            <PurchaseEditForm
+              batch={selBatch}
+              models={models}
+              users={users}
+              rate={rate}
+              onDone={() => setShowEdit(false)}
+            />
           </DModal>
         )}
 
@@ -149,6 +163,7 @@ export function PurchasesScreen({
                   key={b.id}
                   batch={b}
                   onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
+                  onEdit={(id) => router.push(`/purchases/${id}/edit`)}
                 />
               ))
             )}
@@ -167,9 +182,11 @@ export function PurchasesScreen({
 function PurchaseCard({
   batch,
   onArrive,
+  onEdit,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
+  onEdit: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const uniqueProducts = Array.from(new Map(batch.items.map((i) => [i.catalogProductId, i.product])).values());
@@ -209,6 +226,14 @@ function PurchaseCard({
           <div className="pc-sub capitalize">{sub}</div>
         </div>
         {tag}
+        <button
+          className="iconbtn plain"
+          style={{ width: 28, height: 28, flexShrink: 0 }}
+          aria-label="Editar compra"
+          onClick={() => onEdit(batch.id)}
+        >
+          <Pencil size={14} strokeWidth={1.8} />
+        </button>
       </div>
       <div className="pc-foot">
         <div className="pc-stat">
@@ -345,9 +370,11 @@ function BuyTable({
 function BuyDetailPanel({
   batch,
   onArrive,
+  onEdit,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
+  onEdit: (id: string) => void;
 }) {
   const isArrived = batch.status === 'arrived';
   const isPartial = batch.status === 'partial';
@@ -380,16 +407,26 @@ function BuyDetailPanel({
             </div>
           )}
         </div>
-        {!isArrived && (
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
-            className="btn btn-primary"
+            className="btn btn-secondary"
             style={{ height: 34, fontSize: 13 }}
-            onClick={() => onArrive(batch.id)}
+            onClick={() => onEdit(batch.id)}
           >
-            <Check size={14} strokeWidth={2} />
-            {isPartial ? 'Llegó más' : 'Marcar llegada'}
+            <Pencil size={13} strokeWidth={2} />
+            Editar
           </button>
-        )}
+          {!isArrived && (
+            <button
+              className="btn btn-primary"
+              style={{ height: 34, fontSize: 13 }}
+              onClick={() => onArrive(batch.id)}
+            >
+              <Check size={14} strokeWidth={2} />
+              {isPartial ? 'Llegó más' : 'Marcar llegada'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="pd-body">

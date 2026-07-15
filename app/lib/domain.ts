@@ -138,6 +138,9 @@ export type ItemInBatch = {
   catalogProductId: string;
   size: string;
   basePriceUsd: number;
+  // Null when the caller's query didn't fetch it (only the purchase edit form
+  // needs it, to derive the batch's implicit exchange rate).
+  basePriceUyu: number | null;
   shipmentId: string | null;
   product: ModelMeta;
 };
@@ -253,6 +256,25 @@ export function toSupplierPaymentArray(
 // pct is a whole-number percentage (e.g. 5 means 5%). Returns amount unchanged when pct is 0 or absent.
 export function applyCardTax(amountUsd: number, pct: number | null | undefined): number {
   return Math.round(amountUsd * (1 + (pct ?? 0) / 100) * 100) / 100;
+}
+
+// Card taxes are never stored on items — they're baked into basePriceUsd at
+// purchase time via this multiplier: the ratio of gross cost (base + all card
+// fees) to base cost. Because payments must sum to the base cost, the
+// multiplier is exactly recoverable from the stored payment rows, which lets
+// the purchase edit flow reconstruct pre-tax prices without a schema change.
+export function grossMultiplier(
+  payments: { amountUsd: number; cardTaxPct?: number | null }[],
+): number {
+  const paid = payments.filter((p) => p.amountUsd > 0);
+  const baseTotal = paid.reduce((s, p) => s + p.amountUsd, 0);
+  const totalCardTax = paid.reduce((s, p) => s + p.amountUsd * ((p.cardTaxPct ?? 0) / 100), 0);
+  return totalCardTax > 0 && baseTotal > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
+}
+
+// Reconstructs the supplier (pre-tax) price from a stored taxed price.
+export function preTaxPriceUsd(storedPriceUsd: number, multiplier: number): number {
+  return Math.round((storedPriceUsd / multiplier) * 100) / 100;
 }
 
 export type ExpenseRecord = {

@@ -6,10 +6,17 @@ import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
 import { computeShippingPrice } from '@/app/lib/money';
-import { baseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
+import { baseCostUsd, reconcileSupplierPayments, grossMultiplier, preTaxPriceUsd } from '@/app/lib/domain';
 import { invalidatePurchase } from '@/app/lib/cache-tags';
 
-const createPurchaseSchema = z.object({
+const purchaseItemInput = z.object({
+  modelId: z.string().min(1),
+  size: z.string().min(1),
+  basePriceUsd: z.number().finite().min(0),
+  quantity: z.number().int().min(1).default(1),
+});
+
+const purchaseBaseSchema = z.object({
   purchaseDate: z.string().min(1),
   supplier: z.string().optional(),
   description: z.string().optional(),
@@ -19,15 +26,49 @@ const createPurchaseSchema = z.object({
     cardTaxPct: z.number().finite().min(0).max(100).optional(),
   })).optional(),
   exchangeRate: z.number().finite().positive(),
-  items: z.array(z.object({
-    modelId: z.string().min(1),
-    size: z.string().min(1),
-    basePriceUsd: z.number().finite().min(0),
-    quantity: z.number().int().min(1).default(1),
-  })).min(1),
+});
+
+const createPurchaseSchema = purchaseBaseSchema.extend({
+  items: z.array(purchaseItemInput).min(1),
+});
+
+// On edit, `items` is the desired EDITABLE (unshipped) set with PRE-TAX prices;
+// it may be empty when only locked items remain. `expectedEditableItemIds` is
+// the editable set the form loaded, used to detect concurrent changes.
+const updatePurchaseSchema = purchaseBaseSchema.extend({
+  items: z.array(purchaseItemInput),
+  expectedEditableItemIds: z.array(z.string().uuid()),
 });
 
 type PurchaseItem = { modelId: string; size: string; basePriceUsd: number; quantity?: number };
+
+// Expands quantity lines into one row per physical unit.
+function expandItems(items: PurchaseItem[]) {
+  return items.flatMap((it) =>
+    Array.from({ length: it.quantity ?? 1 }, () => ({
+      modelId: it.modelId,
+      size: it.size.trim().toLowerCase(),
+      basePriceUsd: it.basePriceUsd,
+    }))
+  );
+}
+
+// Bakes the payments' card taxes into each unit's base price (see
+// grossMultiplier in domain.ts for how the edit flow reverses this).
+function bakeCardTaxIntoItems(
+  items: { modelId: string; size: string; basePriceUsd: number }[],
+  payments: { amountUsd: number; cardTaxPct?: number }[],
+  baseTotal: number,
+) {
+  const g = grossMultiplier(payments);
+  if (g > 1 && baseTotal === 0) {
+    throw new Error('No se puede aplicar recargo de tarjeta cuando el costo base es cero');
+  }
+  return items.map((it) => ({
+    ...it,
+    basePriceUsd: Math.round(it.basePriceUsd * g * 10000) / 10000,
+  }));
+}
 
 export async function createPurchase(data: {
   purchaseDate: string;
@@ -39,13 +80,7 @@ export async function createPurchase(data: {
 }, opts?: { skipRedirect?: boolean }) {
   parseOrThrow(createPurchaseSchema, data);
 
-  const expandedItems = data.items.flatMap((it) =>
-    Array.from({ length: it.quantity ?? 1 }, () => ({
-      modelId: it.modelId,
-      size: it.size.trim().toLowerCase(),
-      basePriceUsd: it.basePriceUsd,
-    }))
-  );
+  const expandedItems = expandItems(data.items);
 
   // Each partner's entered amount becomes one supplier-payment row. When any
   // amount is given, all payments together must cover the batch's base cost —
@@ -57,18 +92,9 @@ export async function createPurchase(data: {
   }
 
   // Spread card taxes proportionally into each item's base price so profit
-  // calculations reflect the true acquisition cost. The multiplier is the
-  // ratio of gross cost (base + all card fees) to base cost. Items with a
-  // higher base price bear a proportionally larger share of the tax.
-  const totalCardTax = payments.reduce((s, p) => s + p.amountUsd * ((p.cardTaxPct ?? 0) / 100), 0);
-  if (totalCardTax > 0 && baseTotal === 0) {
-    throw new Error('No se puede aplicar recargo de tarjeta cuando el costo base es cero');
-  }
-  const grossMultiplier = totalCardTax > 0 ? (baseTotal + totalCardTax) / baseTotal : 1;
-  const itemsWithTax = expandedItems.map((it) => ({
-    ...it,
-    basePriceUsd: Math.round(it.basePriceUsd * grossMultiplier * 10000) / 10000,
-  }));
+  // calculations reflect the true acquisition cost. Items with a higher base
+  // price bear a proportionally larger share of the tax.
+  const itemsWithTax = bakeCardTaxIntoItems(expandedItems, payments, baseTotal);
 
   await prisma.$transaction(async (tx) => {
     const batch = await tx.batch.create({
@@ -89,6 +115,130 @@ export async function createPurchase(data: {
     });
 
     await addBatchItems(batch.id, itemsWithTax, data.exchangeRate, tx);
+  });
+
+  invalidatePurchase();
+  if (opts?.skipRedirect) return;
+  redirect('/purchases');
+}
+
+// Edits a batch after creation: metadata, supplier payments, and the items the
+// supplier hasn't shipped yet (replace/delete/add — e.g. when the supplier ran
+// out of a jersey). Shipped items are locked: their shipping shares and any
+// recorded profit must not change retroactively, so their stored (taxed)
+// prices stay as-is even if payments/taxes are edited. The editable set is
+// replaced wholesale (delete + recreate) — with per-unit rows there's nothing
+// to diff.
+export async function updatePurchase(batchId: string, data: {
+  purchaseDate: string;
+  supplier?: string;
+  description?: string;
+  supplierPayments?: { userId: string; amountUsd: number; cardTaxPct?: number }[];
+  exchangeRate: number;
+  items: PurchaseItem[];
+  expectedEditableItemIds: string[];
+}, opts?: { skipRedirect?: boolean }) {
+  parseOrThrow(updatePurchaseSchema, data);
+
+  const expandedItems = expandItems(data.items);
+  const payments = (data.supplierPayments ?? []).filter((p) => p.amountUsd > 0);
+
+  await prisma.$transaction(async (tx) => {
+    const batch = await tx.batch.findUnique({
+      where: { id: batchId },
+      select: {
+        supplierPayments: { select: { amountUsd: true, cardTaxPct: true } },
+        items: { select: { id: true, shipmentId: true, basePriceUsd: true } },
+      },
+    });
+    if (!batch) throw new Error('La compra no existe');
+
+    // Concurrency guard: if someone marked items as arrived since the form
+    // loaded, the editable set changed and this edit was built on stale data.
+    const editableIds = new Set(batch.items.filter((i) => i.shipmentId === null).map((i) => i.id));
+    const expectedIds = new Set(data.expectedEditableItemIds);
+    const sameSet = editableIds.size === expectedIds.size && [...editableIds].every((id) => expectedIds.has(id));
+    if (!sameSet) throw new Error('La compra cambió — actualizá la página antes de editar');
+
+    const lockedItems = batch.items.filter((i) => i.shipmentId !== null);
+    if (lockedItems.length + expandedItems.length === 0) {
+      throw new Error('La compra debe tener al menos un item — para borrarla usá "Eliminar compra"');
+    }
+
+    // Locked items keep their stored taxed prices, but the payment-sum rule
+    // applies to the whole batch in pre-tax terms, so undo their old bake-in.
+    const gOld = grossMultiplier(batch.supplierPayments.map((p) => ({
+      amountUsd: Number(p.amountUsd),
+      cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
+    })));
+    const lockedPreTaxTotal = lockedItems.reduce(
+      (s, i) => s + preTaxPriceUsd(Number(i.basePriceUsd), gOld), 0,
+    );
+    const baseTotal = lockedPreTaxTotal + baseCostUsd(expandedItems);
+    if (reconcileSupplierPayments(payments, baseTotal).status === 'mismatch') {
+      throw new Error('Los pagos al proveedor deben sumar el costo base total');
+    }
+
+    const itemsWithTax = bakeCardTaxIntoItems(expandedItems, payments, baseTotal);
+
+    await tx.batch.update({
+      where: { id: batchId },
+      data: {
+        purchaseDate: new Date(data.purchaseDate),
+        supplier: data.supplier?.trim().toLowerCase() || null,
+        description: data.description?.trim().toLowerCase() || null,
+        quantity: lockedItems.length + itemsWithTax.length,
+      },
+    });
+
+    await tx.batchSupplierPayment.deleteMany({ where: { batchId } });
+    if (payments.length > 0) {
+      await tx.batchSupplierPayment.createMany({
+        data: payments.map((p) => ({
+          batchId,
+          userId: p.userId,
+          amountUsd: p.amountUsd,
+          cardTaxPct: p.cardTaxPct != null && p.cardTaxPct > 0 ? p.cardTaxPct : null,
+        })),
+      });
+    }
+
+    await tx.inventoryItem.deleteMany({ where: { batchId, shipmentId: null, status: 'available' } });
+    await addBatchItems(batchId, itemsWithTax, data.exchangeRate, tx);
+
+    // Re-derive the legacy arrivalDate stamp: adding items to a fully-arrived
+    // batch reverts it to partial (clear); deleting the last pending items of
+    // a partial batch completes it (stamp with the newest shipment date).
+    const pending = await tx.inventoryItem.count({ where: { batchId, shipmentId: null } });
+    if (pending > 0) {
+      await tx.batch.update({ where: { id: batchId }, data: { arrivalDate: null } });
+    } else {
+      const lastShipment = await tx.shipment.findFirst({
+        where: { batchId },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      });
+      if (lastShipment) {
+        await tx.batch.update({ where: { id: batchId }, data: { arrivalDate: lastShipment.date } });
+      }
+    }
+  });
+
+  invalidatePurchase();
+  if (opts?.skipRedirect) return;
+  redirect('/purchases');
+}
+
+// Deletes a whole batch. Only allowed while nothing has shipped (which also
+// means nothing was sold), so the cascade only removes in-transit items and
+// supplier payments.
+export async function deleteBatch(batchId: string, opts?: { skipRedirect?: boolean }) {
+  await prisma.$transaction(async (tx) => {
+    const shipped = await tx.inventoryItem.count({
+      where: { batchId, shipmentId: { not: null } },
+    });
+    if (shipped > 0) throw new Error('No se puede eliminar: la compra ya tiene items recibidos');
+    await tx.batch.delete({ where: { id: batchId } });
   });
 
   invalidatePurchase();

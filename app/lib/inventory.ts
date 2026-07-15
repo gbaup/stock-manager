@@ -3,9 +3,10 @@ import { money } from './money';
 import { invalidateSale } from './cache-tags';
 import { compareSizes } from './domain';
 
-// Narrow write interface: only the inventoryItem delegate is needed.
-// Both the top-level PrismaClient and a TransactionClient satisfy this.
+// Narrow write interfaces: only the delegates each helper needs.
+// Both the top-level PrismaClient and a TransactionClient satisfy these.
 type InventoryWriter = Pick<typeof prisma, 'inventoryItem'>;
+type SaleWriter = Pick<typeof prisma, 'inventoryItem' | 'sale'>;
 
 export type StockCount = { available: number; inTransit: number; sold: number };
 
@@ -135,36 +136,43 @@ export async function addBatchItems(
   });
 }
 
+// Claims (flips to 'sold') the oldest available shipped unit for a model+size
+// and returns its id. FIFO by Shipment.date then InventoryItem.createdAt.
+// Throws NotEnoughStockError if nothing matches or a concurrent sale won the
+// race. Must run inside a transaction.
+async function claimOldestAvailableItem(tx: SaleWriter, modelId: string, size: string): Promise<string> {
+  const candidate = await tx.inventoryItem.findFirst({
+    where: {
+      catalogProductId: modelId,
+      size,
+      status: 'available',
+      shipmentId: { not: null },
+    },
+    orderBy: [{ shipment: { date: 'asc' } }, { createdAt: 'asc' }],
+    select: { id: true },
+  });
+  if (!candidate) throw new NotEnoughStockError();
+
+  // Re-check status inside the transaction with a conditional update so
+  // concurrent sales on the same item fail atomically rather than oversell.
+  const { count } = await tx.inventoryItem.updateMany({
+    where: { id: candidate.id, status: 'available' },
+    data: { status: 'sold' },
+  });
+  if (count === 0) throw new NotEnoughStockError();
+  return candidate.id;
+}
+
 // Atomic sale: picks the oldest available item in an arrived batch, flips it
 // to sold (writing both UYU and USD final prices), creates the matching Sale
 // row, and invalidates caches. Throws NotEnoughStockError if no item matches.
-//
-// FIFO by Shipment.date then InventoryItem.createdAt.
 export async function recordSale(intent: SaleIntent, loggedByUserId: string): Promise<{ saleId: string }> {
   const saleId = await prisma.$transaction(async (tx) => {
-    const candidate = await tx.inventoryItem.findFirst({
-      where: {
-        catalogProductId: intent.modelId,
-        size: intent.size,
-        status: 'available',
-        shipmentId: { not: null },
-      },
-      orderBy: [{ shipment: { date: 'asc' } }, { createdAt: 'asc' }],
-      select: { id: true },
-    });
-    if (!candidate) throw new NotEnoughStockError();
-
-    // Re-check status inside the transaction with a conditional update so
-    // concurrent sales on the same item fail atomically rather than oversell.
-    const { count } = await tx.inventoryItem.updateMany({
-      where: { id: candidate.id, status: 'available' },
-      data: { status: 'sold' },
-    });
-    if (count === 0) throw new NotEnoughStockError();
+    const itemId = await claimOldestAvailableItem(tx, intent.modelId, intent.size);
 
     const sale = await tx.sale.create({
       data: {
-        inventoryItemId: candidate.id,
+        inventoryItemId: itemId,
         userId: loggedByUserId,
         price: intent.priceUyu,
         date: intent.date,
@@ -179,6 +187,65 @@ export async function recordSale(intent: SaleIntent, loggedByUserId: string): Pr
 
   invalidateSale();
   return { saleId };
+}
+
+// Cancels a sale keeping the row as history (status 'cancelled') and returns
+// its unit to stock. The item keeps its shipment and createdAt, so it re-enters
+// the FIFO queue in its original slot and shipping shares are untouched.
+export async function cancelSale(saleId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.sale.updateMany({
+      where: { id: saleId, status: 'active' },
+      data: { status: 'cancelled', cancelledAt: new Date() },
+    });
+    if (count === 0) throw new Error('La venta ya fue anulada');
+
+    const sale = await tx.sale.findUniqueOrThrow({
+      where: { id: saleId },
+      select: { inventoryItemId: true },
+    });
+    const released = await tx.inventoryItem.updateMany({
+      where: { id: sale.inventoryItemId, status: 'sold' },
+      data: { status: 'available' },
+    });
+    // A sold item must exist for an active sale; anything else is a broken
+    // invariant, so abort rather than leave the sale half-cancelled.
+    if (released.count === 0) throw new Error('El item de la venta no está marcado como vendido');
+  });
+
+  invalidateSale();
+}
+
+// Swaps the unit behind an active sale (buyer changed model or size), keeping
+// the same Sale row — date, method, collector and logger survive; only the
+// item and price change. Claims the NEW unit first (the old one is still
+// 'sold', so FIFO can't hand it back), then releases the old one.
+export async function swapSaleItem(
+  saleId: string,
+  target: { modelId: string; size: string; priceUyu: number },
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const sale = await tx.sale.findFirst({
+      where: { id: saleId, status: 'active' },
+      select: { inventoryItemId: true },
+    });
+    if (!sale) throw new Error('La venta no existe o fue anulada');
+
+    const newItemId = await claimOldestAvailableItem(tx, target.modelId, target.size);
+
+    const released = await tx.inventoryItem.updateMany({
+      where: { id: sale.inventoryItemId, status: 'sold' },
+      data: { status: 'available' },
+    });
+    if (released.count === 0) throw new Error('El item de la venta no está marcado como vendido');
+
+    await tx.sale.update({
+      where: { id: saleId },
+      data: { inventoryItemId: newItemId, price: target.priceUyu },
+    });
+  });
+
+  invalidateSale();
 }
 
 // Exported so callers that have already fetched items (e.g. detail pages

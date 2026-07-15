@@ -2,8 +2,16 @@
 
 import { redirect } from 'next/navigation';
 import { getCurrentUserId } from '@/app/lib/auth';
-import { saleSchema, parseOrThrow } from '@/app/lib/schemas';
-import { recordSale, NotEnoughStockError } from '@/app/lib/inventory';
+import {
+  saleSchema, saleEditSchema, saleSwapSchema, parseOrThrow,
+  type SaleEditFormValues, type SaleSwapFormValues,
+} from '@/app/lib/schemas';
+import {
+  recordSale, NotEnoughStockError,
+  cancelSale as cancelSaleInventory,
+  swapSaleItem,
+} from '@/app/lib/inventory';
+import { invalidateSale } from '@/app/lib/cache-tags';
 import { prisma } from '@/app/lib/prisma';
 
 type SaleInput = {
@@ -67,4 +75,50 @@ export async function createSale(modelId: string, data: SaleInput, opts?: { skip
   await executeSale(modelId, data);
   if (opts?.skipRedirect) return;
   redirect('/');
+}
+
+export async function updateSale(saleId: string, data: SaleEditFormValues) {
+  const userId = await getCurrentUserId();
+  if (!userId) redirect('/login');
+
+  parseOrThrow(saleEditSchema, data);
+
+  const { count } = await prisma.sale.updateMany({
+    where: { id: saleId, status: 'active' },
+    data: {
+      price: parseFloat(data.price),
+      date: new Date(data.date),
+      method: data.method?.trim().toLowerCase() || null,
+      description: data.description?.trim().toLowerCase() || null,
+      collectedByUserId: data.collectedByUserId || null,
+    },
+  });
+  if (count === 0) throw new Error('La venta no existe o fue anulada');
+
+  invalidateSale();
+}
+
+export async function cancelSale(saleId: string) {
+  const userId = await getCurrentUserId();
+  if (!userId) redirect('/login');
+
+  await cancelSaleInventory(saleId);
+}
+
+export async function swapSale(saleId: string, data: SaleSwapFormValues) {
+  const userId = await getCurrentUserId();
+  if (!userId) redirect('/login');
+
+  parseOrThrow(saleSwapSchema, data);
+
+  try {
+    await swapSaleItem(saleId, {
+      modelId: data.modelId,
+      size: data.size,
+      priceUyu: parseFloat(data.price),
+    });
+  } catch (e) {
+    if (e instanceof NotEnoughStockError) throw new Error('Stock insuficiente');
+    throw e;
+  }
 }

@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Tag as TagIcon, Plus, Shirt } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Tag as TagIcon, Plus, Shirt, Pencil } from 'lucide-react';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
+import { Tag } from '@/components/ui/tag';
 import { DModal } from '@/components/ui/d-modal';
+import { SaleEditForm } from '@/components/screens/sale-edit-form';
 import { FixedPage } from '@/components/ui/fixed-page';
 import { ScrollPanel } from '@/components/ui/scroll-panel';
 import { fmtDate, uyu, todayISO } from '@/app/lib/format';
@@ -168,6 +170,7 @@ function HomeContent({
   const [range, setRange] = useState<Range>('mes');
   const [visible, setVisible] = useState(PAGE);
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, negative = past
+  const [editingSale, setEditingSale] = useState<HomeSaleItem | null>(null);
 
   const pickPerson = (id: string) => { setPersonFilter(id); setVisible(PAGE); };
   const pickRange = (r: Range) => { setRange(r); setVisible(PAGE); };
@@ -189,7 +192,10 @@ function HomeContent({
   // the other (non-month) ranges.
   const inSelectedMonth = (iso: string) => iso.slice(0, 7) === sel.key;
 
-  const monthSales = sales.filter((s) => inSelectedMonth(s.date));
+  // Cancelled sales stay visible in the list as history, but every aggregate
+  // (totals, profit, per-partner split, avg ticket) counts active sales only.
+  const activeSales = sales.filter((s) => s.status === 'active');
+  const monthSales = activeSales.filter((s) => inSelectedMonth(s.date));
   const monthTotal = monthSales.reduce((a, s) => a + s.price, 0);
   const monthProfit = monthSales.reduce((a, s) => a + s.profit, 0);
   const profitPending = monthSales.some((s) => s.profitPending);
@@ -225,6 +231,17 @@ function HomeContent({
   const avgTicket = monthSales.length > 0 ? monthTotal / monthSales.length : 0;
 
   const isDesktop = useIsDesktop();
+
+  const editModal = editingSale && (
+    <DModal title="Editar venta" size="md" onClose={() => setEditingSale(null)}>
+      <SaleEditForm
+        sale={editingSale}
+        models={models}
+        users={users}
+        onDone={() => setEditingSale(null)}
+      />
+    </DModal>
+  );
 
   if (isDesktop) {
     return (
@@ -317,16 +334,18 @@ function HomeContent({
                       <th>Cobró</th>
                       <th>Fecha</th>
                       <th className="num">Monto</th>
+                      <th aria-label="Acciones" />
                     </tr>
                   </thead>
                   <tbody>
                     {list.map((s) => {
                       const m = modelById(s.catalogProductId);
+                      const cancelled = s.status === 'cancelled';
                       return (
                         <tr
                           key={s.id}
                           onClick={() => m && onOpenModel(m.id)}
-                          style={{ cursor: m ? 'pointer' : 'default' }}
+                          style={{ cursor: m ? 'pointer' : 'default', opacity: cancelled ? 0.55 : 1 }}
                         >
                           <td>
                             <div className="dt-cell-model">
@@ -368,17 +387,38 @@ function HomeContent({
                             {fmtDate(s.date)}
                           </td>
                           <td className="num">
-                            <div style={{ color: 'var(--accent)' }}>{uyu(s.price)}</div>
                             <div style={{
-                              fontSize: 11,
-                              color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
-                              marginTop: 1,
+                              color: cancelled ? 'var(--text-faint)' : 'var(--accent)',
+                              textDecoration: cancelled ? 'line-through' : 'none',
                             }}>
-                              {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
-                              {s.profitPending && (
-                                <span style={{ opacity: 0.6 }}> · prov.</span>
-                              )}
+                              {uyu(s.price)}
                             </div>
+                            {cancelled ? (
+                              <Tag>anulada</Tag>
+                            ) : (
+                              <div style={{
+                                fontSize: 11,
+                                color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)',
+                                marginTop: 1,
+                              }}>
+                                {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                                {s.profitPending && (
+                                  <span style={{ opacity: 0.6 }}> · prov.</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ width: 36 }}>
+                            {!cancelled && (
+                              <button
+                                className="iconbtn plain"
+                                style={{ width: 28, height: 28 }}
+                                aria-label="Editar venta"
+                                onClick={(e) => { e.stopPropagation(); setEditingSale(s); }}
+                              >
+                                <Pencil size={14} strokeWidth={1.8} />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -417,6 +457,7 @@ function HomeContent({
             </div>
           </FixedPage.Fill>
         </FixedPage>
+        {editModal}
       </div>
     );
   }
@@ -567,12 +608,13 @@ function HomeContent({
             <div className="sales-list">
               {shown.map((s) => {
                 const m = modelById(s.catalogProductId);
+                const cancelled = s.status === 'cancelled';
                 return (
                   <div
                     key={s.id}
                     className="sale-row"
                     onClick={() => m && onOpenModel(m.id)}
-                    style={{ cursor: m ? 'pointer' : 'default' }}
+                    style={{ cursor: m ? 'pointer' : 'default', opacity: cancelled ? 0.55 : 1 }}
                   >
                     {m ? (
                       <Swatch
@@ -596,19 +638,38 @@ function HomeContent({
                       </div>
                     </div>
                     <div className="sale-end">
-                      <div className="sale-price">{uyu(s.price)}</div>
                       <div
-                        className="sale-profit"
-                        style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+                        className="sale-price"
+                        style={cancelled ? { textDecoration: 'line-through', color: 'var(--text-faint)' } : undefined}
                       >
-                        {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
-                        {s.profitPending && <span className="money-sec"> · provisorio</span>}
+                        {uyu(s.price)}
                       </div>
+                      {cancelled ? (
+                        <Tag>anulada</Tag>
+                      ) : (
+                        <div
+                          className="sale-profit"
+                          style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+                        >
+                          {s.profit >= 0 ? '+' : ''}{uyu(s.profit)}
+                          {s.profitPending && <span className="money-sec"> · provisorio</span>}
+                        </div>
+                      )}
                       <div className="sale-by">
                         {s.collectedByAlias && <Avatar name={s.collectedByAlias} size={18} />}
                         <span>{fmtDate(s.date)}</span>
                       </div>
                     </div>
+                    {!cancelled && (
+                      <button
+                        className="iconbtn plain"
+                        style={{ width: 30, height: 30, alignSelf: 'center' }}
+                        aria-label="Editar venta"
+                        onClick={(e) => { e.stopPropagation(); setEditingSale(s); }}
+                      >
+                        <Pencil size={15} strokeWidth={1.8} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -625,6 +686,7 @@ function HomeContent({
           )}
         </div>
       </div>
+      {editModal}
     </div>
   );
 }
