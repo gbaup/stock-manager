@@ -280,7 +280,7 @@ export function PurchaseEditForm({
                     )}
                   />
                 </div>
-                <button className="iconbtn plain item-del" type="button" onClick={() => remove(index)}>
+                <button className="iconbtn plain item-del" type="button" aria-label="Quitar ítem" onClick={() => remove(index)}>
                   <X size={17} strokeWidth={1.8} />
                 </button>
               </div>

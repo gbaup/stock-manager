@@ -13,6 +13,7 @@ import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { updateSale, cancelSale, swapSale } from '@/app/actions/sales';
+import { useIsDesktop } from '@/app/lib/hooks';
 
 // Edits an existing sale from the home list: price/date/method/collector,
 // swapping the unit for another model or size (buyer changed their mind), or
@@ -29,6 +30,7 @@ export function SaleEditForm({
   onDone: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const isDesktop = useIsDesktop();
   const [view, setView] = useState<'edit' | 'swap'>('edit');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export function SaleEditForm({
                 <Search size={19} strokeWidth={1.8} />
                 <input
                   value={query}
-                  autoFocus
+                  autoFocus={isDesktop}
                   placeholder="Buscá equipo, jugador, color…"
                   onChange={(e) => setQuery(e.target.value)}
                 />

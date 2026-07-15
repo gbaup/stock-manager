@@ -165,7 +165,7 @@ export function PublicScreen({
               <Search size={19} strokeWidth={1.8} />
               <input value={query} placeholder="Buscar camiseta…" onChange={(e) => setQuery(e.target.value)} />
               {query && (
-                <button className="iconbtn plain" style={{ width: 26, height: 26 }} onClick={() => setQuery('')}>
+                <button className="iconbtn plain" style={{ width: 26, height: 26 }} aria-label="Limpiar búsqueda" onClick={() => setQuery('')}>
                   <X size={16} strokeWidth={1.8} />
                 </button>
               )}
@@ -287,7 +287,7 @@ export function PublicScreen({
             onChange={(e) => setQuery(e.target.value)}
           />
           {query && (
-            <button className="iconbtn plain" style={{ width: 26, height: 26 }} onClick={() => setQuery('')}>
+            <button className="iconbtn plain" style={{ width: 26, height: 26 }} aria-label="Limpiar búsqueda" onClick={() => setQuery('')}>
               <X size={16} strokeWidth={1.8} />
             </button>
           )}
@@ -308,10 +308,10 @@ export function PublicScreen({
           ))}
         </div>
         <div className="view-toggle">
-          <button className={`view-btn${view === 'grid' ? ' is-active' : ''}`} onClick={() => setViewPersisted('grid')}>
+          <button className={`view-btn${view === 'grid' ? ' is-active' : ''}`} aria-label="Vista en cuadrícula" aria-pressed={view === 'grid'} onClick={() => setViewPersisted('grid')}>
             <LayoutGrid size={16} strokeWidth={1.8} />
           </button>
-          <button className={`view-btn${view === 'list' ? ' is-active' : ''}`} onClick={() => setViewPersisted('list')}>
+          <button className={`view-btn${view === 'list' ? ' is-active' : ''}`} aria-label="Vista en lista" aria-pressed={view === 'list'} onClick={() => setViewPersisted('list')}>
             <List size={16} strokeWidth={1.8} />
           </button>
         </div>

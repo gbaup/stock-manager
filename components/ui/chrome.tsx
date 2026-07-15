@@ -67,9 +67,9 @@ function activeNavId(pathname: string) {
 
 export function BottomNavShell({ active = '' }: { active?: string }) {
   return (
-    <nav className="bottomnav">
+    <nav className="bottomnav" aria-hidden="true">
       {NAV_ITEMS.map((it) => (
-        <button key={it.id} className={`navbtn ${active === it.id ? 'is-active' : ''}`}>
+        <button key={it.id} className={`navbtn ${active === it.id ? 'is-active' : ''}`} tabIndex={-1}>
           <it.Icon size={23} strokeWidth={active === it.id ? 2 : 1.7} />
           {it.shortLabel ?? it.label}
         </button>

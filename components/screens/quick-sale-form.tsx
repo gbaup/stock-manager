@@ -15,6 +15,7 @@ import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
 import { ModalFooter } from '@/components/ui/modal-footer';
+import { useIsDesktop } from '@/app/lib/hooks';
 
 export function QuickSaleForm({
   models,
@@ -31,6 +32,7 @@ export function QuickSaleForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const isDesktop = useIsDesktop();
 
   const [selectedModelId, setSelectedModelId] = useState('');
   const [query, setQuery] = useState('');
@@ -112,7 +114,7 @@ export function QuickSaleForm({
             <Search size={19} strokeWidth={1.8} />
             <input
               value={query}
-              autoFocus
+              autoFocus={isDesktop}
               placeholder="Buscá equipo, jugador, color…"
               onChange={(e) => setQuery(e.target.value)}
             />

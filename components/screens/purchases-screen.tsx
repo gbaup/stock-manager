@@ -333,6 +333,13 @@ function BuyTable({
               key={b.id}
               className={selected === b.id ? 'is-selected' : ''}
               onClick={() => onOpen(b.id)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpen(b.id);
+                }
+              }}
             >
               <td>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
