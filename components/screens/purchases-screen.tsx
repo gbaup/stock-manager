@@ -35,7 +35,7 @@ export function PurchasesScreen({
   const [buySel, setBuySel] = useState<string | null>(null);
   const [showNewPurchase, setShowNewPurchase] = useState(false);
   const [showArrival, setShowArrival] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -45,6 +45,20 @@ export function PurchasesScreen({
       ? sorted.filter((b) => b.status !== 'arrived')
       : sorted.filter((b) => b.status === 'arrived');
   const arrivedCount = batches.filter((b) => b.status === 'arrived').length;
+
+  // Same modal on desktop and mobile, mirroring the sale edit in home-screen.
+  const editBatch = batches.find((b) => b.id === editId) ?? null;
+  const editModal = editBatch && (
+    <DModal title="Editar compra" size="lg" onClose={() => setEditId(null)}>
+      <PurchaseEditForm
+        batch={editBatch}
+        models={models}
+        users={users}
+        rate={rate}
+        onDone={() => setEditId(null)}
+      />
+    </DModal>
+  );
 
   if (isDesktop) {
     const selBatch = batches.find((b) => b.id === buySel) ?? null;
@@ -92,7 +106,7 @@ export function PurchasesScreen({
               <BuyDetailPanel
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
-                onEdit={() => setShowEdit(true)}
+                onEdit={() => setEditId(selBatch.id)}
               />
             ) : (
               <div className="detail-empty">
@@ -114,17 +128,7 @@ export function PurchasesScreen({
             <ArrivalForm batch={selBatch} users={users} rate={rate} onDone={() => setShowArrival(false)} />
           </DModal>
         )}
-        {showEdit && selBatch && (
-          <DModal title="Editar compra" size="lg" onClose={() => setShowEdit(false)}>
-            <PurchaseEditForm
-              batch={selBatch}
-              models={models}
-              users={users}
-              rate={rate}
-              onDone={() => setShowEdit(false)}
-            />
-          </DModal>
-        )}
+        {editModal}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
@@ -163,7 +167,7 @@ export function PurchasesScreen({
                   key={b.id}
                   batch={b}
                   onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
-                  onEdit={(id) => router.push(`/purchases/${id}/edit`)}
+                  onEdit={setEditId}
                 />
               ))
             )}
@@ -173,6 +177,7 @@ export function PurchasesScreen({
       <button className="fab" onClick={() => router.push('/purchases/new')} aria-label="Registrar compra">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      {editModal}
       <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>

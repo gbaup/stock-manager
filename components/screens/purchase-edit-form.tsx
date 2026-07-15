@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FormHead } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Plus, Shirt, X, Lock, Trash2 } from 'lucide-react';
@@ -57,9 +55,8 @@ export function PurchaseEditForm({
   models: ModelWithStats[];
   users: UserSummary[];
   rate: RateResult;
-  onDone?: () => void;
+  onDone: () => void;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -136,10 +133,7 @@ export function PurchaseEditForm({
             })),
           expectedUpdatedAt: batch.updatedAt,
         }, { skipRedirect: true });
-        // Redirect client-side: a server-side redirect would throw NEXT_REDIRECT
-        // into this try/catch and read as a bogus save error.
-        if (onDone) onDone();
-        else router.push('/purchases');
+        onDone();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al guardar la compra');
       }
@@ -163,8 +157,7 @@ export function PurchaseEditForm({
     startTransition(async () => {
       try {
         await deleteBatch(batch.id, { skipRedirect: true });
-        if (onDone) onDone();
-        else router.push('/purchases');
+        onDone();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al eliminar la compra');
       }
@@ -445,38 +438,18 @@ export function PurchaseEditForm({
     </>
   );
 
-  if (onDone) {
-    return (
-      <>
-        <div className="dm-body">{body}</div>
-        <ModalFooter
-          pending={pending}
-          canSave={canSave}
-          onCancel={onDone}
-          onConfirm={handleSubmit(onSubmit)}
-          confirmLabel="Guardar cambios"
-          pendingLabel="Guardando…"
-        />
-        {modals}
-      </>
-    );
-  }
-
   return (
-    <div className="screen">
-      <FormHead
-        onCancel={() => router.back()}
-        title="Editar compra"
-        onSave={handleSubmit(onSubmit)}
-        saveLabel="Guardar"
+    <>
+      <div className="dm-body">{body}</div>
+      <ModalFooter
+        pending={pending}
         canSave={canSave}
-        isSaving={pending}
-        savingLabel="Guardando…"
+        onCancel={onDone}
+        onConfirm={handleSubmit(onSubmit)}
+        confirmLabel="Guardar cambios"
+        pendingLabel="Guardando…"
       />
-      <div className="body">
-        <div className="body-pad">{body}</div>
-      </div>
       {modals}
-    </div>
+    </>
   );
 }

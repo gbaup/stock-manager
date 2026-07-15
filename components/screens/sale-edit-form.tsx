@@ -37,7 +37,11 @@ export function SaleEditForm({
 
   const [price, setPrice] = useState(String(sale.price));
   const [date, setDate] = useState(sale.date);
-  const [method, setMethod] = useState(sale.method ?? '');
+  // sale.method is stored normalized (lowercase) — map it back to its METHODS
+  // option so the select shows the current value.
+  const [method, setMethod] = useState(
+    () => METHODS.find((m) => m.toLowerCase() === (sale.method ?? '').toLowerCase()) ?? '',
+  );
   const [description, setDescription] = useState(sale.description ?? '');
   const [collectedByUserId, setCollectedByUserId] = useState(sale.collectedByUserId ?? '');
 
