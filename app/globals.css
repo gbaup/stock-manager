@@ -5067,6 +5067,17 @@ body {
     gap: 16px;
   }
 
+  /* ---- single-column fill (saldos body): stretches its ScrollPanel to full height ---- */
+  .col-fill {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .col-fill > .panel-scroll {
+    flex: 1;
+    min-height: 0;
+  }
+
   /* ---- month nav ---- */
   .month-nav {
     display: flex;
