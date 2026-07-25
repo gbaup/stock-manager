@@ -163,10 +163,11 @@ export function Sidebar({
   currentUserAlias?: string;
 }) {
   const pathname = usePathname();
-  const [navCompact, setNavCompact] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('nav-compact') === '1';
-  });
+  const [navCompact, setNavCompact] = useState(false);
+
+  useEffect(() => {
+    setNavCompact(localStorage.getItem('nav-compact') === '1');
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('nav-compact', navCompact);

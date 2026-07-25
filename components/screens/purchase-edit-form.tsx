@@ -34,7 +34,7 @@ function toQuantityLines(
     if (line) line.quantity += 1;
     else lines.set(key, {
       modelId: it.catalogProductId,
-      size: it.size,
+      size: it.size.toUpperCase(),
       basePriceUsd: it.preTaxPriceUsd > 0 ? String(it.preTaxPriceUsd) : '',
       quantity: 1,
     });
