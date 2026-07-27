@@ -1,5 +1,5 @@
 import type { Movement } from './types';
-import { applyCardTax } from '../domain';
+import { applyCardTax } from '../pricing';
 
 // Structural shape of a batch that this projection needs. Any object that
 // matches it works — BatchSummary (used by purchase listings) is a superset,

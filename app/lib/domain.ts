@@ -138,6 +138,9 @@ export type ItemInBatch = {
   catalogProductId: string;
   size: string;
   basePriceUsd: number;
+  // Null when the caller's query didn't fetch it (only the purchase edit form
+  // needs it, to derive the batch's implicit exchange rate).
+  basePriceUyu: number | null;
   shipmentId: string | null;
   product: ModelMeta;
 };
@@ -172,7 +175,18 @@ export type BatchSummary = {
   shippingPaidByAlias: string | null;
   items: ItemInBatch[];
   shipments: ShipmentRecord[];
+  // Optimistic-lock token for the edit flow: every mutation that can change
+  // the batch (metadata edits, item changes, shipments arriving) bumps it.
+  // The edit form echoes it back and updatePurchase rejects a stale token.
+  updatedAt: string;
 };
+
+// A Sale is soft-deleted: cancelling keeps the row as history under status
+// 'cancelled' while the unit returns to stock. Every read that feeds money
+// math (saldos, profit, revenue) must count ACTIVE sales only — filter
+// through these constants, never a raw string. See CONTEXT.md "Sale".
+export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
+export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 
 export type SaleRecord = {
   id: string;
@@ -222,6 +236,19 @@ export type SupplierPaymentStatus = 'empty' | 'exact' | 'mismatch';
 // per-line items (with a quantity) or already-expanded unit rows.
 export function baseCostUsd(items: { basePriceUsd: number; quantity?: number }[]): number {
   return items.reduce((s, it) => s + it.basePriceUsd * (it.quantity ?? 1), 0);
+}
+
+// The reconciliation target when editing a batch: locked items keep their
+// stored (already-taxed) prices, so their contribution is `lockedPreTaxTotal`
+// (from pricing.unbakeBatch) rather than a fresh baseCostUsd computation —
+// only the still-editable items get that. Both the edit form's live preview
+// and the edit action's server-side validation must reconcile against this
+// same total, or the two can silently disagree about what "paid in full" means.
+export function editBatchBaseCostUsd(
+  lockedPreTaxTotal: number,
+  editableItems: { basePriceUsd: number; quantity?: number }[],
+): number {
+  return lockedPreTaxTotal + baseCostUsd(editableItems);
 }
 
 // The reconciliation rule: given the partners' payments and the base cost, is

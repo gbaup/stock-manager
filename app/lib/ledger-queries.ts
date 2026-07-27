@@ -1,6 +1,7 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
 import { CACHE_TAGS } from './cache-tags';
+import { getActiveSalesForLedger } from './queries';
 import type { ExpenseRecord, ConversionRecord, AdjustmentRecord, UserSummary } from './domain';
 import {
   buildMovements,
@@ -109,28 +110,7 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
       },
       orderBy: { purchaseDate: 'desc' },
     }),
-    prisma.$queryRaw<Array<{
-      id: string;
-      price: string;
-      date: Date;
-      collected_by_user_id: string | null;
-      collected_by_alias: string | null;
-      team_name: string;
-    }>>`
-      SELECT
-        s.id,
-        s.price,
-        s.date,
-        s.collected_by_user_id,
-        u.alias  AS collected_by_alias,
-        t.name   AS team_name
-      FROM sales s
-      LEFT JOIN users u  ON s.collected_by_user_id = u.id
-      JOIN inventory_items  ii ON s.inventory_item_id  = ii.id
-      JOIN catalog_products cp ON ii.catalog_product_id = cp.id
-      JOIN teams            t  ON cp.team_id            = t.id
-      ORDER BY s.date DESC
-    `,
+    getActiveSalesForLedger(),
     prisma.expense.findMany({ orderBy: { date: 'desc' }, include: { paidByUser: true } }),
     prisma.conversion.findMany({ orderBy: { date: 'desc' }, include: { fromUser: true, toUser: true } }),
     prisma.adjustment.findMany({ orderBy: { date: 'desc' }, include: { user: true } }),

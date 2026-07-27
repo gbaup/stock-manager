@@ -154,7 +154,10 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
                 style={{ width: 30, height: 34, fontSize: 12, borderRadius: 7 }}
               />
               <div className="ai-main">
-                <div className="ai-team capitalize">{it.product.team}{it.product.version ? ` · ${it.product.version}` : ''}</div>
+                <div className="ai-team capitalize">
+                  {it.product.team}{it.product.version ? ` · ${it.product.version}` : ''}
+                  {it.product.number ? ` · ${it.product.number}` : ''}{it.product.player ? ` · ${it.product.player}` : ''}
+                </div>
                 <div className="ai-meta">
                   {it.size ? `Talle ${it.size.toUpperCase()}` : 'Sin talle'}
                   {it.basePriceUsd > 0 ? ` · ${usd(it.basePriceUsd)}` : ''}

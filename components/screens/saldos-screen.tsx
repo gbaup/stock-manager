@@ -178,7 +178,7 @@ export function SaldosScreen({
             </div>
           </div>
 
-          <FixedPage.Fill>
+          <FixedPage.Fill className="col-fill">
             <ScrollPanel
               head={(
                 <>
