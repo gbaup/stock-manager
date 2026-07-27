@@ -276,6 +276,12 @@ export function toSupplierPaymentArray(
     .filter((p) => p.amountUsd > 0);
 }
 
+// Applies a card tax percentage to a USD amount, returning the gross cost.
+// pct is a whole-number percentage (e.g. 5 means 5%). Returns amount unchanged when pct is 0 or absent.
+export function applyCardTax(amountUsd: number, pct: number | null | undefined): number {
+  return Math.round(amountUsd * (1 + (pct ?? 0) / 100) * 100) / 100;
+}
+
 export type ExpenseRecord = {
   id: string;
   title: string;
