@@ -265,8 +265,12 @@ function HomeContent({
             <div className="kpi-card">
               <div className="kpi-label">Cobrado en {sel.label}{sel.showYear ? ` ${sel.year}` : ''}</div>
               <div className="kpi-value">{uyu(monthTotal)}</div>
-              <div className="kpi-sub">
-                {monthSales.length} {monthSales.length === 1 ? 'venta' : 'ventas'}
+              <div
+                className="kpi-sub"
+                style={{ color: monthProfit >= 0 ? 'var(--ok)' : 'var(--danger)' }}
+              >
+                {monthProfit >= 0 ? '+' : ''}{uyu(monthProfit)}
+                {profitPending && <span style={{ opacity: 0.6 }}> · prov.</span>}
               </div>
             </div>
             <div className="kpi-card">

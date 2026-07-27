@@ -1,10 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Package, Truck, Wallet, Eye, ChevronLeft, ChevronRight, Shirt } from 'lucide-react';
 import type { ComponentType } from 'react';
+
+// External store for the sidebar's collapsed/compact state, persisted to
+// localStorage. useSyncExternalStore (not useState+useEffect) is what keeps
+// the initial client render matching the server (both see the false server
+// snapshot), so hydration never mismatches on the derived title/aria-label/icon.
+const navCompactListeners = new Set<() => void>();
+let navCompactValue = typeof window !== 'undefined' && localStorage.getItem('nav-compact') === '1';
+
+function subscribeNavCompact(listener: () => void) {
+  navCompactListeners.add(listener);
+  return () => navCompactListeners.delete(listener);
+}
+
+function getNavCompactSnapshot() {
+  return navCompactValue;
+}
+
+function getNavCompactServerSnapshot() {
+  return false;
+}
+
+function setNavCompact(next: boolean) {
+  navCompactValue = next;
+  localStorage.setItem('nav-compact', next ? '1' : '0');
+  navCompactListeners.forEach((listener) => listener());
+}
 
 export function TopBar({
   eyebrow,
@@ -163,23 +189,18 @@ export function Sidebar({
   currentUserAlias?: string;
 }) {
   const pathname = usePathname();
-  const [navCompact, setNavCompact] = useState(false);
-
-  useEffect(() => {
-    setNavCompact(localStorage.getItem('nav-compact') === '1');
-  }, []);
+  const navCompact = useSyncExternalStore(
+    subscribeNavCompact,
+    getNavCompactSnapshot,
+    getNavCompactServerSnapshot,
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle('nav-compact', navCompact);
   }, [navCompact]);
 
   function toggleCompact() {
-    setNavCompact((c) => {
-      const next = !c;
-      localStorage.setItem('nav-compact', next ? '1' : '0');
-      document.documentElement.classList.toggle('nav-compact', next);
-      return next;
-    });
+    setNavCompact(!navCompact);
   }
 
   const activeId = activeNavId(pathname);
