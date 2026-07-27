@@ -36,6 +36,27 @@ export const makeSaleSchema = (sizeStock: Record<string, number>) =>
 
 export type SaleFormValues = z.infer<typeof saleSchema>;
 
+// Editing an existing sale: same fields as a sale minus size/quantity (the
+// unit is fixed — changing model/size goes through the swap flow instead).
+export const saleEditSchema = z.object({
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+  date: z.string().min(1, 'Requerido'),
+  method: z.string().optional(),
+  description: z.string().optional(),
+  collectedByUserId: z.string().uuid().optional(),
+});
+
+export type SaleEditFormValues = z.infer<typeof saleEditSchema>;
+
+// Swapping the unit behind a sale (buyer changed model or size).
+export const saleSwapSchema = z.object({
+  modelId: z.string().min(1, 'Elegí un producto'),
+  size: z.string().min(1, 'Elegí un talle'),
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+});
+
+export type SaleSwapFormValues = z.infer<typeof saleSwapSchema>;
+
 export const gastoSchema = z.object({
   title: z.string().min(1, 'Requerido'),
   amount: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un monto válido'),
@@ -157,3 +178,13 @@ export const purchaseSchema = z
   });
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
+
+// Purchase edit form: same shape but items may be empty (locked/shipped items
+// stay in the batch outside the form) and the exchange rate is editable —
+// it's applied to the recreated editable items on save.
+export const purchaseEditSchema = purchaseSchema.extend({
+  items: z.array(purchaseItemSchema),
+  exchangeRate: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá el tipo de cambio'),
+});
+
+export type PurchaseEditFormValues = z.infer<typeof purchaseEditSchema>;

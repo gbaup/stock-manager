@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
-import { Swatch } from '@/components/ui/swatch';
+import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
-import { Plus, Check, ChevronRight } from 'lucide-react';
+import { Plus, Check, ChevronRight, Pencil } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
 import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { PurchaseForm } from '@/components/screens/purchase-form';
+import { PurchaseEditForm } from '@/components/screens/purchase-edit-form';
 import { ArrivalForm } from '@/components/screens/arrival-form';
 
 export function PurchasesScreen({
@@ -34,6 +35,7 @@ export function PurchasesScreen({
   const [buySel, setBuySel] = useState<string | null>(null);
   const [showNewPurchase, setShowNewPurchase] = useState(false);
   const [showArrival, setShowArrival] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -43,6 +45,20 @@ export function PurchasesScreen({
       ? sorted.filter((b) => b.status !== 'arrived')
       : sorted.filter((b) => b.status === 'arrived');
   const arrivedCount = batches.filter((b) => b.status === 'arrived').length;
+
+  // Same modal on desktop and mobile, mirroring the sale edit in home-screen.
+  const editBatch = batches.find((b) => b.id === editId) ?? null;
+  const editModal = editBatch && (
+    <DModal title="Editar compra" size="lg" onClose={() => setEditId(null)}>
+      <PurchaseEditForm
+        batch={editBatch}
+        models={models}
+        users={users}
+        rate={rate}
+        onDone={() => setEditId(null)}
+      />
+    </DModal>
+  );
 
   if (isDesktop) {
     const selBatch = batches.find((b) => b.id === buySel) ?? null;
@@ -90,6 +106,7 @@ export function PurchasesScreen({
               <BuyDetailPanel
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
+                onEdit={() => setEditId(selBatch.id)}
               />
             ) : (
               <div className="detail-empty">
@@ -111,6 +128,7 @@ export function PurchasesScreen({
             <ArrivalForm batch={selBatch} users={users} rate={rate} onDone={() => setShowArrival(false)} />
           </DModal>
         )}
+        {editModal}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
@@ -149,6 +167,7 @@ export function PurchasesScreen({
                   key={b.id}
                   batch={b}
                   onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
+                  onEdit={setEditId}
                 />
               ))
             )}
@@ -158,6 +177,7 @@ export function PurchasesScreen({
       <button className="fab" onClick={() => router.push('/purchases/new')} aria-label="Registrar compra">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      {editModal}
       <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
@@ -167,9 +187,11 @@ export function PurchasesScreen({
 function PurchaseCard({
   batch,
   onArrive,
+  onEdit,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
+  onEdit: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const uniqueProducts = Array.from(new Map(batch.items.map((i) => [i.catalogProductId, i.product])).values());
@@ -209,6 +231,14 @@ function PurchaseCard({
           <div className="pc-sub capitalize">{sub}</div>
         </div>
         {tag}
+        <button
+          className="iconbtn plain"
+          style={{ width: 28, height: 28, flexShrink: 0 }}
+          aria-label="Editar compra"
+          onClick={() => onEdit(batch.id)}
+        >
+          <Pencil size={14} strokeWidth={1.8} />
+        </button>
       </div>
       <div className="pc-foot">
         <div className="pc-stat">
@@ -308,6 +338,13 @@ function BuyTable({
               key={b.id}
               className={selected === b.id ? 'is-selected' : ''}
               onClick={() => onOpen(b.id)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpen(b.id);
+                }
+              }}
             >
               <td>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -345,9 +382,11 @@ function BuyTable({
 function BuyDetailPanel({
   batch,
   onArrive,
+  onEdit,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
+  onEdit: (id: string) => void;
 }) {
   const isArrived = batch.status === 'arrived';
   const isPartial = batch.status === 'partial';
@@ -360,11 +399,13 @@ function BuyDetailPanel({
     batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
     <Tag kind="ok">recibida</Tag>;
 
-  const groupMap = new Map<string, { product: BatchSummary['items'][number]['product']; size: string; count: number }>();
+  const groupMap = new Map<string, { product: BatchSummary['items'][number]['product']; size: string; count: number; finalUsdTotal: number }>();
   batch.items.forEach((item) => {
     const key = `${item.catalogProductId}-${item.size}`;
-    const existing = groupMap.get(key) ?? { product: item.product, size: item.size, count: 0 };
+    const existing = groupMap.get(key) ?? { product: item.product, size: item.size, count: 0, finalUsdTotal: 0 };
     existing.count++;
+    // basePriceUsd is already gross (card surcharge baked in at purchase time, see app/lib/pricing.ts)
+    existing.finalUsdTotal += item.basePriceUsd;
     groupMap.set(key, existing);
   });
 
@@ -380,16 +421,26 @@ function BuyDetailPanel({
             </div>
           )}
         </div>
-        {!isArrived && (
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
-            className="btn btn-primary"
+            className="btn btn-secondary"
             style={{ height: 34, fontSize: 13 }}
-            onClick={() => onArrive(batch.id)}
+            onClick={() => onEdit(batch.id)}
           >
-            <Check size={14} strokeWidth={2} />
-            {isPartial ? 'Llegó más' : 'Marcar llegada'}
+            <Pencil size={13} strokeWidth={2} />
+            Editar
           </button>
-        )}
+          {!isArrived && (
+            <button
+              className="btn btn-primary"
+              style={{ height: 34, fontSize: 13 }}
+              onClick={() => onArrive(batch.id)}
+            >
+              <Check size={14} strokeWidth={2} />
+              {isPartial ? 'Llegó más' : 'Marcar llegada'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="pd-body">
@@ -417,16 +468,35 @@ function BuyDetailPanel({
           <thead>
             <tr>
               <th>Modelo</th>
-              <th>Talle</th>
+              <th>Detalle</th>
               <th className="num">Cant.</th>
+              <th className="num">Costo final</th>
             </tr>
           </thead>
           <tbody>
-            {Array.from(groupMap.values()).map((g, i) => (
+            {Array.from(groupMap.values())
+              .sort((a, b) => a.product.team.localeCompare(b.product.team))
+              .map((g, i) => (
               <tr key={i}>
-                <td className="capitalize dt-team">{g.product.team} · {g.product.version}</td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{g.size.toUpperCase()}</td>
+                <td>
+                  <div className="dt-cell-model">
+                    <Swatch color={g.product.color} number={g.product.number} photo={coverOf(g.product)} className="swatch" />
+                    <div className="dt-cell-main">
+                      <div className="dt-team capitalize">{g.product.team}</div>
+                      {g.product.season && <div className="dt-meta capitalize">{g.product.season}</div>}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div className="dt-meta capitalize">
+                    <ColorDot color={g.product.color} />
+                    {g.product.version ? ` ${g.product.version}` : ''}
+                    {g.product.number ? ` · ${g.product.number}` : ''}{g.product.player ? ` ${g.product.player}` : ''}
+                    {g.size ? ` · ${g.size.toUpperCase()}` : ''}
+                  </div>
+                </td>
                 <td className="num">{g.count}</td>
+                <td className="num">{usd(g.finalUsdTotal / g.count)}</td>
               </tr>
             ))}
           </tbody>
