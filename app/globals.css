@@ -5723,6 +5723,116 @@ body {
     color: var(--text-faint);
     margin-left: 6px;
   }
+
+  /* ---- metrics screen ---- */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 16px 18px 18px;
+    box-shadow: var(--sh-sm);
+  }
+
+  .chart-card.span-2 {
+    grid-column: span 2;
+  }
+
+  .chart-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .chart-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .chart-sub {
+    font-size: 11.5px;
+    color: var(--text-faint);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .chip-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: opacity 0.15s ease;
+  }
+
+  .chip.is-off {
+    opacity: 0.4;
+  }
+
+  .chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .date-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .date-range .input {
+    width: 142px;
+    height: 36px;
+  }
+
+  .date-range-sep {
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+
+  .legend-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+  }
+
+  .legend-item .amount {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    white-space: nowrap;
+  }
 }
 
 /* ============================================================

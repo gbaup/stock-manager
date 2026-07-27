@@ -3,7 +3,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Package, Truck, Wallet, Eye, ChevronLeft, ChevronRight, Shirt } from 'lucide-react';
+import { Home, Package, Truck, Wallet, Eye, ChevronLeft, ChevronRight, Shirt, BarChart3 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 // External store for the sidebar's collapsed/compact state, persisted to
@@ -62,7 +62,16 @@ export function TopBar({
 
 type NavIcon = ComponentType<{ size?: number; strokeWidth?: number }>;
 
-type NavItem = { id: string; label: string; shortLabel?: string; Icon: NavIcon; href: string };
+type NavItem = {
+  id: string;
+  label: string;
+  shortLabel?: string;
+  Icon: NavIcon;
+  href: string;
+  // Desktop sidebar only — BottomNav (mobile) filters these out, since the
+  // screen behind them has no mobile layout at all.
+  desktopOnly?: boolean;
+};
 
 // Single source of truth for app navigation. Grouped for the desktop sidebar;
 // BottomNav flattens it for mobile. shortLabel overrides label where mobile's
@@ -71,10 +80,11 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'GESTIÓN',
     items: [
-      { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
-      { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
-      { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
-      { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
+      { id: 'home',      label: 'Inicio',    Icon: Home,      href: '/home' },
+      { id: 'inventory', label: 'Inventario', Icon: Package,   href: '/inventory' },
+      { id: 'purchases', label: 'Compras',   Icon: Truck,     href: '/purchases' },
+      { id: 'saldos',    label: 'Saldos',    Icon: Wallet,    href: '/saldos' },
+      { id: 'metrics',   label: 'Métricas',  Icon: BarChart3, href: '/metrics', desktopOnly: true },
     ],
   },
   {
@@ -86,6 +96,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 ];
 
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+const MOBILE_NAV_ITEMS: NavItem[] = NAV_ITEMS.filter((it) => !it.desktopOnly);
 
 function activeNavId(pathname: string) {
   return NAV_ITEMS.find((it) => pathname.startsWith(it.href))?.id ?? 'inventory';
@@ -94,7 +105,7 @@ function activeNavId(pathname: string) {
 export function BottomNavShell({ active = '' }: { active?: string }) {
   return (
     <nav className="bottomnav" aria-hidden="true">
-      {NAV_ITEMS.map((it) => (
+      {MOBILE_NAV_ITEMS.map((it) => (
         <button key={it.id} className={`navbtn ${active === it.id ? 'is-active' : ''}`} tabIndex={-1}>
           <it.Icon size={23} strokeWidth={active === it.id ? 2 : 1.7} />
           {it.shortLabel ?? it.label}
@@ -110,7 +121,7 @@ export function BottomNav({ transitCount = 0 }: { transitCount?: number }) {
 
   return (
     <nav className="bottomnav">
-      {NAV_ITEMS.map((it) => {
+      {MOBILE_NAV_ITEMS.map((it) => {
         const badge = it.id === 'purchases' ? transitCount : 0;
         return (
           <Link
