@@ -18,8 +18,8 @@ When adding a migration: edit `prisma/schema.prisma`, then run `npx prisma migra
 
 **Next.js App Router** with a clear separation between reads and mutations:
 
-- `app/lib/queries.ts` — all read-only DB access (server-side only)
-- `app/actions/` — Server Actions for mutations (each file groups actions by domain: models, sales, purchases, etc.)
+- `app/lib/queries.ts` — all read-only DB access (server-side only). Every actual query lives here, including ones a Client Component needs on demand (not at render time) — never write Prisma calls directly in `app/actions/`.
+- `app/actions/` — Server Actions for mutations (each file groups actions by domain: models, sales, purchases, etc.), plus thin client-read RPC boundaries (e.g. `read.ts`) that a Client Component calls to fetch on demand outside of render. These must delegate to `queries.ts`, not query Prisma directly, and must live in their own file with a file-level `'use server'` directive — Next.js doesn't allow mixing `'use server'` and `'use cache'` functions in one file once a Client Component can reach it.
 - `app/api/` — API Routes for things that need raw HTTP (e.g. `upload/route.ts` for Cloudinary multipart upload)
 - `app/lib/schemas.ts` — Zod schemas shared between server actions and client forms
 - `app/lib/domain.ts` — serialization-safe domain types, domain constants (`PEOPLE`, `SIZES`, `VERSIONS`, etc.), and formatting utilities (`fmtDate`, `uyu`, `usd`)
@@ -27,6 +27,7 @@ When adding a migration: edit `prisma/schema.prisma`, then run `npx prisma migra
 **Routing**: The `app/(app)/` group wraps authenticated screens. `app/public/` is unauthenticated.
 
 **Components** live in two layers:
+
 - `components/screens/` — full-page screens (one per feature), rendered as client components with React Hook Form
 - `components/ui/` — reusable primitives (`Field`, `Modal`, `Segmented`, `PhotoGallery`, etc.)
 
@@ -77,6 +78,8 @@ WHATSAPP_VERIFY_TOKEN      # arbitrary string; matched during the webhook GET ha
 WHATSAPP_ACCESS_TOKEN      # Meta Graph API token for the business phone number
 WHATSAPP_PHONE_NUMBER_ID   # the sending phone-number id (Graph API path segment)
 WHATSAPP_APP_SECRET        # app secret; verifies X-Hub-Signature-256 on inbound POSTs (optional in dev)
+WHATSAPP_NUMBER   # optional. Digits-only international phone number (e.g. 59899123456) for the floating WhatsApp button on the public catalog. Unset = button hidden.
+WHATSAPP_MESSAGE  # optional. Pre-filled chat text for the WhatsApp button. Unset = chat opens with no pre-filled text.
 ```
 
 ## Conventions

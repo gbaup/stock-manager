@@ -11,8 +11,9 @@ import { todayISO, uyu, usd } from '@/app/lib/format';
 import type { UserSummary } from '@/app/lib/domain';
 import { createExpense } from '@/app/actions/expenses';
 import { gastoSchema, type GastoFormValues } from '@/app/lib/schemas';
+import { ModalFooter } from '@/components/ui/modal-footer';
 
-export function GastoForm({ users }: { users: UserSummary[] }) {
+export function GastoForm({ users, onDone }: { users: UserSummary[]; onDone?: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const {
@@ -45,8 +46,104 @@ export function GastoForm({ users }: { users: UserSummary[] }) {
         currency: data.currency,
         paidByUserId: data.paidByUserId,
         date: data.date,
-      });
+      }, { skipRedirect: !!onDone });
+      onDone?.();
     });
+  }
+
+  const formFields = (
+    <>
+      <div className="section-label">Gasto extra</div>
+      <Field label="Título" error={errors.title?.message}>
+        <Controller
+          name="title"
+          control={control}
+          render={({ field }) => (
+            <TextInput value={field.value} onChange={field.onChange} placeholder="Pack de 100 sobres manila…" />
+          )}
+        />
+      </Field>
+      <div className="field-row">
+        <Field label="Monto" error={errors.amount?.message}>
+          <Controller
+            name="amount"
+            control={control}
+            render={({ field }) => (
+              <MoneyInput
+                prefix={currency === 'UYU' ? '$U' : 'US$'}
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="0"
+              />
+            )}
+          />
+        </Field>
+        <Field label="Moneda">
+          <Controller
+            name="currency"
+            control={control}
+            render={({ field }) => (
+              <Segmented
+                options={['UYU', 'USD'] as const}
+                value={field.value}
+                onChange={field.onChange}
+                full
+              />
+            )}
+          />
+        </Field>
+      </div>
+      <Field label="Fecha" error={errors.date?.message}>
+        <input className="input mono" type="date" {...register('date')} />
+      </Field>
+
+      <div className="section-label">Pago</div>
+      <Field label="¿Quién lo pagó?" error={errors.paidByUserId?.message}>
+        <Controller
+          name="paidByUserId"
+          control={control}
+          render={({ field }) => (
+            <Segmented
+              options={users.map((u) => u.alias)}
+              value={users.find((u) => u.id === field.value)?.alias ?? ''}
+              onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
+              full
+            />
+          )}
+        />
+      </Field>
+      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
+        Se descuenta del saldo de quien lo pagó, en {currency === 'UYU' ? 'pesos' : 'dólares'}.
+      </div>
+
+      {paidByAlias && amount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+          <span className="mov-chip neg" style={{ fontSize: 14 }}>
+            {paidByAlias} paga − {previewMoney}
+          </span>
+        </div>
+      )}
+
+      {!onDone && (
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: 4 }}
+          disabled={pending}
+          onClick={handleSubmit(onSubmit)}
+        >
+          {pending ? 'Registrando…' : 'Registrar gasto'}
+        </button>
+      )}
+    </>
+  );
+
+  if (onDone) {
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <ModalFooter pending={pending} onCancel={onDone} onConfirm={handleSubmit(onSubmit)} confirmLabel="Registrar gasto" />
+      </>
+    );
   }
 
   return (
@@ -60,87 +157,7 @@ export function GastoForm({ users }: { users: UserSummary[] }) {
         savingLabel="Registrando…"
       />
       <div className="body">
-        <div className="body-pad">
-          <div className="section-label">Gasto extra</div>
-          <Field label="Título" error={errors.title?.message}>
-            <Controller
-              name="title"
-              control={control}
-              render={({ field }) => (
-                <TextInput value={field.value} onChange={field.onChange} placeholder="Pack de 100 sobres manila…" />
-              )}
-            />
-          </Field>
-          <div className="field-row">
-            <Field label="Monto" error={errors.amount?.message}>
-              <Controller
-                name="amount"
-                control={control}
-                render={({ field }) => (
-                  <MoneyInput
-                    prefix={currency === 'UYU' ? '$U' : 'US$'}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="0"
-                  />
-                )}
-              />
-            </Field>
-            <Field label="Moneda">
-              <Controller
-                name="currency"
-                control={control}
-                render={({ field }) => (
-                  <Segmented
-                    options={['UYU', 'USD'] as const}
-                    value={field.value}
-                    onChange={field.onChange}
-                    full
-                  />
-                )}
-              />
-            </Field>
-          </div>
-          <Field label="Fecha" error={errors.date?.message}>
-            <input className="input mono" type="date" {...register('date')} />
-          </Field>
-
-          <div className="section-label">Pago</div>
-          <Field label="¿Quién lo pagó?" error={errors.paidByUserId?.message}>
-            <Controller
-              name="paidByUserId"
-              control={control}
-              render={({ field }) => (
-                <Segmented
-                  options={users.map((u) => u.alias)}
-                  value={users.find((u) => u.id === field.value)?.alias ?? ''}
-                  onChange={(alias) => field.onChange(users.find((u) => u.alias === alias)?.id ?? '')}
-                  full
-                />
-              )}
-            />
-          </Field>
-          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 10 }}>
-            Se descuenta del saldo de quien lo pagó, en {currency === 'UYU' ? 'pesos' : 'dólares'}.
-          </div>
-
-          {paidByAlias && amount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-              <span className="mov-chip neg" style={{ fontSize: 14 }}>
-                {paidByAlias} paga − {previewMoney}
-              </span>
-            </div>
-          )}
-
-          <button
-            className="btn btn-primary"
-            style={{ marginTop: 4 }}
-            disabled={pending}
-            onClick={handleSubmit(onSubmit)}
-          >
-            {pending ? 'Registrando…' : 'Registrar gasto'}
-          </button>
-        </div>
+        <div className="body-pad">{formFields}</div>
       </div>
     </div>
   );

@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DetailHead, BottomNav } from '@/components/ui/chrome';
+import { DetailHead, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
-import { Icon } from '@/components/ui/icon';
+import { ChevronUp, ChevronDown, Tag as TagIcon, Truck, Package } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
-import { fmtDate, uyu, usd } from '@/app/lib/format';
-import { fmtType } from '@/app/lib/domain';
+import { fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
+import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
 export function ModelDetailScreen({
@@ -22,8 +22,19 @@ export function ModelDetailScreen({
   const router = useRouter();
   const cover = coverOf(model);
   const [filter, setFilter] = useState<'Ventas' | 'Todos'>('Ventas');
+  const [showSizes, setShowSizes] = useState(false);
 
   const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
+
+  const sizeStock = sizeStockOf(model);
+  const usesAdultSizes = ['fan', 'player', 'retro'].includes(model.type ?? '');
+  const displaySizes: string[] = usesAdultSizes
+    ? (() => {
+      const core = ['s', 'm', 'l', 'xl'];
+      const extended = ['xs', '2xl', '3xl'].filter((s) => (sizeStock[s] ?? 0) > 0);
+      return [...core, ...extended].sort(compareSizes);
+    })()
+    : model.availableBySize.map((s) => s.size).sort(compareSizes);
 
   return (
     <div className="screen">
@@ -79,7 +90,42 @@ export function ModelDetailScreen({
             <div className="stat"><div className="v">{model.sold}</div><div className="l">Vendidas</div></div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, fontSize: 13, marginTop: 18 }}>
+          {displaySizes.length > 0 && (
+            <>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                onClick={() => setShowSizes((v) => !v)}
+              >
+                <div className="section-label">Stock por talle</div>
+                {showSizes ? <ChevronUp size={14} strokeWidth={1.8} style={{ color: 'var(--text-faint)', marginTop: 13 }} /> : <ChevronDown size={14} strokeWidth={1.8} style={{ color: 'var(--text-faint)', marginTop: 13 }} />}
+              </div>
+              {showSizes && (
+                <div className="stat-row" style={{ flexWrap: 'wrap' }}>
+                  {displaySizes.map((size) => {
+                    const count = sizeStock[size] ?? 0;
+                    return (
+                      <div key={size} className={`stat${count > 0 ? ' ok' : ''}`}>
+                        <div className="v" style={{ fontSize: '20px' }}>{count}</div>
+                        <div className="l">{size.toUpperCase()}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="btn-row" style={{ marginTop: 18 }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => router.push(`/inventory/${model.id}/sale`)}
+              disabled={model.stock === 0}
+            >
+              <TagIcon size={18} strokeWidth={1.8} />Registrar venta
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, fontSize: 13, marginTop: 18, marginBottom: 10 }}>
             {model.revenue > 0 && (
               <div style={{ color: 'var(--text-muted)' }}>
                 Ingresos:{' '}
@@ -96,16 +142,6 @@ export function ModelDetailScreen({
                 {model.profitPending && <span className="money-sec"> · provisorio</span>}
               </div>
             )}
-          </div>
-
-          <div className="btn-row" style={{ marginTop: 18 }}>
-            <button
-              className="btn btn-primary"
-              onClick={() => router.push(`/inventory/${model.id}/sale`)}
-              disabled={model.stock === 0}
-            >
-              <Icon name="tag" size={18} />Venta
-            </button>
           </div>
 
           <div className="section-head">
@@ -127,17 +163,18 @@ export function ModelDetailScreen({
           )}
         </div>
       </div>
+      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );
 }
 
-function EventRow({ ev }: { ev: TimelineEvent }) {
+export function EventRow({ ev }: { ev: TimelineEvent }) {
   if (ev.type === 'sale') {
     const s = ev.data;
     return (
       <div className="event">
-        <div className="event-ico sale"><Icon name="tag" size={17} /></div>
+        <div className="event-ico sale"><TagIcon size={17} strokeWidth={1.8} /></div>
         <div className="event-main">
           <div className="event-title">
             Venta{s.quantity > 1 ? ` ×${s.quantity}` : ''}
@@ -151,9 +188,9 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
           </div>
         </div>
         <div className="event-amt">
-          +{uyu(s.price)}
+          {uyu(s.price)}
           <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
-            ganancia {uyu(s.profit)}
+            {signedUyu(s.profit)}
           </span>
         </div>
       </div>
@@ -165,7 +202,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
     const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
     return (
       <div className="event">
-        <div className="event-ico transit"><Icon name="truck" size={17} /></div>
+        <div className="event-ico transit"><Truck size={17} strokeWidth={1.8} /></div>
         <div className="event-main">
           <div className="event-title">En camino · {ev.qty} u.</div>
           <div className="event-sub">{meta}</div>
@@ -180,7 +217,7 @@ function EventRow({ ev }: { ev: TimelineEvent }) {
   const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`].filter(Boolean).join(' · ');
   return (
     <div className="event">
-      <div className="event-ico buy"><Icon name="box" size={17} /></div>
+      <div className="event-ico buy"><Package size={17} strokeWidth={1.8} /></div>
       <div className="event-main">
         <div className="event-title">Recibida · {ev.qty} u.</div>
         <div className="event-sub">{meta}</div>

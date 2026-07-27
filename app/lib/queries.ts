@@ -4,11 +4,11 @@ import { fmtDate } from './format';
 import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
-import { shippingShareUyu, derivePurchaseStatus } from './domain';
+import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, TimelineEvent, SaleRecord, UserSummary,
-  ShipmentRecord,
+  ShipmentRecord, SaleStatus,
 } from './domain';
 
 export type HomeSaleItem = {
@@ -19,8 +19,14 @@ export type HomeSaleItem = {
   version: string | null;
   number: string | null;
   player: string | null;
+  size: string;
   price: number;
+  profit: number;
+  profitPending: boolean;
   date: string;
+  method: string | null;
+  description: string | null;
+  status: SaleStatus;
   collectedByUserId: string | null;
   collectedByAlias: string | null;
 };
@@ -67,13 +73,13 @@ type ShipmentInput = {
 
 export function batchToSummary(
   b: {
-    id: string; purchaseDate: Date; arrivalDate: Date | null;
+    id: string; purchaseDate: Date; arrivalDate: Date | null; updatedAt: Date;
     supplier: string | null;
     trackingNumber: string | null; description: string | null;
-    supplierPayments: Array<{ userId: string; amountUsd: unknown; user: { alias: string } }>;
+    supplierPayments: Array<{ userId: string; amountUsd: unknown; cardTaxPct: unknown; user: { alias: string } }>;
     shipments: ShipmentInput[];
   },
-  items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
+  items: Array<{ id: string; catalogProductId: string; size: string; basePriceUsd: unknown; basePriceUyu?: unknown; shipmentId: string | null; product: Parameters<typeof productMeta>[0] }>
 ): BatchSummary {
   // Map shipment -> items received via that shipment.
   const itemsByShipment = new Map<string, string[]>();
@@ -130,6 +136,7 @@ export function batchToSummary(
       userId: p.userId,
       alias: p.user.alias,
       amountUsd: Number(p.amountUsd),
+      cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
     })),
     shippingPaidByUserId,
     shippingPaidByAlias,
@@ -138,10 +145,12 @@ export function batchToSummary(
       catalogProductId: i.catalogProductId,
       size: i.size,
       basePriceUsd: Number(i.basePriceUsd),
+      basePriceUyu: i.basePriceUyu != null ? Number(i.basePriceUyu) : null,
       shipmentId: i.shipmentId,
       product: productMeta(i.product),
     })),
     shipments,
+    updatedAt: b.updatedAt.toISOString(),
   };
 }
 
@@ -204,7 +213,10 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
               },
             },
           },
-          sale: {
+          // Only the active sale matters for stats/timeline; cancelled sales
+          // stay in the DB as history but the item is back in stock.
+          sales: {
+            where: { status: SALE_STATUS.active },
             select: {
               id: true, price: true, date: true, method: true,
               description: true, userId: true,
@@ -231,9 +243,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     }
   }
   const availableBySize = [...sizeCounts].map(([size, count]) => ({ size, count }));
-  const soldItems = p.items.filter((i) => i.sale !== null);
+  // The include above filters to active sales, so sales[0] is the item's
+  // current sale (or undefined for available / cancelled-and-restocked items).
+  const soldItems = p.items.filter((i) => i.sales.length > 0);
   const sold = soldItems.length;
-  const revenue = soldItems.reduce((s, i) => s + Number(i.sale!.price), 0);
+  const revenue = soldItems.reduce((s, i) => s + Number(i.sales[0].price), 0);
 
   // Group items by batch so we can build a BatchSummary per batch even when
   // only a subset of the items belong to this model.
@@ -273,7 +287,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
     if (batchData.shipments.length > 0) {
       for (const sh of batchData.shipments) {
-        const share = shippingShareUyu(sh);
+        const share = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
         for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
       }
     }
@@ -315,9 +329,9 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   // Group sales by (date, collectedByUserId, size) so each collector gets their
   // own event per day, split by size — sizes now carry distinct cost/profit.
-  const saleByKey = new Map<string, { size: string; price: number; profit: number; qty: number; s: typeof soldItems[0]['sale']; dateKey: string }>();
+  const saleByKey = new Map<string, { size: string; price: number; profit: number; qty: number; s: typeof soldItems[0]['sales'][0]; dateKey: string }>();
   for (const item of soldItems) {
-    const s = item.sale!;
+    const s = item.sales[0];
     const dateKey = toISODate(s.date)!;
     const key = `${dateKey}::${s.collectedByUserId ?? ''}::${item.size}`;
     const saleProfit = Number(s.price) - itemCostUyu(item);
@@ -333,16 +347,16 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   for (const [, { size, price, profit: eventProfit, qty, s, dateKey }] of saleByKey) {
     const saleData: SaleRecord = {
-      id: s!.id,
+      id: s.id,
       catalogProductId: id,
       size,
       price,
       quantity: qty,
       date: dateKey,
-      method: s!.method,
-      description: s!.description,
-      collectedByUserId: s!.collectedByUserId,
-      collectedByAlias: s!.collectedByUser?.alias ?? null,
+      method: s.method,
+      description: s.description,
+      collectedByUserId: s.collectedByUserId,
+      collectedByAlias: s.collectedByUser?.alias ?? null,
       profit: eventProfit,
     };
     events.push({ type: 'sale', date: dateKey, data: saleData, qty });
@@ -444,11 +458,22 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       id: true,
       price: true,
       date: true,
+      method: true,
+      description: true,
+      status: true,
       collectedByUserId: true,
       collectedByUser: { select: { alias: true } },
       item: {
         select: {
           catalogProductId: true,
+          size: true,
+          basePriceUyu: true,
+          shipment: {
+            select: {
+              shippingPriceUyu: true,
+              _count: { select: { items: true } },
+            },
+          },
           product: {
             select: {
               color: true,
@@ -461,21 +486,76 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
         },
       },
     },
-    orderBy: { date: 'desc' },
+    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
   });
-  return sales.map((s) => ({
-    id: s.id,
-    catalogProductId: s.item.catalogProductId,
-    teamName: s.item.product.team.name,
-    color: s.item.product.color,
-    version: s.item.product.version,
-    number: s.item.product.number !== null ? String(s.item.product.number) : null,
-    player: s.item.product.player,
-    price: Number(s.price),
-    date: toISODate(s.date)!,
-    collectedByUserId: s.collectedByUserId,
-    collectedByAlias: s.collectedByUser?.alias ?? null,
-  }));
+  return sales.map((s) => {
+    // Landed cost of the sold unit: base price + equal-split shipping share
+    // (0 while in transit). Goes through the same shippingShareUyu seam as
+    // getModelDetail, so profit matches the model-detail timeline exactly.
+    // Single source of truth for "in transit": the shipment relation. Cost is
+    // provisional whenever the item has no shipment yet OR its shipment has no
+    // shipping price entered — both leave the shipping share out of the number.
+    const shipment = s.item.shipment;
+    const share = shipment
+      ? shippingShareUyu(
+          shipment.shippingPriceUyu === null ? null : Number(shipment.shippingPriceUyu),
+          shipment._count.items,
+        )
+      : 0;
+    const cost = Number(s.item.basePriceUyu) + share;
+    const profitPending = shipment === null || shipment.shippingPriceUyu === null;
+    return {
+      id: s.id,
+      catalogProductId: s.item.catalogProductId,
+      teamName: s.item.product.team.name,
+      color: s.item.product.color,
+      version: s.item.product.version,
+      number: s.item.product.number !== null ? String(s.item.product.number) : null,
+      player: s.item.product.player,
+      size: s.item.size,
+      price: Number(s.price),
+      profit: Number(s.price) - cost,
+      profitPending,
+      date: toISODate(s.date)!,
+      method: s.method,
+      description: s.description,
+      status: s.status as SaleStatus,
+      collectedByUserId: s.collectedByUserId,
+      collectedByAlias: s.collectedByUser?.alias ?? null,
+    };
+  });
+}
+
+export type LedgerSaleRow = {
+  id: string;
+  price: string;
+  date: Date;
+  collected_by_user_id: string | null;
+  collected_by_alias: string | null;
+  team_name: string;
+};
+
+// Lean, flat-join sale read for the saldos ledger (raw SQL to avoid Prisma's
+// nested-include cost — see #13). This is the one place that decides which
+// sales count toward saldos: always filter through SALE_STATUS, never a raw
+// string, so a cancelled sale can't sneak into a person's balance.
+export async function getActiveSalesForLedger(): Promise<LedgerSaleRow[]> {
+  return prisma.$queryRaw<LedgerSaleRow[]>`
+    SELECT
+      s.id,
+      s.price,
+      s.date,
+      s.collected_by_user_id,
+      u.alias  AS collected_by_alias,
+      t.name   AS team_name
+    FROM sales s
+    LEFT JOIN users u  ON s.collected_by_user_id = u.id
+    JOIN inventory_items  ii ON s.inventory_item_id  = ii.id
+    JOIN catalog_products cp ON ii.catalog_product_id = cp.id
+    JOIN teams            t  ON cp.team_id            = t.id
+    WHERE s.status = ${SALE_STATUS.active}
+    ORDER BY s.date DESC
+  `;
 }
 
 export async function getTransitCount(): Promise<number> {

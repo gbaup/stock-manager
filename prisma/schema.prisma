@@ -56,10 +56,11 @@ model Batch {
 }
 
 model BatchSupplierPayment {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  batchId   String  @map("batch_id") @db.Uuid
-  userId    String  @map("user_id") @db.Uuid
-  amountUsd Decimal @map("amount_usd") @db.Decimal(10, 2)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  amountUsd   Decimal  @map("amount_usd") @db.Decimal(10, 2)
+  cardTaxPct  Decimal? @map("card_tax_pct") @db.Decimal(5, 2)
 
   batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   user  User  @relation("BatchSupplierPaymentUser", fields: [userId], references: [id])
@@ -137,7 +138,7 @@ model InventoryItem {
   product  CatalogProduct @relation(fields: [catalogProductId], references: [id])
   batch    Batch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
   shipment Shipment?      @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
-  sale     Sale?
+  sales    Sale[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -150,7 +151,7 @@ model InventoryItem {
 
 model Sale {
   id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  inventoryItemId String  @unique @map("inventory_item_id") @db.Uuid
+  inventoryItemId String  @map("inventory_item_id") @db.Uuid
   userId          String  @map("user_id") @db.Uuid
   loggedBy        User    @relation("SaleLogger", fields: [userId], references: [id])
 
@@ -161,12 +162,20 @@ model Sale {
   date        DateTime @default(now())
   method      String?  @db.VarChar(150)
   description String?  @db.Text
+  // 'active' | 'cancelled'. A cancelled sale keeps its item link for history;
+  // the item returns to stock and can be sold again. "At most one ACTIVE sale
+  // per item" is enforced by a partial unique index (see migration SQL) that
+  // Prisma cannot express in this schema.
+  status      String   @default("active") @db.VarChar(20)
+  cancelledAt DateTime? @map("cancelled_at")
 
   item InventoryItem @relation(fields: [inventoryItemId], references: [id])
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
+  @@index([inventoryItemId])
+  @@index([status])
   @@map("sales")
 }
 

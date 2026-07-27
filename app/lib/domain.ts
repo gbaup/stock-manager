@@ -9,8 +9,13 @@ export const METHODS = ['Efectivo', 'Transferencia', 'MercadoPago', 'MercadoLibr
 export const VERSIONS = ['home', 'away', 'third', 'fourth', 'arquero'] as const;
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
 export const KID_SIZES = ['20', '22', '24', '26', '28'] as const;
-export const ITEM_TYPES = ['fan', 'player', 'retro', 'kidkit', 'short', 'nba'] as const;
+export const ITEM_TYPES = ['fan', 'player', 'retro', 'kidkit', 'short', 'nba', 'jacket'] as const;
 export const SLEEVES = ['corta', 'larga'] as const;
+
+// Types that carry no version (e.g. jackets, NBA jerseys have no home/away).
+export const TYPES_WITHOUT_VERSION = new Set(['nba', 'jacket']);
+// Types that carry no sleeve (shorts and the above have no sleeve distinction).
+export const TYPES_WITHOUT_SLEEVE = new Set(['nba', 'jacket', 'short']);
 
 const KID_SIZE_LABELS: Record<string, string> = {
   '20': '5-6 años', '22': '7-8 años', '24': '8-10 años', '26': '10-12 años',
@@ -21,6 +26,21 @@ const KID_SIZE_LABELS: Record<string, string> = {
 export const sizesForType = (type: string | null | undefined): readonly string[] =>
   type === 'kidkit' ? KID_SIZES : SIZES;
 
+// Canonical incremental order across all size sets. KID_SIZES and SIZES are
+// disjoint, so a single combined index gives a total order. Sizes are stored
+// lowercase in the DB, so the order set and lookups are lowercased to match
+// (SIZES is declared uppercase for display). Unknown sizes sort last
+// (alphabetically among themselves) for stability.
+const SIZE_ORDER: string[] = [...KID_SIZES, ...SIZES].map((s) => s.toLowerCase());
+export const compareSizes = (a: string, b: string): number => {
+  const ia = SIZE_ORDER.indexOf(a.toLowerCase());
+  const ib = SIZE_ORDER.indexOf(b.toLowerCase());
+  if (ia === -1 && ib === -1) return a.localeCompare(b);
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+};
+
 // Public-facing label: kid numeric sizes -> age range, everything else unchanged.
 export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 
@@ -29,7 +49,7 @@ export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
-  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA',
+  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA', jacket: 'Jacket',
 };
 export const fmtType = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS[t] ?? cap(t) : '');
 export const fmtVersion = (v: string | null | undefined): string => (v ? cap(v) : '');
@@ -118,6 +138,9 @@ export type ItemInBatch = {
   catalogProductId: string;
   size: string;
   basePriceUsd: number;
+  // Null when the caller's query didn't fetch it (only the purchase edit form
+  // needs it, to derive the batch's implicit exchange rate).
+  basePriceUyu: number | null;
   shipmentId: string | null;
   product: ModelMeta;
 };
@@ -147,12 +170,23 @@ export type BatchSummary = {
   shippingPriceUyu: number | null;
   weight: number | null;
   status: PurchaseStatus;
-  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number }>;
+  supplierPayments: Array<{ userId: string; alias: string; amountUsd: number; cardTaxPct: number | null }>;
   shippingPaidByUserId: string | null;
   shippingPaidByAlias: string | null;
   items: ItemInBatch[];
   shipments: ShipmentRecord[];
+  // Optimistic-lock token for the edit flow: every mutation that can change
+  // the batch (metadata edits, item changes, shipments arriving) bumps it.
+  // The edit form echoes it back and updatePurchase rejects a stale token.
+  updatedAt: string;
 };
+
+// A Sale is soft-deleted: cancelling keeps the row as history under status
+// 'cancelled' while the unit returns to stock. Every read that feeds money
+// math (saldos, profit, revenue) must count ACTIVE sales only — filter
+// through these constants, never a raw string. See CONTEXT.md "Sale".
+export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
+export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 
 export type SaleRecord = {
   id: string;
@@ -187,9 +221,11 @@ export type ModelDetail = ModelWithStats & {
 // Equal-split shipping allocation: each item in a shipment carries the same
 // share of that shipment's UYU shipping cost. The single place this rule
 // lives — swap the body if allocation ever becomes weight- or cost-based.
-export function shippingShareUyu(shipment: { shippingPriceUyu: number | null; itemIds: string[] }): number {
-  if (!shipment.shippingPriceUyu || shipment.itemIds.length === 0) return 0;
-  return shipment.shippingPriceUyu / shipment.itemIds.length;
+// Takes the raw price and item count so every caller can reach it regardless
+// of how it holds the shipment (an itemIds array or a relation _count).
+export function shippingShareUyu(shippingPriceUyu: number | null, itemCount: number): number {
+  if (!shippingPriceUyu || itemCount === 0) return 0;
+  return shippingPriceUyu / itemCount;
 }
 
 // ---- Supplier-payment reconciliation (see CONTEXT.md "Reconciliation") ----
@@ -200,6 +236,19 @@ export type SupplierPaymentStatus = 'empty' | 'exact' | 'mismatch';
 // per-line items (with a quantity) or already-expanded unit rows.
 export function baseCostUsd(items: { basePriceUsd: number; quantity?: number }[]): number {
   return items.reduce((s, it) => s + it.basePriceUsd * (it.quantity ?? 1), 0);
+}
+
+// The reconciliation target when editing a batch: locked items keep their
+// stored (already-taxed) prices, so their contribution is `lockedPreTaxTotal`
+// (from pricing.unbakeBatch) rather than a fresh baseCostUsd computation —
+// only the still-editable items get that. Both the edit form's live preview
+// and the edit action's server-side validation must reconcile against this
+// same total, or the two can silently disagree about what "paid in full" means.
+export function editBatchBaseCostUsd(
+  lockedPreTaxTotal: number,
+  editableItems: { basePriceUsd: number; quantity?: number }[],
+): number {
+  return lockedPreTaxTotal + baseCostUsd(editableItems);
 }
 
 // The reconciliation rule: given the partners' payments and the base cost, is
@@ -225,6 +274,12 @@ export function toSupplierPaymentArray(
   return Object.entries(dict ?? {})
     .map(([userId, v]) => ({ userId, amountUsd: parseFloat(v ?? '') || 0 }))
     .filter((p) => p.amountUsd > 0);
+}
+
+// Applies a card tax percentage to a USD amount, returning the gross cost.
+// pct is a whole-number percentage (e.g. 5 means 5%). Returns amount unchanged when pct is 0 or absent.
+export function applyCardTax(amountUsd: number, pct: number | null | undefined): number {
+  return Math.round(amountUsd * (1 + (pct ?? 0) / 100) * 100) / 100;
 }
 
 export type ExpenseRecord = {

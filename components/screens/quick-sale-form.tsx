@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormHead } from '@/components/ui/chrome';
-import { Icon } from '@/components/ui/icon';
+import { Search, X } from 'lucide-react';
 import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
 import { Field, TextInput, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
@@ -11,23 +11,28 @@ import { Segmented } from '@/components/ui/segmented';
 import { SizePicker } from '@/components/ui/size-picker';
 import { uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
-import { METHODS, matchesModel } from '@/app/lib/domain';
+import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
+import { ModalFooter } from '@/components/ui/modal-footer';
+import { useIsDesktop } from '@/app/lib/hooks';
 
 export function QuickSaleForm({
   models,
   users,
   usdRate,
   sessionUserId,
+  onDone,
 }: {
   models: ModelWithStats[];
   users: UserSummary[];
   usdRate: number;
   sessionUserId: string;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const isDesktop = useIsDesktop();
 
   const [selectedModelId, setSelectedModelId] = useState('');
   const [query, setQuery] = useState('');
@@ -57,6 +62,19 @@ export function QuickSaleForm({
     .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
     .slice(0, 7);
 
+  function resetForm() {
+    setSelectedModelId('');
+    setQuery('');
+    setSize('');
+    setPrice('');
+    setQuantity('1');
+    setDate(new Date().toISOString().split('T')[0]);
+    setMethod('');
+    setDescription('');
+    setCollectedByUserId(sessionUserId);
+    setSaveError(null);
+  }
+
   function handleSave() {
     if (!canSave || !model) return;
     setSaveError(null);
@@ -71,6 +89,8 @@ export function QuickSaleForm({
           description: description || undefined,
           collectedByUserId,
         });
+        resetForm();
+        onDone?.();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al registrar la venta');
       }
@@ -85,6 +105,197 @@ export function QuickSaleForm({
 
   const collectedByAlias = users.find((u) => u.id === collectedByUserId)?.alias ?? '';
 
+  const formFields = (
+    <>
+      {!model ? (
+        <>
+          <div className="section-label" style={{ marginTop: 6 }}>¿Qué camiseta vendés?</div>
+          <div className="search">
+            <Search size={19} strokeWidth={1.8} />
+            <input
+              value={query}
+              autoFocus={isDesktop}
+              placeholder="Buscá equipo, jugador, color…"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query && (
+              <button
+                className="iconbtn plain"
+                style={{ width: 26, height: 26 }}
+                onClick={() => setQuery('')}
+              >
+                <X size={16} strokeWidth={1.8} />
+              </button>
+            )}
+          </div>
+
+          <div className="qs-results">
+            {results.length === 0 ? (
+              <Empty title="Sin resultados" desc="Probá con otro nombre." icon="search" />
+            ) : (
+              results.map((m) => (
+                <button
+                  key={m.id}
+                  className="qs-result"
+                  disabled={m.stock === 0}
+                  onClick={() => m.stock > 0 && selectModel(m)}
+                >
+                  <Swatch
+                    color={m.color}
+                    number={m.number}
+                    photo={coverOf(m)}
+                    className="sale-sw"
+                    style={{ width: 38, height: 44, fontSize: 14 }}
+                  />
+                  <div className="qs-r-main">
+                    <div className="qs-r-team capitalize">{m.team}</div>
+                    <div className="qs-r-meta">
+                      {m.season} · {m.version} · {fmtType(m.type)}
+                      {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
+                    </div>
+                  </div>
+                  <div
+                    className="qs-r-stock"
+                    style={{ color: m.stock === 0 ? 'var(--text-faint)' : 'var(--text)' }}
+                  >
+                    <span className="qsr-n">{m.stock}</span>
+                    <span className="qsr-l">{m.stock === 0 ? 'sin stock' : 'stock'}</span>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <button className="qs-picked" onClick={() => { setSelectedModelId(''); setSize(''); }}>
+            <Swatch
+              color={model.color}
+              number={model.number}
+              photo={coverOf(model)}
+              style={{ width: 56, height: 64, fontSize: 21 }}
+            />
+            <div className="qs-p-main">
+              <div className="qs-p-team">{model.team}</div>
+              <div className="qs-p-meta">
+                {model.season} · {model.version} · {stock} en stock
+              </div>
+            </div>
+            <span className="qs-change">Cambiar</span>
+          </button>
+
+          <div className="section-label">Venta</div>
+          <Field label="Talle">
+            <SizePicker availableBySize={sizes} value={size} onChange={setSize} />
+          </Field>
+          <Field label="Precio de venta (UYU)">
+            <MoneyInput value={price} onChange={setPrice} placeholder="2200" />
+          </Field>
+          {priceNum > 0 && (
+            <div
+              style={{
+                fontSize: 12.5,
+                color: 'var(--text-faint)',
+                margin: '-6px 2px 12px',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              ≈ {usd(money.toUsd(priceNum, usdRate))} · total {uyu(priceNum * qty)}
+            </div>
+          )}
+
+          <div className="field-row">
+            <Field label="Cantidad">
+              <TextInput
+                value={quantity}
+                onChange={(v) => setQuantity(v.replace(/[^\d]/g, ''))}
+                mono
+                inputMode="numeric"
+              />
+            </Field>
+            <Field label="Fecha">
+              <input
+                className="input mono"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </Field>
+          </div>
+          {!!size && qty > sizeAvail && (
+            <div style={{ fontSize: 12.5, color: 'var(--danger)', margin: '-6px 2px 12px' }}>
+              Solo hay {sizeAvail} en talle {size}.
+            </div>
+          )}
+
+          <Field label="Método de pago" optional>
+            <SelectInput
+              value={method}
+              onChange={setMethod}
+              options={METHODS}
+              placeholder="Elegí un método…"
+            />
+          </Field>
+
+          <div className="section-label">Cobro</div>
+          <Field label="¿Quién cobró?">
+            <Segmented
+              options={users.map((u) => u.alias)}
+              value={collectedByAlias}
+              onChange={(alias) =>
+                setCollectedByUserId(users.find((u) => u.alias === alias)?.id ?? '')
+              }
+              full
+            />
+          </Field>
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--text-faint)',
+              marginTop: -6,
+              marginBottom: 10,
+            }}
+          >
+            Suma al saldo en mano de quien recibe la plata.
+          </div>
+
+          <Field label="Descripción" optional>
+            <TextAreaInput
+              value={description}
+              onChange={setDescription}
+              placeholder="Comprador, notas…"
+            />
+          </Field>
+
+          {saveError && (
+            <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
+              {saveError}
+            </div>
+          )}
+          {!onDone && (
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 14 }}
+              disabled={!canSave || pending}
+              onClick={handleSave}
+            >
+              {pending ? 'Registrando…' : 'Registrar venta'}
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  if (onDone) {
+    return (
+      <>
+        <div className="dm-body">{formFields}</div>
+        <ModalFooter pending={pending} canSave={canSave} onCancel={onDone} onConfirm={handleSave} confirmLabel="Registrar venta" />
+      </>
+    );
+  }
+
   return (
     <div className="screen">
       <FormHead
@@ -98,181 +309,7 @@ export function QuickSaleForm({
       />
       <div className="body">
         <div className="body-pad">
-          {!model ? (
-            <>
-              <div className="section-label" style={{ marginTop: 6 }}>¿Qué camiseta vendés?</div>
-              <div className="search">
-                <Icon name="search" size={19} />
-                <input
-                  value={query}
-                  autoFocus
-                  placeholder="Buscá equipo, jugador, color…"
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                {query && (
-                  <button
-                    className="iconbtn plain"
-                    style={{ width: 26, height: 26 }}
-                    onClick={() => setQuery('')}
-                  >
-                    <Icon name="x" size={16} />
-                  </button>
-                )}
-              </div>
-
-              <div className="qs-results">
-                {results.length === 0 ? (
-                  <Empty title="Sin resultados" desc="Probá con otro nombre." icon="search" />
-                ) : (
-                  results.map((m) => (
-                    <button
-                      key={m.id}
-                      className="qs-result"
-                      disabled={m.stock === 0}
-                      onClick={() => m.stock > 0 && selectModel(m)}
-                    >
-                      <Swatch
-                        color={m.color}
-                        number={m.number}
-                        photo={coverOf(m)}
-                        className="sale-sw"
-                        style={{ width: 38, height: 44, fontSize: 14 }}
-                      />
-                      <div className="qs-r-main">
-                        <div className="qs-r-team capitalize">{m.team}</div>
-                        <div className="qs-r-meta">
-                          {m.season} · {m.version} · {m.color}
-                          {m.player ? ` · ${m.player}` : ''}
-                        </div>
-                      </div>
-                      <div
-                        className="qs-r-stock"
-                        style={{ color: m.stock === 0 ? 'var(--text-faint)' : 'var(--text)' }}
-                      >
-                        <span className="qsr-n">{m.stock}</span>
-                        <span className="qsr-l">{m.stock === 0 ? 'sin stock' : 'stock'}</span>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <button className="qs-picked" onClick={() => { setSelectedModelId(''); setSize(''); }}>
-                <Swatch
-                  color={model.color}
-                  number={model.number}
-                  photo={coverOf(model)}
-                  style={{ width: 56, height: 64, fontSize: 21 }}
-                />
-                <div className="qs-p-main">
-                  <div className="qs-p-team">{model.team}</div>
-                  <div className="qs-p-meta">
-                    {model.season} · {model.version} · {stock} en stock
-                  </div>
-                </div>
-                <span className="qs-change">Cambiar</span>
-              </button>
-
-              <div className="section-label">Venta</div>
-              <Field label="Talle">
-                <SizePicker availableBySize={sizes} value={size} onChange={setSize} />
-              </Field>
-              <Field label="Precio de venta (UYU)">
-                <MoneyInput value={price} onChange={setPrice} placeholder="2200" />
-              </Field>
-              {priceNum > 0 && (
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    color: 'var(--text-faint)',
-                    margin: '-6px 2px 12px',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                >
-                  ≈ {usd(money.toUsd(priceNum, usdRate))} · total {uyu(priceNum * qty)}
-                </div>
-              )}
-
-              <div className="field-row">
-                <Field label="Cantidad">
-                  <TextInput
-                    value={quantity}
-                    onChange={(v) => setQuantity(v.replace(/[^\d]/g, ''))}
-                    mono
-                    inputMode="numeric"
-                  />
-                </Field>
-                <Field label="Fecha">
-                  <input
-                    className="input mono"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </Field>
-              </div>
-              {!!size && qty > sizeAvail && (
-                <div style={{ fontSize: 12.5, color: 'var(--danger)', margin: '-6px 2px 12px' }}>
-                  Solo hay {sizeAvail} en talle {size}.
-                </div>
-              )}
-
-              <Field label="Método de pago" optional>
-                <SelectInput
-                  value={method}
-                  onChange={setMethod}
-                  options={METHODS}
-                  placeholder="Elegí un método…"
-                />
-              </Field>
-
-              <div className="section-label">Cobro</div>
-              <Field label="¿Quién cobró?">
-                <Segmented
-                  options={users.map((u) => u.alias)}
-                  value={collectedByAlias}
-                  onChange={(alias) =>
-                    setCollectedByUserId(users.find((u) => u.alias === alias)?.id ?? '')
-                  }
-                  full
-                />
-              </Field>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'var(--text-faint)',
-                  marginTop: -6,
-                  marginBottom: 10,
-                }}
-              >
-                Suma al saldo en mano de quien recibe la plata.
-              </div>
-
-              <Field label="Descripción" optional>
-                <TextAreaInput
-                  value={description}
-                  onChange={setDescription}
-                  placeholder="Comprador, notas…"
-                />
-              </Field>
-
-              {saveError && (
-                <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
-                  {saveError}
-                </div>
-              )}
-              <button
-                className="btn btn-primary"
-                style={{ marginTop: 14 }}
-                disabled={!canSave || pending}
-                onClick={handleSave}
-              >
-                {pending ? 'Registrando…' : 'Registrar venta'}
-              </button>
-            </>
-          )}
+          {formFields}
         </div>
       </div>
     </div>

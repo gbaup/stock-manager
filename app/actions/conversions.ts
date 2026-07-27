@@ -18,16 +18,19 @@ const conversionActionSchema = z.object({
   date: z.string().min(1),
 });
 
-export async function createConversion(data: {
-  fromUserId: string;
-  fromCur: 'UYU' | 'USD';
-  toUserId: string;
-  toCur: 'UYU' | 'USD';
-  fromAmount: number;
-  rate: number;
-  toAmount: number;
-  date: string;
-}) {
+export async function createConversion(
+  data: {
+    fromUserId: string;
+    fromCur: 'UYU' | 'USD';
+    toUserId: string;
+    toCur: 'UYU' | 'USD';
+    fromAmount: number;
+    rate: number;
+    toAmount: number;
+    date: string;
+  },
+  opts?: { skipRedirect?: boolean },
+) {
   parseOrThrow(conversionActionSchema, data);
 
   const userId = await getCurrentUserId();
@@ -48,5 +51,6 @@ export async function createConversion(data: {
   });
 
   updateTag('saldos');
+  if (opts?.skipRedirect) return;
   redirect('/saldos');
 }

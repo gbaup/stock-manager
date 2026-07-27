@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TYPES_WITHOUT_VERSION, TYPES_WITHOUT_SLEEVE } from '@/app/lib/domain';
 
 export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
@@ -13,7 +14,7 @@ const saleFields = {
   date: z.string().min(1, 'Requerido'),
   method: z.string().optional(),
   description: z.string().optional(),
-  collectedByUserId: z.string().uuid('¿Quién cobró?'),
+  collectedByUserId: z.string().uuid().optional(),
 };
 
 export const saleSchema = z.object(saleFields);
@@ -34,6 +35,27 @@ export const makeSaleSchema = (sizeStock: Record<string, number>) =>
   });
 
 export type SaleFormValues = z.infer<typeof saleSchema>;
+
+// Editing an existing sale: same fields as a sale minus size/quantity (the
+// unit is fixed — changing model/size goes through the swap flow instead).
+export const saleEditSchema = z.object({
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+  date: z.string().min(1, 'Requerido'),
+  method: z.string().optional(),
+  description: z.string().optional(),
+  collectedByUserId: z.string().uuid().optional(),
+});
+
+export type SaleEditFormValues = z.infer<typeof saleEditSchema>;
+
+// Swapping the unit behind a sale (buyer changed model or size).
+export const saleSwapSchema = z.object({
+  modelId: z.string().min(1, 'Elegí un producto'),
+  size: z.string().min(1, 'Elegí un talle'),
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+});
+
+export type SaleSwapFormValues = z.infer<typeof saleSwapSchema>;
 
 export const gastoSchema = z.object({
   title: z.string().min(1, 'Requerido'),
@@ -105,14 +127,15 @@ export const ajusteSchema = z
 
 export type AjusteFormValues = z.infer<typeof ajusteSchema>;
 
-export const modelSchema = z.object({
+// Validation-only schema: used by the form resolver (no transform, so RHF's TFieldValues matches).
+export const modelFormSchema = z.object({
   teamId: z.string().min(1, 'Requerido'),
   season: z
     .string()
     .min(1, 'Requerido')
     .regex(/^\d{4}(\/\d{2})?$/, 'Formato inválido. Usá YYYY o YYYY/YY (ej: 2006 o 2007/08)'),
   version: z.string(),
-  type: z.string(),
+  type: z.string().min(1, 'Requerido'),
   sleeve: z.string(),
   color: z.string(),
   number: z.string().optional(),
@@ -124,7 +147,18 @@ export const modelSchema = z.object({
   })),
 });
 
-export type ModelFormValues = z.infer<typeof modelSchema>;
+export type ModelFormValues = z.infer<typeof modelFormSchema>;
+
+// Action schema: adds the type→field nullification transform on top.
+// Server actions parse with this to get version/sleeve already nullified.
+export const modelSchema = modelFormSchema.transform((data) => {
+  const type = (data.type || 'fan').trim().toLowerCase();
+  return {
+    ...data,
+    version: TYPES_WITHOUT_VERSION.has(type) ? null : data.version,
+    sleeve: TYPES_WITHOUT_SLEEVE.has(type) ? null : data.sleeve,
+  };
+});
 
 const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
@@ -139,7 +173,18 @@ export const purchaseSchema = z
     supplier: z.string().optional(),
     description: z.string().optional(),
     supplierPayments: z.record(z.string().uuid(), numericOptional).optional(),
+    supplierCardTaxPcts: z.record(z.string().uuid(), numericOptional).optional(),
     items: z.array(purchaseItemSchema).min(1, 'Agregá al menos un item'),
   });
 
 export type PurchaseFormValues = z.infer<typeof purchaseSchema>;
+
+// Purchase edit form: same shape but items may be empty (locked/shipped items
+// stay in the batch outside the form) and the exchange rate is editable —
+// it's applied to the recreated editable items on save.
+export const purchaseEditSchema = purchaseSchema.extend({
+  items: z.array(purchaseItemSchema),
+  exchangeRate: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá el tipo de cambio'),
+});
+
+export type PurchaseEditFormValues = z.infer<typeof purchaseEditSchema>;

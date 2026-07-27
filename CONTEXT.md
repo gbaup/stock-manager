@@ -20,6 +20,10 @@ The set of `InventoryItem`s whose `Batch` has arrived **and** whose `status` is 
 **In transit**:
 `InventoryItem`s whose `Batch` has not arrived yet, regardless of `status`. They exist in the catalog but cannot be sold.
 
+**Catalog**:
+The public-facing view of `Stock` — the set of in-stock `Model`s shown to buyers on `app/public`, with each model's available `size`s surfaced as filter facets. Buyers filter it by a curated, ordered subset of jersey `type`s (deliberately excludes internal-only types like `nba`); that ordering is a merchandising choice, distinct from the canonical `ITEM_TYPES` order.
+_Avoid_: Storefront, shop, listings page.
+
 **Photo**:
 A single image attached to a `Model`. Stored in Cloudinary; identified by a `publicId` (needed to delete) and exposed as a `url`. A `Model` holds an ordered array of photos; index 0 is the primary photo (shown in listings) by convention.
 _Avoid_: Image, Picture, Thumbnail.
@@ -47,8 +51,8 @@ _Avoid_: payer, "paid by" (those described the old single-payer column, now drop
 The rule binding supplier payments to a batch's base cost. A batch is in one of three states: **empty** (nobody has paid yet — a legitimate state for initial stock carried at reference prices, no balance is touched), **exact** (the partners' payments sum to the base cost), or **mismatch** (they were entered but don't sum to it — invalid, blocked). Only `exact` and `empty` may be saved.
 
 **Sale**:
-The record of one `InventoryItem` being sold to a person. One Sale = one item. Carries the final price (typically UYU), the date, the method, and who collected the money.
-_Avoid_: Order, Transaction.
+The record of one `InventoryItem` being sold to a person. One Sale = one item. Carries the final price (typically UYU), the date, the method, and who collected the money. A sale can be **cancelled** (anulada): the row is kept as history with `status = 'cancelled'` and the unit returns to stock in its original FIFO slot. Only **active** sales count toward stock math, saldos, revenue and profit — every read path must filter through the `SALE_STATUS` constants in `domain.ts`, never a raw string.
+_Avoid_: Order, Transaction, deleting a Sale row (cancel it instead).
 
 **Expense**:
 A standalone cost in UYU or USD that is not tied to a Batch (e.g. office, fees).
@@ -75,6 +79,10 @@ The two currencies the business operates in. `InventoryItem.basePriceUsd` is the
 **Exchange rate**:
 A UYU-per-USD number, snapshotted on the `Batch` at purchase time and on the `Sale` at sale time so historical conversions stay stable.
 
+**Card surcharge bake-in**:
+Card surcharges ("recargo de tarjeta") are never stored on items or as their own column. At purchase time each item's stored `basePriceUsd` is multiplied by the **gross multiplier** — the ratio of gross cost (base cost + all card surcharges) to base cost — so stored prices are *gross*. Because supplier payments must reconcile to the base cost, the multiplier is exactly recoverable from the stored payment rows, which lets the purchase edit flow reverse the bake-in and recover **pre-tax prices** (what the supplier actually charged) without a schema change. `app/lib/pricing.ts` is the single owner of this rule — both directions and all rounding.
+_Avoid_: card tax column, storing the surcharge separately from the item price.
+
 **Live rate / Fallback rate**:
 The live rate is fetched from an external FX source (`app/lib/fx.ts`). When the live fetch fails, the system uses a hardcoded **fallback rate**; any UI that displays a converted amount derived from the fallback must surface that fact to the user (so they know they're seeing an estimate, not the rate that will be persisted).
 
@@ -89,4 +97,4 @@ The live rate is fetched from an external FX source (`app/lib/fx.ts`). When the 
 
 ## Flagged ambiguities
 
-- **`quantity` on Sale forms.** Historically the sale form has accepted a `quantity` field, but a `Sale` is 1:1 with an `InventoryItem`. The model is one Sale per item; any UI batching must be implemented as a loop at the call site, not as a `quantity` column.
+- **`quantity` on Sale forms.** Historically the sale form has accepted a `quantity` field, but a `Sale` is 1:1 with an `InventoryItem`. The model is one Sale per item; any UI batching must be implemented as a loop, not as a `quantity` column. That loop lives inside `inventory.recordSale`'s single transaction (one claim + one `Sale` insert per unit, all-or-nothing), not in the Server Action — ADR 0003 already makes Inventory the owner of every Sale write, and a per-unit loop split across N separate transactions at the action layer would allow partial fulfillment on a stock race.
