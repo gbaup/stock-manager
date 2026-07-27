@@ -471,7 +471,9 @@ function BuyDetailPanel({
             </tr>
           </thead>
           <tbody>
-            {Array.from(groupMap.values()).map((g, i) => (
+            {Array.from(groupMap.values())
+              .sort((a, b) => a.product.team.localeCompare(b.product.team))
+              .map((g, i) => (
               <tr key={i}>
                 <td>
                   <div className="dt-cell-model">
