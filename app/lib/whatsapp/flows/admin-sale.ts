@@ -1,6 +1,5 @@
 import { getModels, getUsers } from '@/app/lib/queries';
 import { matchesModel, sizeStockOf, fmtSize } from '@/app/lib/domain';
-import { getExchangeRate } from '@/app/lib/exchange-rate';
 import { saleSchema, parseOrThrow } from '@/app/lib/schemas';
 import { recordSale, NotEnoughStockError } from '@/app/lib/inventory';
 import { uyu, fmtDate, todayISO } from '@/app/lib/format';
@@ -216,25 +215,22 @@ async function finalizeSale(sale: NonNullable<ConversationData['sale']>, adminUs
 
   const qty = parseInt(draft.quantity, 10);
   const priceUyu = parseFloat(draft.price);
-  const exchangeRate = await getExchangeRate();
   const saleDate = new Date(draft.date);
 
   try {
-    for (let i = 0; i < qty; i++) {
-      await recordSale(
-        {
-          modelId: sale.modelId!,
-          size: draft.size,
-          priceUyu,
-          exchangeRate,
-          date: saleDate,
-          method: draft.method?.trim().toLowerCase() || null,
-          description: null,
-          collectedByUserId: draft.collectedByUserId || null,
-        },
-        adminUserId,
-      );
-    }
+    await recordSale(
+      {
+        modelId: sale.modelId!,
+        size: draft.size,
+        priceUyu,
+        date: saleDate,
+        method: draft.method?.trim().toLowerCase() || null,
+        description: null,
+        collectedByUserId: draft.collectedByUserId || null,
+      },
+      qty,
+      adminUserId,
+    );
   } catch (e) {
     if (e instanceof NotEnoughStockError) {
       return { step: 'start', data: {}, replies: [{ kind: 'text', body: MSG.admin.noStock }] };
