@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
-import { Swatch } from '@/components/ui/swatch';
+import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
@@ -466,15 +466,30 @@ function BuyDetailPanel({
           <thead>
             <tr>
               <th>Modelo</th>
-              <th>Talle</th>
+              <th>Detalle</th>
               <th className="num">Cant.</th>
             </tr>
           </thead>
           <tbody>
             {Array.from(groupMap.values()).map((g, i) => (
               <tr key={i}>
-                <td className="capitalize dt-team">{g.product.team} · {g.product.version}</td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{g.size.toUpperCase()}</td>
+                <td>
+                  <div className="dt-cell-model">
+                    <Swatch color={g.product.color} number={g.product.number} photo={coverOf(g.product)} className="swatch" />
+                    <div className="dt-cell-main">
+                      <div className="dt-team capitalize">{g.product.team}</div>
+                      {g.product.season && <div className="dt-meta capitalize">{g.product.season}</div>}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div className="dt-meta capitalize">
+                    <ColorDot color={g.product.color} />
+                    {g.product.version ? ` ${g.product.version}` : ''}
+                    {g.product.number ? ` · ${g.product.number}` : ''}{g.product.player ? ` ${g.product.player}` : ''}
+                    {g.size ? ` · ${g.size.toUpperCase()}` : ''}
+                  </div>
+                </td>
                 <td className="num">{g.count}</td>
               </tr>
             ))}
