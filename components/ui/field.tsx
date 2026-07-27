@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useId } from 'react';
 import { JERSEY_COLORS } from '@/app/lib/domain';
 import { X, Check, Plus, Scale } from 'lucide-react';
 import { Modal } from './modal';
@@ -193,10 +193,6 @@ export function TeamCombobox({
   const menuId = useId();
 
   const selectedTeam = localTeams.find((t) => t.id === value);
-
-  useEffect(() => {
-    if (!open) setQuery(selectedTeam?.name ?? '');
-  }, [open, selectedTeam]);
 
   const q = normTeam(query);
   const ql = q.toLowerCase();

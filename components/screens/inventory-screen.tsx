@@ -116,6 +116,7 @@ export function InventoryScreen({
     const params = new URLSearchParams(window.location.search);
     const modelId = params.get('model');
     if (!modelId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location, can't run during SSR/initial render
     selectModel(modelId);
     params.delete('model');
     const qs = params.toString();
