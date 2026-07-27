@@ -526,6 +526,38 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
   });
 }
 
+export type LedgerSaleRow = {
+  id: string;
+  price: string;
+  date: Date;
+  collected_by_user_id: string | null;
+  collected_by_alias: string | null;
+  team_name: string;
+};
+
+// Lean, flat-join sale read for the saldos ledger (raw SQL to avoid Prisma's
+// nested-include cost — see #13). This is the one place that decides which
+// sales count toward saldos: always filter through SALE_STATUS, never a raw
+// string, so a cancelled sale can't sneak into a person's balance.
+export async function getActiveSalesForLedger(): Promise<LedgerSaleRow[]> {
+  return prisma.$queryRaw<LedgerSaleRow[]>`
+    SELECT
+      s.id,
+      s.price,
+      s.date,
+      s.collected_by_user_id,
+      u.alias  AS collected_by_alias,
+      t.name   AS team_name
+    FROM sales s
+    LEFT JOIN users u  ON s.collected_by_user_id = u.id
+    JOIN inventory_items  ii ON s.inventory_item_id  = ii.id
+    JOIN catalog_products cp ON ii.catalog_product_id = cp.id
+    JOIN teams            t  ON cp.team_id            = t.id
+    WHERE s.status = ${SALE_STATUS.active}
+    ORDER BY s.date DESC
+  `;
+}
+
 export async function getTransitCount(): Promise<number> {
   'use cache';
   cacheLife('hours');

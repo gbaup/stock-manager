@@ -8,7 +8,7 @@ import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Plus, Shirt, X, Lock, Trash2 } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import {
-  sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray,
+  sizesForType, editBatchBaseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray,
 } from '@/app/lib/domain';
 import { unbakeBatch } from '@/app/lib/pricing';
 import { usd } from '@/app/lib/format';
@@ -97,10 +97,10 @@ export function PurchaseEditForm({
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
-  const editableUsd = baseCostUsd(
+  const totalUsd = editBatchBaseCostUsd(
+    lockedPreTaxTotal,
     validItems.map((it) => ({ basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0, quantity: it.quantity ?? 1 })),
   );
-  const totalUsd = lockedPreTaxTotal + editableUsd;
   const totalQty = lockedItems.length + validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
   const needsSupplierPayer = totalUsd > 0;
 

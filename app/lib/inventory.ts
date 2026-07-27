@@ -163,30 +163,40 @@ async function claimOldestAvailableItem(tx: SaleWriter, modelId: string, size: s
   return candidate.id;
 }
 
-// Atomic sale: picks the oldest available item in an arrived batch, flips it
-// to sold (writing both UYU and USD final prices), creates the matching Sale
-// row, and invalidates caches. Throws NotEnoughStockError if no item matches.
-export async function recordSale(intent: SaleIntent, loggedByUserId: string): Promise<{ saleId: string }> {
-  const saleId = await prisma.$transaction(async (tx) => {
-    const itemId = await claimOldestAvailableItem(tx, intent.modelId, intent.size);
+// Atomic sale: picks `quantity` oldest-available items in an arrived batch,
+// flips each to sold and creates its matching Sale row, all inside one
+// transaction — either every unit sells or none does. Throws
+// NotEnoughStockError (rolling back the whole batch) if any claim fails,
+// so a request for 5 when only 3 are in stock never partially fulfills.
+export async function recordSale(
+  intent: SaleIntent,
+  quantity: number,
+  loggedByUserId: string,
+): Promise<{ saleIds: string[] }> {
+  const saleIds = await prisma.$transaction(async (tx) => {
+    const ids: string[] = [];
+    for (let i = 0; i < quantity; i++) {
+      const itemId = await claimOldestAvailableItem(tx, intent.modelId, intent.size);
 
-    const sale = await tx.sale.create({
-      data: {
-        inventoryItemId: itemId,
-        userId: loggedByUserId,
-        price: intent.priceUyu,
-        date: intent.date,
-        method: intent.method,
-        description: intent.description,
-        collectedByUserId: intent.collectedByUserId,
-      },
-      select: { id: true },
-    });
-    return sale.id;
+      const sale = await tx.sale.create({
+        data: {
+          inventoryItemId: itemId,
+          userId: loggedByUserId,
+          price: intent.priceUyu,
+          date: intent.date,
+          method: intent.method,
+          description: intent.description,
+          collectedByUserId: intent.collectedByUserId,
+        },
+        select: { id: true },
+      });
+      ids.push(sale.id);
+    }
+    return ids;
   });
 
   invalidateSale();
-  return { saleId };
+  return { saleIds };
 }
 
 // Edits an active sale's details (price, date, method, collector). Details

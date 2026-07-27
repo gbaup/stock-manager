@@ -97,4 +97,4 @@ The live rate is fetched from an external FX source (`app/lib/fx.ts`). When the 
 
 ## Flagged ambiguities
 
-- **`quantity` on Sale forms.** Historically the sale form has accepted a `quantity` field, but a `Sale` is 1:1 with an `InventoryItem`. The model is one Sale per item; any UI batching must be implemented as a loop at the call site, not as a `quantity` column.
+- **`quantity` on Sale forms.** Historically the sale form has accepted a `quantity` field, but a `Sale` is 1:1 with an `InventoryItem`. The model is one Sale per item; any UI batching must be implemented as a loop, not as a `quantity` column. That loop lives inside `inventory.recordSale`'s single transaction (one claim + one `Sale` insert per unit, all-or-nothing), not in the Server Action — ADR 0003 already makes Inventory the owner of every Sale write, and a per-unit loop split across N separate transactions at the action layer would allow partial fulfillment on a stock race.

@@ -238,6 +238,19 @@ export function baseCostUsd(items: { basePriceUsd: number; quantity?: number }[]
   return items.reduce((s, it) => s + it.basePriceUsd * (it.quantity ?? 1), 0);
 }
 
+// The reconciliation target when editing a batch: locked items keep their
+// stored (already-taxed) prices, so their contribution is `lockedPreTaxTotal`
+// (from pricing.unbakeBatch) rather than a fresh baseCostUsd computation —
+// only the still-editable items get that. Both the edit form's live preview
+// and the edit action's server-side validation must reconcile against this
+// same total, or the two can silently disagree about what "paid in full" means.
+export function editBatchBaseCostUsd(
+  lockedPreTaxTotal: number,
+  editableItems: { basePriceUsd: number; quantity?: number }[],
+): number {
+  return lockedPreTaxTotal + baseCostUsd(editableItems);
+}
+
 // The reconciliation rule: given the partners' payments and the base cost, is
 // the batch `empty` (nobody paid — a valid state), `exact` (payments cover the
 // cost), or `mismatch` (paid, but the totals disagree — invalid)?

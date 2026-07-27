@@ -11,7 +11,6 @@ import {
   cancelSale as cancelSaleInventory,
   updateSaleDetails, swapSaleItem,
 } from '@/app/lib/inventory';
-import { prisma } from '@/app/lib/prisma';
 
 type SaleInput = {
   size: string;
@@ -33,29 +32,23 @@ async function executeSale(modelId: string, data: SaleInput): Promise<void> {
   const priceUyu = parseFloat(data.price);
   const saleDate = new Date(data.date);
 
-  const available = await prisma.inventoryItem.count({
-    where: { catalogProductId: modelId, size: data.size, status: 'available', shipmentId: { not: null } },
-  });
-  if (available < qty) throw new Error('Stock insuficiente');
-
-  for (let i = 0; i < qty; i++) {
-    try {
-      await recordSale(
-        {
-          modelId,
-          size: data.size,
-          priceUyu,
-          date: saleDate,
-          method: data.method?.trim().toLowerCase() || null,
-          description: data.description?.trim().toLowerCase() || null,
-          collectedByUserId: data.collectedByUserId || null,
-        },
-        userId,
-      );
-    } catch (e) {
-      if (e instanceof NotEnoughStockError) throw new Error('Stock insuficiente');
-      throw e;
-    }
+  try {
+    await recordSale(
+      {
+        modelId,
+        size: data.size,
+        priceUyu,
+        date: saleDate,
+        method: data.method?.trim().toLowerCase() || null,
+        description: data.description?.trim().toLowerCase() || null,
+        collectedByUserId: data.collectedByUserId || null,
+      },
+      qty,
+      userId,
+    );
+  } catch (e) {
+    if (e instanceof NotEnoughStockError) throw new Error('Stock insuficiente');
+    throw e;
   }
 }
 

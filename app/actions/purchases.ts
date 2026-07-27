@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
 import { computeShippingPrice } from '@/app/lib/money';
-import { baseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
+import { baseCostUsd, editBatchBaseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
 import { bakeCardTaxIntoItems, unbakeBatch } from '@/app/lib/pricing';
 import { invalidatePurchase } from '@/app/lib/cache-tags';
 
@@ -159,7 +159,7 @@ export async function updatePurchase(batchId: string, data: {
         cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
       })),
     );
-    const baseTotal = lockedPreTaxTotal + baseCostUsd(expandedItems);
+    const baseTotal = editBatchBaseCostUsd(lockedPreTaxTotal, expandedItems);
     if (reconcileSupplierPayments(payments, baseTotal).status === 'mismatch') {
       throw new Error('Los pagos al proveedor deben sumar el costo base total');
     }
