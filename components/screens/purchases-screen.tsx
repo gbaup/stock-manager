@@ -399,11 +399,13 @@ function BuyDetailPanel({
     batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
     <Tag kind="ok">recibida</Tag>;
 
-  const groupMap = new Map<string, { product: BatchSummary['items'][number]['product']; size: string; count: number }>();
+  const groupMap = new Map<string, { product: BatchSummary['items'][number]['product']; size: string; count: number; finalUsdTotal: number }>();
   batch.items.forEach((item) => {
     const key = `${item.catalogProductId}-${item.size}`;
-    const existing = groupMap.get(key) ?? { product: item.product, size: item.size, count: 0 };
+    const existing = groupMap.get(key) ?? { product: item.product, size: item.size, count: 0, finalUsdTotal: 0 };
     existing.count++;
+    // basePriceUsd is already gross (card surcharge baked in at purchase time, see app/lib/pricing.ts)
+    existing.finalUsdTotal += item.basePriceUsd;
     groupMap.set(key, existing);
   });
 
@@ -468,6 +470,7 @@ function BuyDetailPanel({
               <th>Modelo</th>
               <th>Detalle</th>
               <th className="num">Cant.</th>
+              <th className="num">Costo final</th>
             </tr>
           </thead>
           <tbody>
@@ -493,6 +496,7 @@ function BuyDetailPanel({
                   </div>
                 </td>
                 <td className="num">{g.count}</td>
+                <td className="num">{usd(g.finalUsdTotal / g.count)}</td>
               </tr>
             ))}
           </tbody>
