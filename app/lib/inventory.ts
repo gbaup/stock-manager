@@ -266,9 +266,12 @@ export async function swapSaleItem(
   await prisma.$transaction(async (tx) => {
     const sale = await tx.sale.findFirst({
       where: { id: saleId, status: SALE_STATUS.active },
-      select: { inventoryItemId: true },
+      select: { inventoryItemId: true, item: { select: { catalogProductId: true, size: true } } },
     });
     if (!sale) throw new Error('La venta no existe o fue anulada');
+    if (sale.item.catalogProductId === target.modelId && sale.item.size === target.size) {
+      throw new Error('Elegí un producto o talle distinto al actual');
+    }
 
     const newItemId = await claimOldestAvailableItem(tx, target.modelId, target.size);
 
