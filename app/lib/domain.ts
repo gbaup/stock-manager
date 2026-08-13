@@ -41,6 +41,18 @@ export const compareSizes = (a: string, b: string): number => {
   return ia - ib;
 };
 
+// Canonical version order (home before away before third...), same
+// indexOf-based pattern as compareSizes. Unknown/null versions sort last.
+const VERSION_ORDER: string[] = [...VERSIONS];
+export const compareVersions = (a: string | null, b: string | null): number => {
+  const ia = a ? VERSION_ORDER.indexOf(a.toLowerCase()) : -1;
+  const ib = b ? VERSION_ORDER.indexOf(b.toLowerCase()) : -1;
+  if (ia === -1 && ib === -1) return (a ?? '').localeCompare(b ?? '');
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+};
+
 // Public-facing label: kid numeric sizes -> age range, everything else unchanged.
 export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 

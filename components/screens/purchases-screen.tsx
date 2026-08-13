@@ -10,6 +10,7 @@ import { DModal } from '@/components/ui/d-modal';
 import { Plus, Check, ChevronRight, Pencil } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
+import { compareVersions } from '@/app/lib/domain';
 import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { PurchaseForm } from '@/components/screens/purchase-form';
@@ -45,6 +46,15 @@ export function PurchasesScreen({
       ? sorted.filter((b) => b.status !== 'arrived')
       : sorted.filter((b) => b.status === 'arrived');
   const arrivedCount = batches.filter((b) => b.status === 'arrived').length;
+
+  // Stable purchase numbering: #1 is the oldest purchase ever made, independent
+  // of the current tab/sort — so a batch's number never shifts as it moves
+  // from "en camino" to "recibidas".
+  const orderMap = new Map(
+    [...batches]
+      .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate))
+      .map((b, i) => [b.id, i + 1]),
+  );
 
   // Same modal on desktop and mobile, mirroring the sale edit in home-screen.
   const editBatch = batches.find((b) => b.id === editId) ?? null;
@@ -96,7 +106,7 @@ export function PurchasesScreen({
                   desc={tab === 'pending' ? 'Todas las compras llegaron.' : ''}
                 />
               ) : (
-                <BuyTable list={list} selected={buySel} onOpen={setBuySel} />
+                <BuyTable list={list} selected={buySel} onOpen={setBuySel} orderMap={orderMap} />
               )}
             </div>
           </div>
@@ -202,11 +212,9 @@ function PurchaseCard({
 
   const title = single
     ? `${single.team} · ${single.version}`
-    : `${uniqueProducts.length} modelos · ${qty} items`;
+    : `${qty} items`;
 
-  const sub = single
-    ? batch.supplier || batch.description || `${qty} ${qty === 1 ? 'unidad' : 'unidades'}`
-    : batch.description || uniqueProducts.map((m) => m.team).join(', ');
+  const sub = batch.supplier || batch.description || '';
 
   const tag =
     batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
@@ -220,15 +228,9 @@ function PurchaseCard({
   return (
     <div className={`purchase-card${isArrived ? '' : ' pending'}`}>
       <div className="pc-head">
-        <div className="pc-swatches">
-          {uniqueProducts.slice(0, 3).map((m, i) => (
-            <Swatch key={m.id} color={m.color} number={m.number} className="pc-sw" style={{ zIndex: 3 - i }} />
-          ))}
-          {uniqueProducts.length > 3 && <span className="pc-more">+{uniqueProducts.length - 3}</span>}
-        </div>
         <div className="pc-main">
           <div className="pc-team capitalize">{title}</div>
-          <div className="pc-sub capitalize">{sub}</div>
+          {sub && <div className="pc-sub capitalize">{sub}</div>}
         </div>
         {tag}
         <button
@@ -302,33 +304,31 @@ function BuyTable({
   list,
   selected,
   onOpen,
+  orderMap,
 }: {
   list: BatchSummary[];
   selected: string | null;
   onOpen: (id: string) => void;
+  orderMap: Map<string, number>;
 }) {
   return (
     <table className="dtable">
       <thead>
         <tr>
-          <th>Pedido</th>
-          <th className="num">Items</th>
+          <th className="num">#</th>
           <th>Fecha</th>
+          <th className="num">Items</th>
+          <th className="num">Valor</th>
           <th>Estado</th>
+          <th>Detalle</th>
         </tr>
       </thead>
       <tbody>
         {list.map((b) => {
-          const uniqueProducts = Array.from(
-            new Map(b.items.map((i) => [i.catalogProductId, i.product])).values()
-          );
           const qty = b.items.length;
-          const single = uniqueProducts.length === 1 ? uniqueProducts[0] : null;
           const isPartial = b.status === 'partial';
-          const title = single
-            ? `${single.team} · ${single.version}`
-            : `${uniqueProducts.length} modelos`;
-          const sub = single ? (b.supplier || b.description || '') : (b.description || '');
+          const detail = b.supplier || b.description || '';
+          const rowValueUsd = b.items.reduce((s, i) => s + i.basePriceUsd, 0);
           const tag =
             b.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
             b.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
@@ -346,31 +346,12 @@ function BuyTable({
                 }
               }}
             >
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="sw-stack">
-                    {uniqueProducts.slice(0, 3).map((m, i) => (
-                      <Swatch
-                        key={m.id}
-                        color={m.color}
-                        number={m.number}
-                        className="swatch"
-                        style={{ zIndex: 3 - i }}
-                      />
-                    ))}
-                    {uniqueProducts.length > 3 && (
-                      <span className="sw-stack-more">+{uniqueProducts.length - 3}</span>
-                    )}
-                  </div>
-                  <div className="dt-cell-main">
-                    <div className="dt-team capitalize">{title}</div>
-                    {sub && <div className="dt-meta capitalize">{sub}</div>}
-                  </div>
-                </div>
-              </td>
-              <td className="num">{isPartial ? `${b.arrivedQuantity ?? 0}/${qty}` : qty}</td>
+              <td className="num" style={{ color: 'var(--text-faint)' }}>{orderMap.get(b.id)}</td>
               <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>{fmtDate(b.purchaseDate)}</td>
+              <td className="num">{isPartial ? `${b.arrivedQuantity ?? 0}/${qty}` : qty}</td>
+              <td className="num">{rowValueUsd > 0 ? usd(rowValueUsd) : '—'}</td>
               <td>{tag}</td>
+              <td className="capitalize">{detail}</td>
             </tr>
           );
         })}
@@ -392,7 +373,8 @@ function BuyDetailPanel({
   const isPartial = batch.status === 'partial';
   const qty = batch.items.length;
   const totalShipUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
-  const totalCostUsd = batch.items.reduce((s, i) => s + ((i as BatchSummary['items'][number] & { basePriceUsd?: number }).basePriceUsd ?? 0), 0);
+  const totalCostUsd = batch.items.reduce((s, i) => s + i.basePriceUsd, 0);
+  const baseCostNoFeeUsd = batch.supplierPayments.reduce((s, p) => s + p.amountUsd, 0);
 
   const tag =
     batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
@@ -453,13 +435,35 @@ function BuyDetailPanel({
             <div className="v" style={{ fontSize: 15 }}>{fmtDate(batch.purchaseDate)}</div>
             <div className="l">Pedido</div>
           </div>
-          {totalCostUsd > 0 && (
+          {baseCostNoFeeUsd > 0 && (
             <div className="d-stat">
-              <div className="v" style={{ fontSize: 16 }}>{usd(totalCostUsd)}</div>
+              <div className="v" style={{ fontSize: 16 }}>{usd(baseCostNoFeeUsd)}</div>
               <div className="l">Costo base</div>
             </div>
           )}
+          {totalCostUsd > 0 && (
+            <div className="d-stat">
+              <div className="v" style={{ fontSize: 16 }}>{usd(totalCostUsd)}</div>
+              <div className="l">Costo base final</div>
+            </div>
+          )}
         </div>
+
+        {batch.supplierPayments.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+              Pago al proveedor
+            </div>
+            {batch.supplierPayments.map((p) => (
+              <div key={p.userId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                <span className="capitalize">{p.alias}</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>
+                  {usd(p.amountUsd)}{p.cardTaxPct ? ` +${p.cardTaxPct}%` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
           Items del pedido
@@ -475,7 +479,11 @@ function BuyDetailPanel({
           </thead>
           <tbody>
             {Array.from(groupMap.values())
-              .sort((a, b) => a.product.team.localeCompare(b.product.team))
+              .sort((a, b) =>
+                a.product.team.localeCompare(b.product.team) ||
+                a.product.season.localeCompare(b.product.season) ||
+                compareVersions(a.product.version, b.product.version)
+              )
               .map((g, i) => (
               <tr key={i}>
                 <td>
