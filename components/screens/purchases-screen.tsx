@@ -16,6 +16,7 @@ import type { RateResult } from '@/app/lib/exchange-rate';
 import { PurchaseForm } from '@/components/screens/purchase-form';
 import { PurchaseEditForm } from '@/components/screens/purchase-edit-form';
 import { ArrivalForm } from '@/components/screens/arrival-form';
+import { ShipmentEditForm } from '@/components/screens/shipment-edit-form';
 
 export function PurchasesScreen({
   batches,
@@ -37,6 +38,7 @@ export function PurchasesScreen({
   const [showNewPurchase, setShowNewPurchase] = useState(false);
   const [showArrival, setShowArrival] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editShipment, setEditShipment] = useState<{ batchId: string; shipmentId: string } | null>(null);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -66,6 +68,20 @@ export function PurchasesScreen({
         users={users}
         rate={rate}
         onDone={() => setEditId(null)}
+      />
+    </DModal>
+  );
+
+  const editShipmentBatch = editShipment ? batches.find((b) => b.id === editShipment.batchId) ?? null : null;
+  const editShipmentRecord = editShipmentBatch?.shipments.find((sh) => sh.id === editShipment?.shipmentId) ?? null;
+  const shipmentEditModal = editShipmentBatch && editShipmentRecord && (
+    <DModal title="Editar envío" onClose={() => setEditShipment(null)}>
+      <ShipmentEditForm
+        shipment={editShipmentRecord}
+        batchUpdatedAt={editShipmentBatch.updatedAt}
+        users={users}
+        rate={rate}
+        onDone={() => setEditShipment(null)}
       />
     </DModal>
   );
@@ -117,6 +133,7 @@ export function PurchasesScreen({
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
                 onEdit={() => setEditId(selBatch.id)}
+                onEditShipment={(shipmentId) => setEditShipment({ batchId: selBatch.id, shipmentId })}
               />
             ) : (
               <div className="detail-empty">
@@ -139,6 +156,7 @@ export function PurchasesScreen({
           </DModal>
         )}
         {editModal}
+        {shipmentEditModal}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
@@ -178,6 +196,7 @@ export function PurchasesScreen({
                   batch={b}
                   onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
                   onEdit={setEditId}
+                  onEditShipment={(shipmentId) => setEditShipment({ batchId: b.id, shipmentId })}
                 />
               ))
             )}
@@ -188,6 +207,7 @@ export function PurchasesScreen({
         <Plus size={26} strokeWidth={2.2} />
       </button>
       {editModal}
+      {shipmentEditModal}
       <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
@@ -198,10 +218,12 @@ function PurchaseCard({
   batch,
   onArrive,
   onEdit,
+  onEditShipment,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
   onEdit: (id: string) => void;
+  onEditShipment: (shipmentId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const uniqueProducts = Array.from(new Map(batch.items.map((i) => [i.catalogProductId, i.product])).values());
@@ -272,7 +294,7 @@ function PurchaseCard({
           {open && (
             <div className="ship-list">
               {batch.shipments.map((sh, i) => (
-                <ShipmentRow key={sh.id} sh={sh} index={i + 1} />
+                <ShipmentRow key={sh.id} sh={sh} index={i + 1} onEdit={() => onEditShipment(sh.id)} />
               ))}
             </div>
           )}
@@ -282,7 +304,7 @@ function PurchaseCard({
   );
 }
 
-function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
+function ShipmentRow({ sh, index, onEdit }: { sh: ShipmentRecord; index: number; onEdit: () => void }) {
   const n = sh.itemIds.length;
   const meta = [
     sh.trackingNumber,
@@ -296,6 +318,15 @@ function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
         <div className="ship-top">{fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}</div>
         <div className="ship-meta">{meta || 'sin datos de envío'}</div>
       </div>
+      <button
+        type="button"
+        className="iconbtn plain"
+        style={{ width: 26, height: 26, flexShrink: 0 }}
+        aria-label="Editar envío"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+      >
+        <Pencil size={13} strokeWidth={1.8} />
+      </button>
     </div>
   );
 }
@@ -364,10 +395,12 @@ function BuyDetailPanel({
   batch,
   onArrive,
   onEdit,
+  onEditShipment,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
   onEdit: (id: string) => void;
+  onEditShipment: (shipmentId: string) => void;
 }) {
   const isArrived = batch.status === 'arrived';
   const isPartial = batch.status === 'partial';
@@ -528,11 +561,22 @@ function BuyDetailPanel({
                 sh.shippingPaidByAlias ? `pagó ${sh.shippingPaidByAlias}` : null,
               ].filter(Boolean).join(' · ');
               return (
-                <div key={sh.id} className="ship-card">
-                  <div className="ship-card-head">
-                    #{i + 1} · {fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}
+                <div key={sh.id} className="ship-card" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="ship-card-head">
+                      #{i + 1} · {fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}
+                    </div>
+                    {meta && <div className="ship-card-meta">{meta}</div>}
                   </div>
-                  {meta && <div className="ship-card-meta">{meta}</div>}
+                  <button
+                    type="button"
+                    className="iconbtn plain"
+                    style={{ width: 26, height: 26, flexShrink: 0 }}
+                    aria-label="Editar envío"
+                    onClick={() => onEditShipment(sh.id)}
+                  >
+                    <Pencil size={13} strokeWidth={1.8} />
+                  </button>
                 </div>
               );
             })}

@@ -84,6 +84,17 @@ export const arrivalSchema = z
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
 
+// Editing a shipment's cost inputs after arrival (e.g. a mistyped weight).
+// Deliberately excludes date/tracking/itemIds — those aren't in scope for a
+// cost correction and stay locked.
+export const shipmentEditSchema = z.object({
+  shippingRateUsd: numericOptional,
+  weight: numericOptional,
+  shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+});
+
+export type ShipmentEditFormValues = z.infer<typeof shipmentEditSchema>;
+
 export const conversionSchema = z
   .object({
     fromUserId: z.string().uuid('Seleccioná el origen'),
