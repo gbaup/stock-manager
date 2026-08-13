@@ -78,6 +78,7 @@ export function PurchaseForm({
         draft.values.items[draft.pendingIndex].modelId = newModelId;
       }
       reset(draft.values);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(draft.step ?? 2);
     } catch {
       // borrador corrupto: lo ignoramos
