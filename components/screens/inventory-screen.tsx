@@ -150,7 +150,7 @@ export function InventoryScreen({
           </div>
         </header>
 
-        <div className="split">
+        <div className="split split-inventory">
           <div className="split-list">
             <div className="split-list-tools">
               <div className="search" style={{ marginTop: 0 }}>

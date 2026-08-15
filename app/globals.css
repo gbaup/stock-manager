@@ -4732,7 +4732,8 @@ body {
     overflow: hidden;
   }
 
-  .split-purchases {
+  .split-purchases,
+  .split-inventory {
     --rail-w: 520px;
   }
 
