@@ -217,7 +217,7 @@ export type SaleRecord = {
 export type TimelineEvent =
   | { type: 'sale'; date: string; data: SaleRecord; qty: number }
   | { type: 'transit'; date: string; data: BatchSummary; qty: number }
-  | { type: 'arrived'; date: string; data: BatchSummary; qty: number };
+  | { type: 'arrived'; date: string; data: BatchSummary; qty: number; shipUyuPerUnit: number; shipUsdPerUnit: number };
 
 export type ModelDetail = ModelWithStats & {
   sold: number;

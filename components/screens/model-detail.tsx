@@ -212,9 +212,7 @@ export function EventRow({ ev }: { ev: TimelineEvent }) {
   }
 
   const b = ev.data;
-  const shipUyu = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
-  const shipUsd = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
-  const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`].filter(Boolean).join(' · ');
+  const meta = [b.supplier, `llegó ${fmtDate(ev.date)}`].filter(Boolean).join(' · ');
   return (
     <div className="event">
       <div className="event-ico buy"><Package size={17} strokeWidth={1.8} /></div>
@@ -222,10 +220,10 @@ export function EventRow({ ev }: { ev: TimelineEvent }) {
         <div className="event-title">Recibida · {ev.qty} u.</div>
         <div className="event-sub">{meta}</div>
       </div>
-      {shipUyu > 0 && (
+      {ev.shipUyuPerUnit > 0 && (
         <div className="event-amt" style={{ color: 'var(--text-muted)' }}>
-          envío {uyu(shipUyu)}
-          {shipUsd > 0 && <span className="sec">{usd(shipUsd)}</span>}
+          envío {uyu(ev.shipUyuPerUnit)} c/u
+          {ev.shipUsdPerUnit > 0 && <span className="sec">{usd(ev.shipUsdPerUnit)} c/u</span>}
         </div>
       )}
     </div>

@@ -259,10 +259,12 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   const events: TimelineEvent[] = [];
 
-  // itemId -> allocated UYU shipping cost for that unit. Built per batch so the
+  // itemId -> allocated shipping cost for that unit. Built per batch so the
   // equal-split denominator counts every item in a shipment, not just this
   // model's. Items with no resolvable shipping (in transit) are simply absent.
+  // UYU feeds the profit calc below; USD is display-only (timeline "envío" line).
   const shippingShareByItem = new Map<string, number>();
+  const shippingShareUsdByItem = new Map<string, number>();
 
   // The summary needs ALL items of each batch (for accurate shipment grouping
   // and shipping totals), even though this page only renders this model's units.
@@ -287,8 +289,12 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
     if (batchData.shipments.length > 0) {
       for (const sh of batchData.shipments) {
-        const share = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
-        for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
+        const shareUyu = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
+        const shareUsd = shippingShareUyu(sh.shippingPriceUsd, sh.itemIds.length);
+        for (const itemId of sh.itemIds) {
+          shippingShareByItem.set(itemId, shareUyu);
+          shippingShareUsdByItem.set(itemId, shareUsd);
+        }
       }
     }
 
@@ -304,14 +310,31 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       });
     }
     if (arrivedForModel > 0) {
-      const lastDate = batchData.shipments.length
-        ? batchData.shipments[batchData.shipments.length - 1].date
-        : toISODate(batch.purchaseDate)!;
+      // A batch can arrive across several partial shipments over time; this
+      // model's units may have come in an earlier one than the batch's overall
+      // last shipment. Use the latest shipment date among THIS model's arrived
+      // items, not the batch-wide last, so the date matches what actually
+      // happened to these units (and sorts correctly against sales of them).
+      const shipmentDateById = new Map(batchData.shipments.map((sh) => [sh.id, sh.date]));
+      const arrivedItems = items.filter((i) => i.shipmentId);
+      const lastDate = arrivedItems.reduce(
+        (max, i) => {
+          const d = shipmentDateById.get(i.shipmentId!);
+          return d && d > max ? d : max;
+        },
+        toISODate(batch.purchaseDate)!,
+      );
+      // Average this model's own per-unit shipping share, not the batch total —
+      // a shipment can carry many other models' units too.
+      const totalShipUyu = arrivedItems.reduce((s, i) => s + (shippingShareByItem.get(i.id) ?? 0), 0);
+      const totalShipUsd = arrivedItems.reduce((s, i) => s + (shippingShareUsdByItem.get(i.id) ?? 0), 0);
       events.push({
         type: 'arrived',
         date: lastDate,
         data: batchData,
         qty: arrivedForModel,
+        shipUyuPerUnit: totalShipUyu / arrivedForModel,
+        shipUsdPerUnit: totalShipUsd / arrivedForModel,
       });
     }
   }
