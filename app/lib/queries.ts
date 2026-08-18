@@ -305,11 +305,16 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     // visible even after every unit has arrived, so the timeline shows the full
     // lifecycle (ordered, then received) instead of losing the order once the
     // 'transit' event disappears.
+    // basePriceUsd/basePriceUyu are stored GROSS (card surcharge already baked
+    // in, see pricing.ts), so this average is the real per-unit price paid —
+    // no separate fee lookup needed.
     events.push({
       type: 'purchase',
       date: toISODate(batch.purchaseDate)!,
       data: batchData,
       qty: items.length,
+      priceUyuPerUnit: items.reduce((s, i) => s + Number(i.basePriceUyu), 0) / items.length,
+      priceUsdPerUnit: items.reduce((s, i) => s + Number(i.basePriceUsd), 0) / items.length,
     });
 
     if (transitForModel > 0) {

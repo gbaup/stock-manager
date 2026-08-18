@@ -652,6 +652,12 @@ function PanelEventRow({ ev }: { ev: TimelineEvent }) {
           <div className="event-title">Compra · {ev.qty} u.</div>
           <div className="event-sub">{meta}</div>
         </div>
+        {ev.priceUyuPerUnit > 0 && (
+          <div className="event-amt" style={{ color: 'var(--text-muted)' }}>
+            {uyu(ev.priceUyuPerUnit)} c/u
+            {ev.priceUsdPerUnit > 0 && <span className="sec">{usd(ev.priceUsdPerUnit)} c/u</span>}
+          </div>
+        )}
       </div>
     );
   }
