@@ -1387,6 +1387,11 @@ body {
   color: oklch(0.5 0.11 60);
 }
 
+.event-ico.purchase {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
 .event-main {
   flex: 1;
   min-width: 0;

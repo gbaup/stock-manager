@@ -7,7 +7,7 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
-import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ChevronDown, ChevronRight } from 'lucide-react';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
@@ -637,6 +637,20 @@ function PanelEventRow({ ev }: { ev: TimelineEvent }) {
           <span className="sec" style={{ color: s.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
             {signedUyu(s.profit)}
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === 'purchase') {
+    const b = ev.data;
+    const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
+    return (
+      <div className="event">
+        <div className="event-ico purchase"><ShoppingCart size={17} strokeWidth={1.8} /></div>
+        <div className="event-main">
+          <div className="event-title">Compra · {ev.qty} u.</div>
+          <div className="event-sub">{meta}</div>
         </div>
       </div>
     );

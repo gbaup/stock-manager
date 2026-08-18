@@ -301,6 +301,17 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     const arrivedForModel = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
     const transitForModel = items.length - arrivedForModel;
 
+    // The purchase order itself, independent of shipment/arrival status — kept
+    // visible even after every unit has arrived, so the timeline shows the full
+    // lifecycle (ordered, then received) instead of losing the order once the
+    // 'transit' event disappears.
+    events.push({
+      type: 'purchase',
+      date: toISODate(batch.purchaseDate)!,
+      data: batchData,
+      qty: items.length,
+    });
+
     if (transitForModel > 0) {
       events.push({
         type: 'transit',
