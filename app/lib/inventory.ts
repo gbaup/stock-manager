@@ -368,9 +368,13 @@ export async function sellReservedItem(
       },
       select: { id: true },
     });
+
+    return sale.id;
   });
 
   invalidateSale();
+
+  return { saleId };
 }
 
 // Exported so callers that have already fetched items (e.g. detail pages
