@@ -42,21 +42,13 @@ export function InventoryScreen({
   const [showNewModel, setShowNewModel] = useState(false);
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
-  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try {
-      return new Set(JSON.parse(localStorage.getItem('inv-expanded-teams') ?? '[]'));
-    } catch {
-      return new Set();
-    }
-  });
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => new Set());
 
   function toggleTeam(team: string) {
     setExpandedTeams((prev) => {
       const next = new Set(prev);
       if (next.has(team)) next.delete(team);
       else next.add(team);
-      localStorage.setItem('inv-expanded-teams', JSON.stringify([...next]));
       return next;
     });
   }
