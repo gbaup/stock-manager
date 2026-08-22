@@ -235,12 +235,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const stock = counts.available;
   const inTransit = counts.inTransit;
 
-  // Sizes with available stock (shipped + not sold), with per-size counts.
+  // Items with available stock (shipped + not sold).
+  const availableItems = p.items.filter((i) => i.status === 'available' && i.shipmentId !== null);
   const sizeCounts = new Map<string, number>();
-  for (const i of p.items) {
-    if (i.status === 'available' && i.shipmentId !== null) {
-      sizeCounts.set(i.size, (sizeCounts.get(i.size) ?? 0) + 1);
-    }
+  for (const i of availableItems) {
+    sizeCounts.set(i.size, (sizeCounts.get(i.size) ?? 0) + 1);
   }
   const availableBySize = [...sizeCounts].map(([size, count]) => ({ size, count }));
   // The include above filters to active sales, so sales[0] is the item's
@@ -355,16 +354,41 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     }
   }
 
-  // Landed cost of one sold unit, in UYU: its base price plus the shipping
-  // share resolved above (0 while in transit).
-  const itemCostUyu = (i: typeof soldItems[0]) =>
+  // Landed cost of one unit, base price plus the shipping share resolved
+  // above (0 while in transit). Shared by sold-item profit math and the
+  // available-stock cost summary below.
+  const itemCostUyu = (i: typeof p.items[0]) =>
     Number(i.basePriceUyu) + (shippingShareByItem.get(i.id) ?? 0);
+  const itemCostUsd = (i: typeof p.items[0]) =>
+    Number(i.basePriceUsd) + (shippingShareUsdByItem.get(i.id) ?? 0);
 
   const cost = soldItems.reduce((s, i) => s + itemCostUyu(i), 0);
   const profit = revenue - cost;
   // A unit sold before it arrived has no shipping share yet, so its profit is
   // provisional until its shipment lands.
   const profitPending = soldItems.some((i) => !i.shipmentId);
+
+  // Landed cost of currently available (arrived, unsold) stock — the capital
+  // tied up in this model right now — total, average, and broken down by size.
+  const stockCostUyu = availableItems.reduce((s, i) => s + itemCostUyu(i), 0);
+  const stockCostUsd = availableItems.reduce((s, i) => s + itemCostUsd(i), 0);
+  const avgCostUyu = availableItems.length ? stockCostUyu / availableItems.length : 0;
+  const avgCostUsd = availableItems.length ? stockCostUsd / availableItems.length : 0;
+
+  const costBySizeMap = new Map<string, { count: number; totalUyu: number; totalUsd: number }>();
+  for (const i of availableItems) {
+    const entry = costBySizeMap.get(i.size) ?? { count: 0, totalUyu: 0, totalUsd: 0 };
+    entry.count += 1;
+    entry.totalUyu += itemCostUyu(i);
+    entry.totalUsd += itemCostUsd(i);
+    costBySizeMap.set(i.size, entry);
+  }
+  const costBySize = [...costBySizeMap].map(([size, { count, totalUyu, totalUsd }]) => ({
+    size,
+    count,
+    avgCostUyu: totalUyu / count,
+    avgCostUsd: totalUsd / count,
+  }));
 
   // Group sales by (date, collectedByUserId, size) so each collector gets their
   // own event per day, split by size — sizes now carry distinct cost/profit.
@@ -412,6 +436,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     revenue,
     profit,
     profitPending,
+    stockCostUyu,
+    stockCostUsd,
+    avgCostUyu,
+    avgCostUsd,
+    costBySize,
     events,
   };
 }

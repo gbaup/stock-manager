@@ -5342,6 +5342,17 @@ body {
   .d-stat.ok .v { color: var(--accent); }
   .d-stat.warn .v { color: var(--warn); }
 
+  .d-stat .money-sec {
+    display: block;
+    margin-top: 2px;
+  }
+
+  .d-costgrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
   .d-actions {
     display: flex;
     gap: 8px;
@@ -5381,6 +5392,13 @@ body {
     font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.02em;
+    margin-top: 2px;
+  }
+
+  .d-size-cell .sz-c {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-faint);
     margin-top: 2px;
   }
 

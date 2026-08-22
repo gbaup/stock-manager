@@ -228,8 +228,22 @@ export type ModelDetail = ModelWithStats & {
   // still in transit, so its shipping share — and thus its profit — isn't final.
   profit: number;
   profitPending: boolean;
+  // Landed cost (base price + allocated shipping) of currently available
+  // (arrived, unsold) stock — i.e. capital tied up in this model right now.
+  stockCostUyu: number;
+  stockCostUsd: number;
+  avgCostUyu: number;
+  avgCostUsd: number;
+  costBySize: { size: string; count: number; avgCostUyu: number; avgCostUsd: number }[];
   events: TimelineEvent[];
 };
+
+// Size -> average landed cost of available stock, the per-size counterpart to
+// sizeStockOf. Absent for sizes with no available stock.
+export const costBySizeOf = (
+  model: { costBySize: { size: string; avgCostUyu: number; avgCostUsd: number }[] },
+): Record<string, { avgCostUyu: number; avgCostUsd: number }> =>
+  Object.fromEntries(model.costBySize.map((s) => [s.size, { avgCostUyu: s.avgCostUyu, avgCostUsd: s.avgCostUsd }]));
 
 // Equal-split shipping allocation: each item in a shipment carries the same
 // share of that shipment's UYU shipping cost. The single place this rule

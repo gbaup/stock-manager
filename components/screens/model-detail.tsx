@@ -9,7 +9,7 @@ import { Empty } from '@/components/ui/empty';
 import { ChevronUp, ChevronDown, Tag as TagIcon, Truck, Package, ShoppingCart } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
-import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
+import { fmtType, compareSizes, sizeStockOf, costBySizeOf } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent } from '@/app/lib/domain';
 
 export function ModelDetailScreen({
@@ -27,6 +27,7 @@ export function ModelDetailScreen({
   const events = filter === 'Ventas' ? model.events.filter((e) => e.type === 'sale') : model.events;
 
   const sizeStock = sizeStockOf(model);
+  const sizeCost = costBySizeOf(model);
   const usesAdultSizes = ['fan', 'player', 'retro'].includes(model.type ?? '');
   const displaySizes: string[] = usesAdultSizes
     ? (() => {
@@ -90,6 +91,21 @@ export function ModelDetailScreen({
             <div className="stat"><div className="v">{model.sold}</div><div className="l">Vendidas</div></div>
           </div>
 
+          {model.stock > 0 && (
+            <div className="stat-row">
+              <div className="stat">
+                <div className="v" style={{ fontSize: 20 }}>{uyu(model.stockCostUyu)}</div>
+                <div className="money-sec" style={{ marginTop: 2 }}>{usd(model.stockCostUsd)}</div>
+                <div className="l">Costo en stock</div>
+              </div>
+              <div className="stat">
+                <div className="v" style={{ fontSize: 20 }}>{uyu(model.avgCostUyu)}</div>
+                <div className="money-sec" style={{ marginTop: 2 }}>{usd(model.avgCostUsd)}</div>
+                <div className="l">Costo promedio</div>
+              </div>
+            </div>
+          )}
+
           {displaySizes.length > 0 && (
             <>
               <div
@@ -103,10 +119,14 @@ export function ModelDetailScreen({
                 <div className="stat-row" style={{ flexWrap: 'wrap' }}>
                   {displaySizes.map((size) => {
                     const count = sizeStock[size] ?? 0;
+                    const avgCostUyu = sizeCost[size]?.avgCostUyu;
                     return (
                       <div key={size} className={`stat${count > 0 ? ' ok' : ''}`}>
                         <div className="v" style={{ fontSize: '20px' }}>{count}</div>
                         <div className="l">{size.toUpperCase()}</div>
+                        {count > 0 && avgCostUyu !== undefined && (
+                          <div className="money-sec" style={{ fontSize: 9, marginTop: 3 }}>{uyu(avgCostUyu)}</div>
+                        )}
                       </div>
                     );
                   })}

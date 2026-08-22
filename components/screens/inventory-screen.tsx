@@ -9,7 +9,7 @@ import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
 import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
-import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
+import { fmtType, compareSizes, sizeStockOf, costBySizeOf } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { fetchModelDetail } from '@/app/actions/read';
@@ -481,6 +481,7 @@ function ModelDetailPanel({
     : model.events;
 
   const sizeStock = sizeStockOf(model);
+  const sizeCost = costBySizeOf(model);
   const usesAdultSizes = ['fan', 'player', 'retro'].includes(model.type ?? '');
   const displaySizes: string[] = usesAdultSizes
     ? (() => {
@@ -534,6 +535,21 @@ function ModelDetailPanel({
           </div>
         </div>
 
+        {model.stock > 0 && (
+          <div className="d-costgrid">
+            <div className="d-stat">
+              <div className="v">{uyu(model.stockCostUyu)}</div>
+              <div className="money-sec">{usd(model.stockCostUsd)}</div>
+              <div className="l">Costo en stock</div>
+            </div>
+            <div className="d-stat">
+              <div className="v">{uyu(model.avgCostUyu)}</div>
+              <div className="money-sec">{usd(model.avgCostUsd)}</div>
+              <div className="l">Costo promedio</div>
+            </div>
+          </div>
+        )}
+
         <div className="d-actions">
           <button
             className="btn btn-primary"
@@ -551,6 +567,7 @@ function ModelDetailPanel({
             <div className="d-sizes">
               {displaySizes.map((size) => {
                 const count = sizeStock[size] ?? 0;
+                const avgCostUyu = sizeCost[size]?.avgCostUyu;
                 return (
                   <div key={size} className="d-size-cell">
                     <span className="sz-l">{size.toUpperCase()}</span>
@@ -560,6 +577,9 @@ function ModelDetailPanel({
                     >
                       {count}
                     </span>
+                    {count > 0 && avgCostUyu !== undefined && (
+                      <span className="sz-c">{uyu(avgCostUyu)}</span>
+                    )}
                   </div>
                 );
               })}
