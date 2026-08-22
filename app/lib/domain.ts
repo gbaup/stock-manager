@@ -41,6 +41,18 @@ export const compareSizes = (a: string, b: string): number => {
   return ia - ib;
 };
 
+// Canonical version order (home before away before third...), same
+// indexOf-based pattern as compareSizes. Unknown/null versions sort last.
+const VERSION_ORDER: string[] = [...VERSIONS];
+export const compareVersions = (a: string | null, b: string | null): number => {
+  const ia = a ? VERSION_ORDER.indexOf(a.toLowerCase()) : -1;
+  const ib = b ? VERSION_ORDER.indexOf(b.toLowerCase()) : -1;
+  if (ia === -1 && ib === -1) return (a ?? '').localeCompare(b ?? '');
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+};
+
 // Public-facing label: kid numeric sizes -> age range, everything else unchanged.
 export const fmtSize = (size: string): string => KID_SIZE_LABELS[size] ?? size;
 
@@ -92,6 +104,9 @@ export type ModelMeta = {
 export type ModelWithStats = ModelMeta & {
   stock: number;
   inTransit: number;
+  // Units bought for a client but not yet handed over — excluded from `stock`
+  // and from the public catalog, but tracked separately so they aren't lost.
+  reserved: number;
   // Sizes that currently have stock, with their available unit counts. Drives
   // the size picker on the sale forms so a sale consumes the right size (FIFO
   // is applied *within* the chosen size).
@@ -170,6 +185,11 @@ export type BatchSummary = {
   shippingPriceUyu: number | null;
   weight: number | null;
   status: PurchaseStatus;
+  // Sum of items' basePriceUsd (gross, card surcharge baked in) and of
+  // supplierPayments' amountUsd — computed once here so callers don't each
+  // re-derive the same sums from items/supplierPayments.
+  totalCostUsd: number;
+  baseCostNoFeeUsd: number;
   supplierPayments: Array<{ userId: string; alias: string; amountUsd: number; cardTaxPct: number | null }>;
   shippingPaidByUserId: string | null;
   shippingPaidByAlias: string | null;
@@ -188,6 +208,12 @@ export type BatchSummary = {
 export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
 export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 
+// An InventoryItem's lifecycle: 'available' (sellable) -> 'reserved' (spoken
+// for by a client, hidden from the public catalog) -> 'sold', or back to
+// 'available' if a reservation is released.
+export const INVENTORY_STATUS = { available: 'available', reserved: 'reserved', sold: 'sold' } as const;
+export type InventoryStatus = (typeof INVENTORY_STATUS)[keyof typeof INVENTORY_STATUS];
+
 export type SaleRecord = {
   id: string;
   catalogProductId: string;
@@ -204,8 +230,9 @@ export type SaleRecord = {
 
 export type TimelineEvent =
   | { type: 'sale'; date: string; data: SaleRecord; qty: number }
+  | { type: 'purchase'; date: string; data: BatchSummary; qty: number; priceUyuPerUnit: number; priceUsdPerUnit: number }
   | { type: 'transit'; date: string; data: BatchSummary; qty: number }
-  | { type: 'arrived'; date: string; data: BatchSummary; qty: number };
+  | { type: 'arrived'; date: string; data: BatchSummary; qty: number; shipUyuPerUnit: number; shipUsdPerUnit: number };
 
 export type ModelDetail = ModelWithStats & {
   sold: number;
@@ -215,8 +242,26 @@ export type ModelDetail = ModelWithStats & {
   // still in transit, so its shipping share — and thus its profit — isn't final.
   profit: number;
   profitPending: boolean;
+  // Landed cost (base price + allocated shipping) of currently available
+  // (arrived, unsold) stock — i.e. capital tied up in this model right now.
+  stockCostUyu: number;
+  stockCostUsd: number;
+  avgCostUyu: number;
+  avgCostUsd: number;
+  costBySize: { size: string; count: number; avgCostUyu: number; avgCostUsd: number }[];
+  // Reserved counterparts to availableBySize / the individual units behind
+  // them, for the "Reservado" list (each with a Vender/Liberar action).
+  reservedBySize: { size: string; count: number }[];
+  reservedItems: { id: string; size: string; note: string | null; reservedAt: string }[];
   events: TimelineEvent[];
 };
+
+// Size -> average landed cost of available stock, the per-size counterpart to
+// sizeStockOf. Absent for sizes with no available stock.
+export const costBySizeOf = (
+  model: { costBySize: { size: string; avgCostUyu: number; avgCostUsd: number }[] },
+): Record<string, { avgCostUyu: number; avgCostUsd: number }> =>
+  Object.fromEntries(model.costBySize.map((s) => [s.size, { avgCostUyu: s.avgCostUyu, avgCostUsd: s.avgCostUsd }]));
 
 // Equal-split shipping allocation: each item in a shipment carries the same
 // share of that shipment's UYU shipping cost. The single place this rule

@@ -20,6 +20,28 @@ export function useIsDesktop() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
+// Shared by ArrivalForm and ShipmentEditForm: warns before saving a shipment
+// that has a shipping cost (rate + weight both set) but no payer chosen, so
+// the cost doesn't silently go undiscounted from anyone's balance.
+export function useShippingPayerConfirm<T extends { shippingPaidByUserId?: string }>(
+  watchedShipUsd: string | null | undefined,
+  watchedWeight: string | null | undefined,
+  doSubmit: (data: T) => void,
+) {
+  const hasShip = (parseFloat(watchedShipUsd || '') || 0) > 0 && (parseFloat(watchedWeight || '') || 0) > 0;
+  const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
+
+  function onSubmit(data: T) {
+    if (hasShip && !data.shippingPaidByUserId) {
+      requestConfirm(data);
+      return;
+    }
+    doSubmit(data);
+  }
+
+  return { hasShip, onSubmit, showConfirm, confirm, cancel };
+}
+
 export function useConfirmGate<T>(doSubmit: (data: T) => void) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingData, setPendingData] = useState<T | null>(null);

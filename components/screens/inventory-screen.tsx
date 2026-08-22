@@ -7,14 +7,19 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
-import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ChevronDown, ChevronRight } from 'lucide-react';
+import { Modal } from '@/components/ui/modal';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark, Share2 } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
-import { fmtType, compareSizes, sizeStockOf } from '@/app/lib/domain';
+import { fmtType, compareSizes, sizeStockOf, costBySizeOf, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { fetchModelDetail } from '@/app/actions/read';
 import { ModelForm } from '@/components/screens/model-form';
 import { SaleForm } from '@/components/screens/sale-form';
+import { ReserveForm } from '@/components/screens/reserve-form';
+import { ReservedSaleForm } from '@/components/screens/reserved-sale-form';
+import { ShareStockModal } from '@/components/screens/share-stock-modal';
+import { releaseReservation } from '@/app/actions/reservations';
 
 type Layout = 'cards' | 'rows' | 'grid';
 type Filter = 'all' | 'instock' | 'transit' | 'out';
@@ -42,34 +47,20 @@ export function InventoryScreen({
   const [showNewModel, setShowNewModel] = useState(false);
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
-  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try {
-      return new Set(JSON.parse(localStorage.getItem('inv-expanded-teams') ?? '[]'));
-    } catch {
-      return new Set();
-    }
-  });
+  const [showReserveModal, setShowReserveModal] = useState(false);
+  const [showShareStock, setShowShareStock] = useState(false);
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => new Set());
 
   function toggleTeam(team: string) {
     setExpandedTeams((prev) => {
       const next = new Set(prev);
       if (next.has(team)) next.delete(team);
       else next.add(team);
-      localStorage.setItem('inv-expanded-teams', JSON.stringify([...next]));
       return next;
     });
   }
 
-  const q = query.trim().toLowerCase();
-  let list = models.filter((m) => {
-    if (!q) return true;
-    return [m.team, m.season, m.version, m.color, m.player, m.number, m.type]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .includes(q);
-  });
+  let list = models.filter((m) => matchesModel(m, query));
   if (filter === 'instock') list = list.filter((m) => m.stock > 0);
   else if (filter === 'out') list = list.filter((m) => m.stock === 0);
   else if (filter === 'transit') list = list.filter((m) => m.inTransit > 0);
@@ -109,6 +100,17 @@ export function InventoryScreen({
     });
   }
 
+  // Re-fetches the currently open detail panel — used after reserve/liberar/
+  // vender actions, which (unlike a plain sale) need their effect to show up
+  // immediately in the still-open panel rather than on the next selection.
+  function refreshDetail() {
+    if (!invSel) return;
+    startDetailTransition(async () => {
+      const detail = await fetchModelDetail(invSel);
+      setSelDetail(detail);
+    });
+  }
+
   const isDesktop = useIsDesktop();
 
   useEffect(() => {
@@ -116,6 +118,7 @@ export function InventoryScreen({
     const params = new URLSearchParams(window.location.search);
     const modelId = params.get('model');
     if (!modelId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     selectModel(modelId);
     params.delete('model');
     const qs = params.toString();
@@ -143,13 +146,21 @@ export function InventoryScreen({
                 : <LayoutGrid size={16} strokeWidth={1.8} />
               }
             </button>
+            <button
+              className="iconbtn plain"
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowShareStock(true)}
+              title="Compartir stock"
+            >
+              <Share2 size={16} strokeWidth={1.8} />
+            </button>
             <button className="btn btn-primary" onClick={() => setShowNewModel(true)}>
               Nuevo modelo
             </button>
           </div>
         </header>
 
-        <div className="split">
+        <div className="split split-inventory">
           <div className="split-list">
             <div className="split-list-tools">
               <div className="search" style={{ marginTop: 0 }}>
@@ -205,8 +216,11 @@ export function InventoryScreen({
               <ModelDetailPanel
                 model={selDetail}
                 loading={detailPending}
+                users={users}
                 onSell={() => setShowSaleModal(true)}
                 onEdit={() => setShowEditModel(true)}
+                onReserve={() => setShowReserveModal(true)}
+                onChanged={refreshDetail}
               />
             ) : (
               <DetailEmpty />
@@ -228,6 +242,17 @@ export function InventoryScreen({
           <DModal title="Registrar venta" size="md" onClose={() => setShowSaleModal(false)}>
             <SaleForm model={selDetail} stock={selDetail.stock} usdRate={usdRate} users={users} onDone={() => setShowSaleModal(false)} />
           </DModal>
+        )}
+        {showReserveModal && selDetail && (
+          <DModal title="Reservar stock" size="md" onClose={() => setShowReserveModal(false)}>
+            <ReserveForm
+              model={selDetail}
+              onDone={() => { setShowReserveModal(false); refreshDetail(); }}
+            />
+          </DModal>
+        )}
+        {showShareStock && (
+          <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
         )}
 
         <Sidebar transitCount={transitCount} />
@@ -255,6 +280,14 @@ export function InventoryScreen({
                 {l === 'cards' ? <Package size={16} strokeWidth={1.8} /> : l === 'rows' ? <List size={16} strokeWidth={1.8} /> : <LayoutGrid size={16} strokeWidth={1.8} />}
               </button>
             ))}
+            <button
+              className="iconbtn plain"
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowShareStock(true)}
+              title="Compartir stock"
+            >
+              <Share2 size={16} strokeWidth={1.8} />
+            </button>
           </div>
         }
       />
@@ -303,6 +336,9 @@ export function InventoryScreen({
       <button className="fab" onClick={() => router.push('/inventory/new')} aria-label="Agregar modelo">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      {showShareStock && (
+        <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
+      )}
       <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
@@ -322,6 +358,7 @@ function CardList({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: strin
               <Tag><ColorDot color={m.color} />{m.color}</Tag>
               {m.player && <Tag kind="player" className="capitalize">{m.number} {m.player}</Tag>}
               {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}
+              {m.reserved > 0 && <Tag kind="reserved">+{m.reserved} reservado</Tag>}
             </div>
           </div>
           <div className="mcard-stock">
@@ -423,6 +460,11 @@ function InvTable({
                 {m.color ? ` · ${m.color}` : ''}
                 {m.player ? ` · ${m.player}` : ''}
               </div>
+              {m.reserved > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <Tag kind="reserved">+{m.reserved} reservado</Tag>
+                </div>
+              )}
             </div>
           </div>
         </td>
@@ -473,21 +515,48 @@ function DetailEmpty() {
 function ModelDetailPanel({
   model,
   loading,
+  users,
   onSell,
   onEdit,
+  onReserve,
+  onChanged,
 }: {
   model: ModelDetail;
   loading?: boolean;
+  users: UserSummary[];
   onSell: () => void;
   onEdit: () => void;
+  onReserve: () => void;
+  onChanged: () => void;
 }) {
   const [evFilter, setEvFilter] = useState<'Ventas' | 'Todos'>('Ventas');
+  const [sellingItemId, setSellingItemId] = useState<string | null>(null);
+  const [releasingItemId, setReleasingItemId] = useState<string | null>(null);
+  const [releasePending, startReleaseTransition] = useTransition();
+  const [releaseError, setReleaseError] = useState<string | null>(null);
   const cover = coverOf(model);
   const events = evFilter === 'Ventas'
     ? model.events.filter((e) => e.type === 'sale')
     : model.events;
 
   const sizeStock = sizeStockOf(model);
+  const sizeCost = costBySizeOf(model);
+  const reservedBySizeMap = Object.fromEntries(model.reservedBySize.map((s) => [s.size, s.count]));
+  const sellingItem = model.reservedItems.find((i) => i.id === sellingItemId) ?? null;
+
+  function confirmRelease() {
+    if (!releasingItemId) return;
+    setReleaseError(null);
+    startReleaseTransition(async () => {
+      try {
+        await releaseReservation(releasingItemId);
+        setReleasingItemId(null);
+        onChanged();
+      } catch (e) {
+        setReleaseError(e instanceof Error ? e.message : 'Error al liberar la reserva');
+      }
+    });
+  }
   const usesAdultSizes = ['fan', 'player', 'retro'].includes(model.type ?? '');
   const displaySizes: string[] = usesAdultSizes
     ? (() => {
@@ -536,10 +605,29 @@ function ModelDetailPanel({
             <div className="l">En camino</div>
           </div>
           <div className="d-stat">
+            <div className="v">{model.reserved}</div>
+            <div className="l">Reservado</div>
+          </div>
+          <div className="d-stat">
             <div className="v">{model.sold}</div>
             <div className="l">Vendidas</div>
           </div>
         </div>
+
+        {model.stock > 0 && (
+          <div className="d-costgrid">
+            <div className="d-stat">
+              <div className="v">{uyu(model.stockCostUyu)}</div>
+              <div className="money-sec">{usd(model.stockCostUsd)}</div>
+              <div className="l">Costo en stock</div>
+            </div>
+            <div className="d-stat">
+              <div className="v">{uyu(model.avgCostUyu)}</div>
+              <div className="money-sec">{usd(model.avgCostUsd)}</div>
+              <div className="l">Costo promedio</div>
+            </div>
+          </div>
+        )}
 
         <div className="d-actions">
           <button
@@ -550,6 +638,14 @@ function ModelDetailPanel({
           >
             <TagIcon size={16} strokeWidth={1.8} />Registrar venta
           </button>
+          <button
+            className="btn btn-secondary"
+            onClick={onReserve}
+            disabled={model.stock === 0}
+            style={{ flex: 1 }}
+          >
+            <Bookmark size={16} strokeWidth={1.8} />Reservar
+          </button>
         </div>
 
         {displaySizes.length > 0 && (
@@ -558,6 +654,8 @@ function ModelDetailPanel({
             <div className="d-sizes">
               {displaySizes.map((size) => {
                 const count = sizeStock[size] ?? 0;
+                const avgCostUyu = sizeCost[size]?.avgCostUyu;
+                const reservedCount = reservedBySizeMap[size] ?? 0;
                 return (
                   <div key={size} className="d-size-cell">
                     <span className="sz-l">{size.toUpperCase()}</span>
@@ -567,9 +665,42 @@ function ModelDetailPanel({
                     >
                       {count}
                     </span>
+                    {count > 0 && avgCostUyu !== undefined && (
+                      <span className="sz-c">{uyu(avgCostUyu)}</span>
+                    )}
+                    {reservedCount > 0 && (
+                      <span className="sz-c" style={{ color: 'oklch(0.44 0.13 310)' }}>{reservedCount} res.</span>
+                    )}
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {model.reservedItems.length > 0 && (
+          <div>
+            <div className="d-section-label" style={{ marginBottom: 8 }}>Reservado</div>
+            <div className="timeline">
+              {model.reservedItems.map((item) => (
+                <div key={item.id} className="event">
+                  <div className="event-ico reserved"><Bookmark size={17} strokeWidth={1.8} /></div>
+                  <div className="event-main">
+                    <div className="event-title">Talle {item.size.toUpperCase()}</div>
+                    <div className="event-sub">
+                      {item.note ? item.note : 'Sin nota'} · desde {fmtDate(item.reservedAt)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12.5 }} onClick={() => setReleasingItemId(item.id)}>
+                      Liberar
+                    </button>
+                    <button className="btn btn-primary" style={{ padding: '6px 10px', fontSize: 12.5 }} onClick={() => setSellingItemId(item.id)}>
+                      Vender
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -610,6 +741,29 @@ function ModelDetailPanel({
           </div>
         )}
       </div>
+
+      {sellingItem && (
+        <DModal title="Registrar venta" size="md" onClose={() => setSellingItemId(null)}>
+          <ReservedSaleForm
+            model={model}
+            item={sellingItem}
+            users={users}
+            onDone={() => { setSellingItemId(null); onChanged(); }}
+          />
+        </DModal>
+      )}
+
+      {releasingItemId && (
+        <Modal
+          icon="check"
+          title="¿Liberar esta reserva?"
+          confirmLabel={releasePending ? 'Liberando…' : 'Liberar'}
+          onCancel={() => { setReleasingItemId(null); setReleaseError(null); }}
+          onConfirm={confirmRelease}
+        >
+          {releaseError ?? 'La unidad vuelve a stock disponible y deja de estar reservada.'}
+        </Modal>
+      )}
     </>
   );
 }
@@ -641,6 +795,26 @@ function PanelEventRow({ ev }: { ev: TimelineEvent }) {
     );
   }
 
+  if (ev.type === 'purchase') {
+    const b = ev.data;
+    const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
+    return (
+      <div className="event">
+        <div className="event-ico purchase"><ShoppingCart size={17} strokeWidth={1.8} /></div>
+        <div className="event-main">
+          <div className="event-title">Compra · {ev.qty} u.</div>
+          <div className="event-sub">{meta}</div>
+        </div>
+        {ev.priceUyuPerUnit > 0 && (
+          <div className="event-amt" style={{ color: 'var(--text-muted)' }}>
+            {uyu(ev.priceUyuPerUnit)} c/u
+            {ev.priceUsdPerUnit > 0 && <span className="sec">{usd(ev.priceUsdPerUnit)} c/u</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (ev.type === 'transit') {
     const b = ev.data;
     const meta = [b.supplier, `pedido ${fmtDate(b.purchaseDate)}`].filter(Boolean).join(' · ');
@@ -656,9 +830,7 @@ function PanelEventRow({ ev }: { ev: TimelineEvent }) {
   }
 
   const b = ev.data;
-  const shipUyu = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUyu ?? 0), 0);
-  const shipUsd = b.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
-  const meta = [b.supplier, `llegó ${fmtDate(b.arrivalDate)}`].filter(Boolean).join(' · ');
+  const meta = [b.supplier, `llegó ${fmtDate(ev.date)}`].filter(Boolean).join(' · ');
   return (
     <div className="event">
       <div className="event-ico buy"><Package size={17} strokeWidth={1.8} /></div>
@@ -666,10 +838,10 @@ function PanelEventRow({ ev }: { ev: TimelineEvent }) {
         <div className="event-title">Recibida · {ev.qty} u.</div>
         <div className="event-sub">{meta}</div>
       </div>
-      {shipUyu > 0 && (
+      {ev.shipUyuPerUnit > 0 && (
         <div className="event-amt" style={{ color: 'var(--text-muted)' }}>
-          envío {uyu(shipUyu)}
-          {shipUsd > 0 && <span className="sec">{usd(shipUsd)}</span>}
+          envío {uyu(ev.shipUyuPerUnit)} c/u
+          {ev.shipUsdPerUnit > 0 && <span className="sec">{usd(ev.shipUsdPerUnit)} c/u</span>}
         </div>
       )}
     </div>
@@ -705,9 +877,10 @@ function VisualGrid({ list, onOpen, selected }: { list: ModelWithStats[]; onOpen
             <div className="tile-body">
               <div className="tile-team capitalize">{m.team}</div>
               <div className="tile-meta">{m.season} · {m.version}</div>
-              {m.inTransit > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <Tag kind="transit">+{m.inTransit} en camino</Tag>
+              {(m.inTransit > 0 || m.reserved > 0) && (
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}
+                  {m.reserved > 0 && <Tag kind="reserved">+{m.reserved} reservado</Tag>}
                 </div>
               )}
             </div>

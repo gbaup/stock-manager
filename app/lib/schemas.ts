@@ -7,22 +7,16 @@ export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   return result.data;
 }
 
-const saleFields = {
+// Shared by any schema that claims units from stock (a sale or a reservation).
+const claimFields = {
   size: z.string().min(1, 'Elegí un talle'),
-  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
   quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
-  date: z.string().min(1, 'Requerido'),
-  method: z.string().optional(),
-  description: z.string().optional(),
-  collectedByUserId: z.string().uuid().optional(),
 };
-
-export const saleSchema = z.object(saleFields);
 
 // `sizeStock` maps each in-stock size to its available count. Quantity is
 // capped to the *selected* size's stock, not the model total.
-export const makeSaleSchema = (sizeStock: Record<string, number>) =>
-  z.object(saleFields).superRefine((data, ctx) => {
+function capQuantityToStock(sizeStock: Record<string, number>) {
+  return (data: { size: string; quantity: string }, ctx: z.RefinementCtx) => {
     const avail = sizeStock[data.size] ?? 0;
     const qty = parseInt(data.quantity, 10);
     if (qty > 0 && qty > avail) {
@@ -32,9 +26,36 @@ export const makeSaleSchema = (sizeStock: Record<string, number>) =>
         message: avail === 0 ? 'Sin stock en ese talle' : `Solo hay ${avail} en ese talle`,
       });
     }
-  });
+  };
+}
+
+const saleFields = {
+  ...claimFields,
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
+  date: z.string().min(1, 'Requerido'),
+  method: z.string().optional(),
+  description: z.string().optional(),
+  collectedByUserId: z.string().uuid().optional(),
+};
+
+export const saleSchema = z.object(saleFields);
+
+export const makeSaleSchema = (sizeStock: Record<string, number>) =>
+  z.object(saleFields).superRefine(capQuantityToStock(sizeStock));
 
 export type SaleFormValues = z.infer<typeof saleSchema>;
+
+const reserveFields = {
+  ...claimFields,
+  note: z.string().max(200, 'Máximo 200 caracteres').optional(),
+};
+
+export const reserveSchema = z.object(reserveFields);
+
+export const makeReserveSchema = (sizeStock: Record<string, number>) =>
+  z.object(reserveFields).superRefine(capQuantityToStock(sizeStock));
+
+export type ReserveFormValues = z.infer<typeof reserveSchema>;
 
 // Editing an existing sale: same fields as a sale minus size/quantity (the
 // unit is fixed — changing model/size goes through the swap flow instead).
@@ -83,6 +104,17 @@ export const arrivalSchema = z
   });
 
 export type ArrivalFormValues = z.infer<typeof arrivalSchema>;
+
+// Editing a shipment's cost inputs after arrival (e.g. a mistyped weight).
+// Deliberately excludes date/tracking/itemIds — those aren't in scope for a
+// cost correction and stay locked.
+export const shipmentEditSchema = z.object({
+  shippingRateUsd: numericOptional,
+  weight: numericOptional,
+  shippingPaidByUserId: z.string().optional().transform((v) => v || undefined).pipe(z.string().uuid().optional()),
+});
+
+export type ShipmentEditFormValues = z.infer<typeof shipmentEditSchema>;
 
 export const conversionSchema = z
   .object({

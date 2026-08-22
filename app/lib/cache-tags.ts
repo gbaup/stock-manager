@@ -21,3 +21,9 @@ export function invalidateSale() {
   updateTag(CACHE_TAGS.models);
   updateTag(CACHE_TAGS.saldos);
 }
+
+// A reservation only moves an item's status, no money — unlike invalidateSale,
+// saldos isn't touched.
+export function invalidateReservation() {
+  updateTag(CACHE_TAGS.models);
+}
