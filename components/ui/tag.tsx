@@ -4,7 +4,7 @@ export function Tag({
   className = '',
 }: {
   children: React.ReactNode;
-  kind?: 'ok' | 'transit' | 'partial' | 'player' | '';
+  kind?: 'ok' | 'transit' | 'partial' | 'player' | 'reserved' | '';
   className?: string;
 }) {
   return <span className={`tag ${kind} ${className}`.trim()}>{children}</span>;

@@ -1,14 +1,15 @@
+import { updateTag } from 'next/cache';
 import { prisma } from './prisma';
 import { money } from './money';
-import { invalidateSale } from './cache-tags';
-import { compareSizes, SALE_STATUS } from './domain';
+import { invalidateSale, CACHE_TAGS } from './cache-tags';
+import { compareSizes, SALE_STATUS, INVENTORY_STATUS } from './domain';
 
 // Narrow write interfaces: only the delegates each helper needs.
 // Both the top-level PrismaClient and a TransactionClient satisfy these.
 type InventoryWriter = Pick<typeof prisma, 'inventoryItem'>;
 type SaleWriter = Pick<typeof prisma, 'inventoryItem' | 'sale'>;
 
-export type StockCount = { available: number; inTransit: number; sold: number };
+export type StockCount = { available: number; inTransit: number; reserved: number; sold: number };
 
 export type SaleIntent = {
   modelId: string;
@@ -74,7 +75,7 @@ export async function availableSizes(modelId: string): Promise<Array<{ size: str
   const items = await prisma.inventoryItem.findMany({
     where: {
       catalogProductId: modelId,
-      status: 'available',
+      status: INVENTORY_STATUS.available,
       shipmentId: { not: null },
     },
     select: { size: true },
@@ -94,7 +95,7 @@ export async function availableSizesByModel(
   const items = await prisma.inventoryItem.findMany({
     where: {
       ...(modelIds ? { catalogProductId: { in: modelIds } } : {}),
-      status: 'available',
+      status: INVENTORY_STATUS.available,
       shipmentId: { not: null },
     },
     select: { catalogProductId: true, size: true },
@@ -131,21 +132,22 @@ export async function addBatchItems(
       size: it.size,
       basePriceUsd: it.basePriceUsd,
       basePriceUyu: money.toUyu(it.basePriceUsd, exchangeRate),
-      status: 'available',
+      status: INVENTORY_STATUS.available,
     })),
   });
 }
 
-// Claims (flips to 'sold') the oldest available shipped unit for a model+size
-// and returns its id. FIFO by Shipment.date then InventoryItem.createdAt.
-// Throws NotEnoughStockError if nothing matches or a concurrent sale won the
-// race. Must run inside a transaction.
-async function claimOldestAvailableItem(tx: SaleWriter, modelId: string, size: string): Promise<string> {
+// Claims the oldest available shipped unit for a model+size, flipping it to
+// `toStatus` ('sold' for a sale, 'reserved' for a reservation), and returns
+// its id. FIFO by Shipment.date then InventoryItem.createdAt. Throws
+// NotEnoughStockError if nothing matches or a concurrent claim won the race.
+// Must run inside a transaction.
+async function claimAvailableItem(tx: SaleWriter, modelId: string, size: string, toStatus: string): Promise<string> {
   const candidate = await tx.inventoryItem.findFirst({
     where: {
       catalogProductId: modelId,
       size,
-      status: 'available',
+      status: INVENTORY_STATUS.available,
       shipmentId: { not: null },
     },
     orderBy: [{ shipment: { date: 'asc' } }, { createdAt: 'asc' }],
@@ -154,10 +156,10 @@ async function claimOldestAvailableItem(tx: SaleWriter, modelId: string, size: s
   if (!candidate) throw new NotEnoughStockError();
 
   // Re-check status inside the transaction with a conditional update so
-  // concurrent sales on the same item fail atomically rather than oversell.
+  // concurrent claims on the same item fail atomically rather than oversell.
   const { count } = await tx.inventoryItem.updateMany({
-    where: { id: candidate.id, status: 'available' },
-    data: { status: 'sold' },
+    where: { id: candidate.id, status: INVENTORY_STATUS.available },
+    data: { status: toStatus },
   });
   if (count === 0) throw new NotEnoughStockError();
   return candidate.id;
@@ -176,7 +178,7 @@ export async function recordSale(
   const saleIds = await prisma.$transaction(async (tx) => {
     const ids: string[] = [];
     for (let i = 0; i < quantity; i++) {
-      const itemId = await claimOldestAvailableItem(tx, intent.modelId, intent.size);
+      const itemId = await claimAvailableItem(tx, intent.modelId, intent.size, INVENTORY_STATUS.sold);
 
       const sale = await tx.sale.create({
         data: {
@@ -244,8 +246,8 @@ export async function cancelSale(saleId: string): Promise<void> {
       select: { inventoryItemId: true },
     });
     const released = await tx.inventoryItem.updateMany({
-      where: { id: sale.inventoryItemId, status: 'sold' },
-      data: { status: 'available' },
+      where: { id: sale.inventoryItemId, status: INVENTORY_STATUS.sold },
+      data: { status: INVENTORY_STATUS.available },
     });
     // A sold item must exist for an active sale; anything else is a broken
     // invariant, so abort rather than leave the sale half-cancelled.
@@ -273,11 +275,11 @@ export async function swapSaleItem(
       throw new Error('Elegí un producto o talle distinto al actual');
     }
 
-    const newItemId = await claimOldestAvailableItem(tx, target.modelId, target.size);
+    const newItemId = await claimAvailableItem(tx, target.modelId, target.size, INVENTORY_STATUS.sold);
 
     const released = await tx.inventoryItem.updateMany({
-      where: { id: sale.inventoryItemId, status: 'sold' },
-      data: { status: 'available' },
+      where: { id: sale.inventoryItemId, status: INVENTORY_STATUS.sold },
+      data: { status: INVENTORY_STATUS.available },
     });
     if (released.count === 0) throw new Error('El item de la venta no está marcado como vendido');
 
@@ -290,6 +292,80 @@ export async function swapSaleItem(
   invalidateSale();
 }
 
+// Reserves `quantity` oldest-available shipped units of a model+size for a
+// client (e.g. bought but not yet delivered), tagging each with an optional
+// note. Atomic like recordSale: either every unit reserves or none does.
+export async function reserveItems(
+  modelId: string,
+  size: string,
+  quantity: number,
+  note: string | null,
+): Promise<{ itemIds: string[] }> {
+  const itemIds = await prisma.$transaction(async (tx) => {
+    const ids: string[] = [];
+    for (let i = 0; i < quantity; i++) {
+      const itemId = await claimAvailableItem(tx, modelId, size, INVENTORY_STATUS.reserved);
+      await tx.inventoryItem.update({ where: { id: itemId }, data: { reservedNote: note } });
+      ids.push(itemId);
+    }
+    return ids;
+  });
+
+  updateTag(CACHE_TAGS.models);
+  return { itemIds };
+}
+
+// Releases a reserved unit back to available stock (the client backed out).
+export async function releaseReservation(itemId: string): Promise<void> {
+  const { count } = await prisma.inventoryItem.updateMany({
+    where: { id: itemId, status: INVENTORY_STATUS.reserved },
+    data: { status: INVENTORY_STATUS.available, reservedNote: null },
+  });
+  if (count === 0) throw new Error('El item no está reservado');
+
+  updateTag(CACHE_TAGS.models);
+}
+
+// Finalizes a reservation as a sale, going straight from 'reserved' to 'sold'
+// without passing back through 'available'. Mirrors the per-unit body of
+// recordSale, but claims a specific reserved item instead of FIFO-picking one.
+export async function sellReservedItem(
+  itemId: string,
+  saleDetails: {
+    priceUyu: number;
+    date: Date;
+    method: string | null;
+    description: string | null;
+    collectedByUserId: string | null;
+  },
+  loggedByUserId: string,
+): Promise<{ saleId: string }> {
+  const saleId = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.inventoryItem.updateMany({
+      where: { id: itemId, status: INVENTORY_STATUS.reserved },
+      data: { status: INVENTORY_STATUS.sold, reservedNote: null },
+    });
+    if (count === 0) throw new NotEnoughStockError();
+
+    const sale = await tx.sale.create({
+      data: {
+        inventoryItemId: itemId,
+        userId: loggedByUserId,
+        price: saleDetails.priceUyu,
+        date: saleDetails.date,
+        method: saleDetails.method,
+        description: saleDetails.description,
+        collectedByUserId: saleDetails.collectedByUserId,
+      },
+      select: { id: true },
+    });
+    return sale.id;
+  });
+
+  invalidateSale();
+  return { saleId };
+}
+
 // Exported so callers that have already fetched items (e.g. detail pages
 // that need items for timelines or size lists) can derive counts in-process
 // without a second DB round trip. An item is in transit until it gets linked
@@ -299,11 +375,13 @@ export function countStock(
 ): StockCount {
   let available = 0;
   let inTransit = 0;
+  let reserved = 0;
   let sold = 0;
   for (const i of items) {
     if (i.shipmentId === null) inTransit += 1;
-    else if (i.status === 'available') available += 1;
-    else if (i.status === 'sold') sold += 1;
+    else if (i.status === INVENTORY_STATUS.available) available += 1;
+    else if (i.status === INVENTORY_STATUS.reserved) reserved += 1;
+    else if (i.status === INVENTORY_STATUS.sold) sold += 1;
   }
-  return { available, inTransit, sold };
+  return { available, inTransit, reserved, sold };
 }

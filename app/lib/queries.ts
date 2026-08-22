@@ -4,7 +4,7 @@ import { fmtDate } from './format';
 import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
-import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS } from './domain';
+import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS, INVENTORY_STATUS } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, TimelineEvent, SaleRecord, UserSummary,
@@ -189,6 +189,7 @@ export async function getModels(): Promise<ModelWithStats[]> {
       ...productMeta(p),
       stock: c?.available ?? 0,
       inTransit: c?.inTransit ?? 0,
+      reserved: c?.reserved ?? 0,
       availableBySize: sizes.get(p.id) ?? [],
     };
   });
@@ -234,14 +235,27 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const counts = countStock(p.items);
   const stock = counts.available;
   const inTransit = counts.inTransit;
+  const reserved = counts.reserved;
 
   // Items with available stock (shipped + not sold).
-  const availableItems = p.items.filter((i) => i.status === 'available' && i.shipmentId !== null);
+  const availableItems = p.items.filter((i) => i.status === INVENTORY_STATUS.available && i.shipmentId !== null);
   const sizeCounts = new Map<string, number>();
   for (const i of availableItems) {
     sizeCounts.set(i.size, (sizeCounts.get(i.size) ?? 0) + 1);
   }
   const availableBySize = [...sizeCounts].map(([size, count]) => ({ size, count }));
+
+  // Units reserved for a client — hidden from public stock, tracked here for
+  // the "Reservado" list (each with its own Vender/Liberar action).
+  const reservedItemsRaw = p.items.filter((i) => i.status === INVENTORY_STATUS.reserved);
+  const reservedSizeCounts = new Map<string, number>();
+  for (const i of reservedItemsRaw) {
+    reservedSizeCounts.set(i.size, (reservedSizeCounts.get(i.size) ?? 0) + 1);
+  }
+  const reservedBySize = [...reservedSizeCounts].map(([size, count]) => ({ size, count }));
+  const reservedItems = reservedItemsRaw
+    .map((i) => ({ id: i.id, size: i.size, note: i.reservedNote, reservedAt: toISODate(i.updatedAt)! }))
+    .sort((a, b) => b.reservedAt.localeCompare(a.reservedAt));
   // The include above filters to active sales, so sales[0] is the item's
   // current sale (or undefined for available / cancelled-and-restocked items).
   const soldItems = p.items.filter((i) => i.sales.length > 0);
@@ -431,7 +445,10 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     ...productMeta(p),
     stock,
     inTransit,
+    reserved,
     availableBySize,
+    reservedBySize,
+    reservedItems,
     sold,
     revenue,
     profit,
@@ -501,7 +518,7 @@ export async function getPublicModels() {
   const models = products
     .map((p) => {
       const availableItems = p.items.filter(
-        (i) => i.shipmentId !== null && i.status === 'available'
+        (i) => i.shipmentId !== null && i.status === INVENTORY_STATUS.available
       );
       // When showing all models, suppress sizes entirely (availability not guaranteed)
       const sizes = SHOW_ALL_MODELS

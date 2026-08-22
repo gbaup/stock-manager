@@ -7,7 +7,8 @@ import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
-import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
+import { Modal } from '@/components/ui/modal';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf, costBySizeOf } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
@@ -15,6 +16,9 @@ import { useIsDesktop } from '@/app/lib/hooks';
 import { fetchModelDetail } from '@/app/actions/read';
 import { ModelForm } from '@/components/screens/model-form';
 import { SaleForm } from '@/components/screens/sale-form';
+import { ReserveForm } from '@/components/screens/reserve-form';
+import { ReservedSaleForm } from '@/components/screens/reserved-sale-form';
+import { releaseReservation } from '@/app/actions/reservations';
 
 type Layout = 'cards' | 'rows' | 'grid';
 type Filter = 'all' | 'instock' | 'transit' | 'out';
@@ -42,6 +46,7 @@ export function InventoryScreen({
   const [showNewModel, setShowNewModel] = useState(false);
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
+  const [showReserveModal, setShowReserveModal] = useState(false);
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => new Set());
 
   function toggleTeam(team: string) {
@@ -97,6 +102,17 @@ export function InventoryScreen({
     setInvSel(id);
     startDetailTransition(async () => {
       const detail = await fetchModelDetail(id);
+      setSelDetail(detail);
+    });
+  }
+
+  // Re-fetches the currently open detail panel — used after reserve/liberar/
+  // vender actions, which (unlike a plain sale) need their effect to show up
+  // immediately in the still-open panel rather than on the next selection.
+  function refreshDetail() {
+    if (!invSel) return;
+    startDetailTransition(async () => {
+      const detail = await fetchModelDetail(invSel);
       setSelDetail(detail);
     });
   }
@@ -198,8 +214,11 @@ export function InventoryScreen({
               <ModelDetailPanel
                 model={selDetail}
                 loading={detailPending}
+                users={users}
                 onSell={() => setShowSaleModal(true)}
                 onEdit={() => setShowEditModel(true)}
+                onReserve={() => setShowReserveModal(true)}
+                onChanged={refreshDetail}
               />
             ) : (
               <DetailEmpty />
@@ -220,6 +239,14 @@ export function InventoryScreen({
         {showSaleModal && selDetail && (
           <DModal title="Registrar venta" size="md" onClose={() => setShowSaleModal(false)}>
             <SaleForm model={selDetail} stock={selDetail.stock} usdRate={usdRate} users={users} onDone={() => setShowSaleModal(false)} />
+          </DModal>
+        )}
+        {showReserveModal && selDetail && (
+          <DModal title="Reservar stock" size="md" onClose={() => setShowReserveModal(false)}>
+            <ReserveForm
+              model={selDetail}
+              onDone={() => { setShowReserveModal(false); refreshDetail(); }}
+            />
           </DModal>
         )}
 
@@ -315,6 +342,7 @@ function CardList({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: strin
               <Tag><ColorDot color={m.color} />{m.color}</Tag>
               {m.player && <Tag kind="player" className="capitalize">{m.number} {m.player}</Tag>}
               {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}
+              {m.reserved > 0 && <Tag kind="reserved">+{m.reserved} reservado</Tag>}
             </div>
           </div>
           <div className="mcard-stock">
@@ -416,6 +444,11 @@ function InvTable({
                 {m.color ? ` · ${m.color}` : ''}
                 {m.player ? ` · ${m.player}` : ''}
               </div>
+              {m.reserved > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <Tag kind="reserved">+{m.reserved} reservado</Tag>
+                </div>
+              )}
             </div>
           </div>
         </td>
@@ -466,15 +499,25 @@ function DetailEmpty() {
 function ModelDetailPanel({
   model,
   loading,
+  users,
   onSell,
   onEdit,
+  onReserve,
+  onChanged,
 }: {
   model: ModelDetail;
   loading?: boolean;
+  users: UserSummary[];
   onSell: () => void;
   onEdit: () => void;
+  onReserve: () => void;
+  onChanged: () => void;
 }) {
   const [evFilter, setEvFilter] = useState<'Ventas' | 'Todos'>('Ventas');
+  const [sellingItemId, setSellingItemId] = useState<string | null>(null);
+  const [releasingItemId, setReleasingItemId] = useState<string | null>(null);
+  const [releasePending, startReleaseTransition] = useTransition();
+  const [releaseError, setReleaseError] = useState<string | null>(null);
   const cover = coverOf(model);
   const events = evFilter === 'Ventas'
     ? model.events.filter((e) => e.type === 'sale')
@@ -482,6 +525,22 @@ function ModelDetailPanel({
 
   const sizeStock = sizeStockOf(model);
   const sizeCost = costBySizeOf(model);
+  const reservedBySizeMap = Object.fromEntries(model.reservedBySize.map((s) => [s.size, s.count]));
+  const sellingItem = model.reservedItems.find((i) => i.id === sellingItemId) ?? null;
+
+  function confirmRelease() {
+    if (!releasingItemId) return;
+    setReleaseError(null);
+    startReleaseTransition(async () => {
+      try {
+        await releaseReservation(releasingItemId);
+        setReleasingItemId(null);
+        onChanged();
+      } catch (e) {
+        setReleaseError(e instanceof Error ? e.message : 'Error al liberar la reserva');
+      }
+    });
+  }
   const usesAdultSizes = ['fan', 'player', 'retro'].includes(model.type ?? '');
   const displaySizes: string[] = usesAdultSizes
     ? (() => {
@@ -530,6 +589,10 @@ function ModelDetailPanel({
             <div className="l">En camino</div>
           </div>
           <div className="d-stat">
+            <div className="v">{model.reserved}</div>
+            <div className="l">Reservado</div>
+          </div>
+          <div className="d-stat">
             <div className="v">{model.sold}</div>
             <div className="l">Vendidas</div>
           </div>
@@ -559,6 +622,14 @@ function ModelDetailPanel({
           >
             <TagIcon size={16} strokeWidth={1.8} />Registrar venta
           </button>
+          <button
+            className="btn btn-secondary"
+            onClick={onReserve}
+            disabled={model.stock === 0}
+            style={{ flex: 1 }}
+          >
+            <Bookmark size={16} strokeWidth={1.8} />Reservar
+          </button>
         </div>
 
         {displaySizes.length > 0 && (
@@ -568,6 +639,7 @@ function ModelDetailPanel({
               {displaySizes.map((size) => {
                 const count = sizeStock[size] ?? 0;
                 const avgCostUyu = sizeCost[size]?.avgCostUyu;
+                const reservedCount = reservedBySizeMap[size] ?? 0;
                 return (
                   <div key={size} className="d-size-cell">
                     <span className="sz-l">{size.toUpperCase()}</span>
@@ -580,9 +652,39 @@ function ModelDetailPanel({
                     {count > 0 && avgCostUyu !== undefined && (
                       <span className="sz-c">{uyu(avgCostUyu)}</span>
                     )}
+                    {reservedCount > 0 && (
+                      <span className="sz-c" style={{ color: 'oklch(0.44 0.13 310)' }}>{reservedCount} res.</span>
+                    )}
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {model.reservedItems.length > 0 && (
+          <div>
+            <div className="d-section-label" style={{ marginBottom: 8 }}>Reservado</div>
+            <div className="timeline">
+              {model.reservedItems.map((item) => (
+                <div key={item.id} className="event">
+                  <div className="event-ico reserved"><Bookmark size={17} strokeWidth={1.8} /></div>
+                  <div className="event-main">
+                    <div className="event-title">Talle {item.size.toUpperCase()}</div>
+                    <div className="event-sub">
+                      {item.note ? item.note : 'Sin nota'} · desde {fmtDate(item.reservedAt)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12.5 }} onClick={() => setReleasingItemId(item.id)}>
+                      Liberar
+                    </button>
+                    <button className="btn btn-primary" style={{ padding: '6px 10px', fontSize: 12.5 }} onClick={() => setSellingItemId(item.id)}>
+                      Vender
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -623,6 +725,29 @@ function ModelDetailPanel({
           </div>
         )}
       </div>
+
+      {sellingItem && (
+        <DModal title="Registrar venta" size="md" onClose={() => setSellingItemId(null)}>
+          <ReservedSaleForm
+            model={model}
+            item={sellingItem}
+            users={users}
+            onDone={() => { setSellingItemId(null); onChanged(); }}
+          />
+        </DModal>
+      )}
+
+      {releasingItemId && (
+        <Modal
+          icon="check"
+          title="¿Liberar esta reserva?"
+          confirmLabel={releasePending ? 'Liberando…' : 'Liberar'}
+          onCancel={() => { setReleasingItemId(null); setReleaseError(null); }}
+          onConfirm={confirmRelease}
+        >
+          {releaseError ?? 'La unidad vuelve a stock disponible y deja de estar reservada.'}
+        </Modal>
+      )}
     </>
   );
 }
@@ -736,9 +861,10 @@ function VisualGrid({ list, onOpen, selected }: { list: ModelWithStats[]; onOpen
             <div className="tile-body">
               <div className="tile-team capitalize">{m.team}</div>
               <div className="tile-meta">{m.season} · {m.version}</div>
-              {m.inTransit > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <Tag kind="transit">+{m.inTransit} en camino</Tag>
+              {(m.inTransit > 0 || m.reserved > 0) && (
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}
+                  {m.reserved > 0 && <Tag kind="reserved">+{m.reserved} reservado</Tag>}
                 </div>
               )}
             </div>

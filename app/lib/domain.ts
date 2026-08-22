@@ -104,6 +104,9 @@ export type ModelMeta = {
 export type ModelWithStats = ModelMeta & {
   stock: number;
   inTransit: number;
+  // Units bought for a client but not yet handed over — excluded from `stock`
+  // and from the public catalog, but tracked separately so they aren't lost.
+  reserved: number;
   // Sizes that currently have stock, with their available unit counts. Drives
   // the size picker on the sale forms so a sale consumes the right size (FIFO
   // is applied *within* the chosen size).
@@ -200,6 +203,12 @@ export type BatchSummary = {
 export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
 export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 
+// An InventoryItem's lifecycle: 'available' (sellable) -> 'reserved' (spoken
+// for by a client, hidden from the public catalog) -> 'sold', or back to
+// 'available' if a reservation is released.
+export const INVENTORY_STATUS = { available: 'available', reserved: 'reserved', sold: 'sold' } as const;
+export type InventoryStatus = (typeof INVENTORY_STATUS)[keyof typeof INVENTORY_STATUS];
+
 export type SaleRecord = {
   id: string;
   catalogProductId: string;
@@ -235,6 +244,10 @@ export type ModelDetail = ModelWithStats & {
   avgCostUyu: number;
   avgCostUsd: number;
   costBySize: { size: string; count: number; avgCostUyu: number; avgCostUsd: number }[];
+  // Reserved counterparts to availableBySize / the individual units behind
+  // them, for the "Reservado" list (each with a Vender/Liberar action).
+  reservedBySize: { size: string; count: number }[];
+  reservedItems: { id: string; size: string; note: string | null; reservedAt: string }[];
   events: TimelineEvent[];
 };
 

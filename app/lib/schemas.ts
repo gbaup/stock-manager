@@ -36,6 +36,31 @@ export const makeSaleSchema = (sizeStock: Record<string, number>) =>
 
 export type SaleFormValues = z.infer<typeof saleSchema>;
 
+const reserveFields = {
+  size: z.string().min(1, 'Elegí un talle'),
+  quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
+  note: z.string().optional(),
+};
+
+export const reserveSchema = z.object(reserveFields);
+
+// Same cap-to-available-stock pattern as makeSaleSchema — a reservation can
+// only claim units that are actually available.
+export const makeReserveSchema = (sizeStock: Record<string, number>) =>
+  z.object(reserveFields).superRefine((data, ctx) => {
+    const avail = sizeStock[data.size] ?? 0;
+    const qty = parseInt(data.quantity, 10);
+    if (qty > 0 && qty > avail) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['quantity'],
+        message: avail === 0 ? 'Sin stock en ese talle' : `Solo hay ${avail} en ese talle`,
+      });
+    }
+  });
+
+export type ReserveFormValues = z.infer<typeof reserveSchema>;
+
 // Editing an existing sale: same fields as a sale minus size/quantity (the
 // unit is fixed — changing model/size goes through the swap flow instead).
 export const saleEditSchema = z.object({
