@@ -195,6 +195,7 @@ export function TeamCombobox({
   const selectedTeam = localTeams.find((t) => t.id === value);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!open) setQuery(selectedTeam?.name ?? '');
   }, [open, selectedTeam]);
 

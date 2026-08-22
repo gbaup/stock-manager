@@ -11,11 +11,15 @@ A jersey design — the team, season, version, color, sleeve, etc. A `Model` is 
 _Avoid_: `CatalogProduct` (used only as the Prisma table name; no other code path should mention it), Product, Jersey, SKU.
 
 **InventoryItem**:
-One physical jersey. Belongs to exactly one `Model` and exactly one `Batch`. Carries a size, a cost, and a `status` of `available` or `sold`.
+One physical jersey. Belongs to exactly one `Model` and exactly one `Batch`. Carries a size, a cost, and a `status` of `available`, `reserved`, or `sold`.
 _Avoid_: Unit, Stock item.
 
 **Stock**:
-The set of `InventoryItem`s whose `Batch` has arrived **and** whose `status` is `available`. "How much stock do we have of this model in size M?" → count of items meeting both conditions.
+The set of `InventoryItem`s whose `Batch` has arrived **and** whose `status` is `available`. A `reserved` item has arrived but does **not** count as stock even though it hasn't sold. "How much stock do we have of this model in size M?" → count of items meeting both conditions.
+
+**Reservation**:
+An `InventoryItem` held for a specific client before it's sold — `status` moves `available` → `reserved`, carrying an optional free-text note (e.g. client name; not required). A reservation resolves one of two ways: it's released back to `available`, or it's sold, moving straight `reserved` → `sold` without passing back through `available`. Reserving draws from the same FIFO-oldest-available pool as a sale, so the two compete for the last unit of a size.
+_Avoid_: Hold, Layaway.
 
 **In transit**:
 `InventoryItem`s whose `Batch` has not arrived yet, regardless of `status`. They exist in the catalog but cannot be sold.

@@ -4,8 +4,7 @@ import { useState, useTransition } from 'react';
 import { Search, X, ArrowLeftRight } from 'lucide-react';
 import { Swatch, coverOf } from '@/components/ui/swatch';
 import { Empty } from '@/components/ui/empty';
-import { Field, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
-import { Segmented } from '@/components/ui/segmented';
+import { Field, MoneyInput } from '@/components/ui/field';
 import { SizePicker } from '@/components/ui/size-picker';
 import { Modal } from '@/components/ui/modal';
 import { ModalFooter } from '@/components/ui/modal-footer';
@@ -14,6 +13,7 @@ import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { updateSale, cancelSale, swapSale } from '@/app/actions/sales';
 import { useIsDesktop } from '@/app/lib/hooks';
+import { SaleMoneyFields } from '@/components/screens/sale-money-fields';
 
 // Edits an existing sale from the home list: price/date/method/collector,
 // swapping the unit for another model or size (buyer changed their mind), or
@@ -93,8 +93,6 @@ export function SaleEditForm({
     () => cancelSale(sale.id),
     'Error al anular la venta',
   );
-
-  const collectedByAlias = users.find((u) => u.id === collectedByUserId)?.alias ?? '';
 
   const errorLine = saveError && (
     <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
@@ -223,46 +221,19 @@ export function SaleEditForm({
   return (
     <>
       <div className="dm-body">
-        <div className="section-label" style={{ marginTop: 6 }}>Venta</div>
-        <Field label="Precio de venta (UYU)">
-          <MoneyInput value={price} onChange={setPrice} placeholder="2200" />
-        </Field>
-        <Field label="Fecha">
-          <input
-            className="input mono"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </Field>
-        <Field label="Método de pago" optional>
-          <SelectInput
-            value={method}
-            onChange={setMethod}
-            options={METHODS}
-            placeholder="Elegí un método…"
-          />
-        </Field>
-
-        <div className="section-label">Cobro</div>
-        <Field label="¿Quién cobró?">
-          <Segmented
-            options={users.map((u) => u.alias)}
-            value={collectedByAlias}
-            onChange={(alias) =>
-              setCollectedByUserId(users.find((u) => u.alias === alias)?.id ?? '')
-            }
-            full
-          />
-        </Field>
-
-        <Field label="Descripción" optional>
-          <TextAreaInput
-            value={description}
-            onChange={setDescription}
-            placeholder="Comprador, notas…"
-          />
-        </Field>
+        <SaleMoneyFields
+          price={price}
+          onPriceChange={setPrice}
+          date={date}
+          onDateChange={setDate}
+          method={method}
+          onMethodChange={setMethod}
+          description={description}
+          onDescriptionChange={setDescription}
+          collectedByUserId={collectedByUserId}
+          onCollectedByUserIdChange={setCollectedByUserId}
+          users={users}
+        />
 
         <button
           className="btn btn-secondary"

@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { prisma } from '@/app/lib/prisma';
 import { z } from 'zod';
-import { arrivalSchema, parseOrThrow } from '@/app/lib/schemas';
+import { arrivalSchema, shipmentEditSchema, parseOrThrow } from '@/app/lib/schemas';
 import { addBatchItems } from '@/app/lib/inventory';
 import { computeShippingPrice } from '@/app/lib/money';
 import { baseCostUsd, editBatchBaseCostUsd, reconcileSupplierPayments } from '@/app/lib/domain';
@@ -224,6 +224,63 @@ export async function deleteBatch(batchId: string, opts?: { skipRedirect?: boole
     });
     if (shipped > 0) throw new Error('No se puede eliminar: la compra ya tiene items recibidos');
     await tx.batch.delete({ where: { id: batchId } });
+  });
+
+  invalidatePurchase();
+  if (opts?.skipRedirect) return;
+  redirect('/purchases');
+}
+
+// Corrects a shipment's cost inputs after arrival (e.g. a mistyped weight).
+// Profit is derived live from Shipment.shippingPriceUyu (see shippingShareUyu
+// call sites in queries.ts) — updating it here reflows profit for every sale
+// tied to this shipment automatically, no historical rows need to change.
+export async function updateShipment(
+  shipmentId: string,
+  data: {
+    shippingRateUsd?: string;
+    weight?: string;
+    shippingPaidByUserId?: string;
+    exchangeRate: number;
+    expectedUpdatedAt: string;
+  },
+  opts?: { skipRedirect?: boolean },
+) {
+  const { exchangeRate, expectedUpdatedAt, ...rest } = data;
+  parseOrThrow(shipmentEditSchema, rest);
+
+  const weight = data.weight ? parseFloat(data.weight) : 0;
+  const rateUsd = data.shippingRateUsd ? parseFloat(data.shippingRateUsd) : 0;
+  const shipping = computeShippingPrice({ rateUsd, weight, exchangeRate });
+
+  await prisma.$transaction(async (tx) => {
+    const shipment = await tx.shipment.findUnique({
+      where: { id: shipmentId },
+      select: { batchId: true, batch: { select: { updatedAt: true } } },
+    });
+    if (!shipment) throw new Error('El envío no existe');
+
+    // Same optimistic-lock token updatePurchase checks — markArrived already
+    // bumps it on every shipment, so this reuses that lock rather than adding
+    // a second one on Shipment.
+    if (shipment.batch.updatedAt.toISOString() !== expectedUpdatedAt) {
+      throw new Error('La compra cambió — actualizá la página antes de editar');
+    }
+
+    await tx.shipment.update({
+      where: { id: shipmentId },
+      data: {
+        weight: weight > 0 ? weight : null,
+        shippingPriceUsd: shipping.usd,
+        shippingPriceUyu: shipping.uyu,
+        shippingPaidByUserId: data.shippingPaidByUserId || null,
+      },
+    });
+
+    await tx.batch.update({
+      where: { id: shipment.batchId },
+      data: { updatedAt: new Date() },
+    });
   });
 
   invalidatePurchase();

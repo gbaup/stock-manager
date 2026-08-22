@@ -10,11 +10,13 @@ import { DModal } from '@/components/ui/d-modal';
 import { Plus, Check, ChevronRight, Pencil } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
+import { compareVersions } from '@/app/lib/domain';
 import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { PurchaseForm } from '@/components/screens/purchase-form';
 import { PurchaseEditForm } from '@/components/screens/purchase-edit-form';
 import { ArrivalForm } from '@/components/screens/arrival-form';
+import { ShipmentEditForm } from '@/components/screens/shipment-edit-form';
 
 export function PurchasesScreen({
   batches,
@@ -36,6 +38,7 @@ export function PurchasesScreen({
   const [showNewPurchase, setShowNewPurchase] = useState(false);
   const [showArrival, setShowArrival] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editShipment, setEditShipment] = useState<{ batchId: string; shipmentId: string } | null>(null);
 
   const sorted = [...batches].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
   // The "pending" tab now bundles both transit and partial — anything still
@@ -45,6 +48,15 @@ export function PurchasesScreen({
       ? sorted.filter((b) => b.status !== 'arrived')
       : sorted.filter((b) => b.status === 'arrived');
   const arrivedCount = batches.filter((b) => b.status === 'arrived').length;
+
+  // Stable purchase numbering: #1 is the oldest purchase ever made, independent
+  // of the current tab/sort — so a batch's number never shifts as it moves
+  // from "en camino" to "recibidas".
+  const orderMap = new Map(
+    [...batches]
+      .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate) || a.id.localeCompare(b.id))
+      .map((b, i) => [b.id, i + 1]),
+  );
 
   // Same modal on desktop and mobile, mirroring the sale edit in home-screen.
   const editBatch = batches.find((b) => b.id === editId) ?? null;
@@ -56,6 +68,20 @@ export function PurchasesScreen({
         users={users}
         rate={rate}
         onDone={() => setEditId(null)}
+      />
+    </DModal>
+  );
+
+  const editShipmentBatch = editShipment ? batches.find((b) => b.id === editShipment.batchId) ?? null : null;
+  const editShipmentRecord = editShipmentBatch?.shipments.find((sh) => sh.id === editShipment?.shipmentId) ?? null;
+  const shipmentEditModal = editShipmentBatch && editShipmentRecord && (
+    <DModal title="Editar envío" onClose={() => setEditShipment(null)}>
+      <ShipmentEditForm
+        shipment={editShipmentRecord}
+        batchUpdatedAt={editShipmentBatch.updatedAt}
+        users={users}
+        rate={rate}
+        onDone={() => setEditShipment(null)}
       />
     </DModal>
   );
@@ -96,7 +122,7 @@ export function PurchasesScreen({
                   desc={tab === 'pending' ? 'Todas las compras llegaron.' : ''}
                 />
               ) : (
-                <BuyTable list={list} selected={buySel} onOpen={setBuySel} />
+                <BuyTable list={list} selected={buySel} onOpen={setBuySel} orderMap={orderMap} />
               )}
             </div>
           </div>
@@ -107,6 +133,7 @@ export function PurchasesScreen({
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
                 onEdit={() => setEditId(selBatch.id)}
+                onEditShipment={(shipmentId) => setEditShipment({ batchId: selBatch.id, shipmentId })}
               />
             ) : (
               <div className="detail-empty">
@@ -129,6 +156,7 @@ export function PurchasesScreen({
           </DModal>
         )}
         {editModal}
+        {shipmentEditModal}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
@@ -168,6 +196,7 @@ export function PurchasesScreen({
                   batch={b}
                   onArrive={(id) => router.push(`/purchases/${id}/arrival`)}
                   onEdit={setEditId}
+                  onEditShipment={(shipmentId) => setEditShipment({ batchId: b.id, shipmentId })}
                 />
               ))
             )}
@@ -178,6 +207,7 @@ export function PurchasesScreen({
         <Plus size={26} strokeWidth={2.2} />
       </button>
       {editModal}
+      {shipmentEditModal}
       <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
@@ -188,10 +218,12 @@ function PurchaseCard({
   batch,
   onArrive,
   onEdit,
+  onEditShipment,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
   onEdit: (id: string) => void;
+  onEditShipment: (shipmentId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const uniqueProducts = Array.from(new Map(batch.items.map((i) => [i.catalogProductId, i.product])).values());
@@ -202,33 +234,25 @@ function PurchaseCard({
 
   const title = single
     ? `${single.team} · ${single.version}`
-    : `${uniqueProducts.length} modelos · ${qty} items`;
+    : `${qty} items`;
 
-  const sub = single
-    ? batch.supplier || batch.description || `${qty} ${qty === 1 ? 'unidad' : 'unidades'}`
-    : batch.description || uniqueProducts.map((m) => m.team).join(', ');
+  const sub = batch.supplier || batch.description || '';
 
   const tag =
     batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
       batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
         <Tag kind="ok">recibida</Tag>;
 
-  const totalShippingUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
+  const totalShippingUsd = batch.shippingPriceUsd ?? 0;
   const arrivalDate = batch.arrivalDate;
   const arriveLabel = isPartial ? 'Llegó más' : 'Llegó';
 
   return (
     <div className={`purchase-card${isArrived ? '' : ' pending'}`}>
       <div className="pc-head">
-        <div className="pc-swatches">
-          {uniqueProducts.slice(0, 3).map((m, i) => (
-            <Swatch key={m.id} color={m.color} number={m.number} className="pc-sw" style={{ zIndex: 3 - i }} />
-          ))}
-          {uniqueProducts.length > 3 && <span className="pc-more">+{uniqueProducts.length - 3}</span>}
-        </div>
         <div className="pc-main">
           <div className="pc-team capitalize">{title}</div>
-          <div className="pc-sub capitalize">{sub}</div>
+          {sub && <div className="pc-sub capitalize">{sub}</div>}
         </div>
         {tag}
         <button
@@ -270,7 +294,7 @@ function PurchaseCard({
           {open && (
             <div className="ship-list">
               {batch.shipments.map((sh, i) => (
-                <ShipmentRow key={sh.id} sh={sh} index={i + 1} />
+                <ShipmentRow key={sh.id} sh={sh} index={i + 1} onEdit={() => onEditShipment(sh.id)} />
               ))}
             </div>
           )}
@@ -280,7 +304,7 @@ function PurchaseCard({
   );
 }
 
-function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
+function ShipmentRow({ sh, index, onEdit }: { sh: ShipmentRecord; index: number; onEdit: () => void }) {
   const n = sh.itemIds.length;
   const meta = [
     sh.trackingNumber,
@@ -294,6 +318,15 @@ function ShipmentRow({ sh, index }: { sh: ShipmentRecord; index: number }) {
         <div className="ship-top">{fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}</div>
         <div className="ship-meta">{meta || 'sin datos de envío'}</div>
       </div>
+      <button
+        type="button"
+        className="iconbtn plain"
+        style={{ width: 26, height: 26, flexShrink: 0 }}
+        aria-label="Editar envío"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+      >
+        <Pencil size={13} strokeWidth={1.8} />
+      </button>
     </div>
   );
 }
@@ -302,33 +335,31 @@ function BuyTable({
   list,
   selected,
   onOpen,
+  orderMap,
 }: {
   list: BatchSummary[];
   selected: string | null;
   onOpen: (id: string) => void;
+  orderMap: Map<string, number>;
 }) {
   return (
     <table className="dtable">
       <thead>
         <tr>
-          <th>Pedido</th>
-          <th className="num">Items</th>
+          <th className="num">#</th>
           <th>Fecha</th>
+          <th className="num">Items</th>
+          <th className="num">Valor</th>
           <th>Estado</th>
+          <th>Detalle</th>
         </tr>
       </thead>
       <tbody>
         {list.map((b) => {
-          const uniqueProducts = Array.from(
-            new Map(b.items.map((i) => [i.catalogProductId, i.product])).values()
-          );
           const qty = b.items.length;
-          const single = uniqueProducts.length === 1 ? uniqueProducts[0] : null;
           const isPartial = b.status === 'partial';
-          const title = single
-            ? `${single.team} · ${single.version}`
-            : `${uniqueProducts.length} modelos`;
-          const sub = single ? (b.supplier || b.description || '') : (b.description || '');
+          const detail = b.supplier || b.description || '';
+          const rowValueUsd = b.totalCostUsd;
           const tag =
             b.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
             b.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
@@ -346,31 +377,12 @@ function BuyTable({
                 }
               }}
             >
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="sw-stack">
-                    {uniqueProducts.slice(0, 3).map((m, i) => (
-                      <Swatch
-                        key={m.id}
-                        color={m.color}
-                        number={m.number}
-                        className="swatch"
-                        style={{ zIndex: 3 - i }}
-                      />
-                    ))}
-                    {uniqueProducts.length > 3 && (
-                      <span className="sw-stack-more">+{uniqueProducts.length - 3}</span>
-                    )}
-                  </div>
-                  <div className="dt-cell-main">
-                    <div className="dt-team capitalize">{title}</div>
-                    {sub && <div className="dt-meta capitalize">{sub}</div>}
-                  </div>
-                </div>
-              </td>
-              <td className="num">{isPartial ? `${b.arrivedQuantity ?? 0}/${qty}` : qty}</td>
+              <td className="num" style={{ color: 'var(--text-faint)' }}>{orderMap.get(b.id)}</td>
               <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>{fmtDate(b.purchaseDate)}</td>
+              <td className="num">{isPartial ? `${b.arrivedQuantity ?? 0}/${qty}` : qty}</td>
+              <td className="num">{rowValueUsd > 0 ? usd(rowValueUsd) : '—'}</td>
               <td>{tag}</td>
+              <td className="capitalize">{detail}</td>
             </tr>
           );
         })}
@@ -383,16 +395,19 @@ function BuyDetailPanel({
   batch,
   onArrive,
   onEdit,
+  onEditShipment,
 }: {
   batch: BatchSummary;
   onArrive: (id: string) => void;
   onEdit: (id: string) => void;
+  onEditShipment: (shipmentId: string) => void;
 }) {
   const isArrived = batch.status === 'arrived';
   const isPartial = batch.status === 'partial';
   const qty = batch.items.length;
-  const totalShipUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
-  const totalCostUsd = batch.items.reduce((s, i) => s + ((i as BatchSummary['items'][number] & { basePriceUsd?: number }).basePriceUsd ?? 0), 0);
+  const totalShipUsd = batch.shippingPriceUsd ?? 0;
+  const totalCostUsd = batch.totalCostUsd;
+  const baseCostNoFeeUsd = batch.baseCostNoFeeUsd;
 
   const tag =
     batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
@@ -453,13 +468,35 @@ function BuyDetailPanel({
             <div className="v" style={{ fontSize: 15 }}>{fmtDate(batch.purchaseDate)}</div>
             <div className="l">Pedido</div>
           </div>
-          {totalCostUsd > 0 && (
+          {baseCostNoFeeUsd > 0 && (
             <div className="d-stat">
-              <div className="v" style={{ fontSize: 16 }}>{usd(totalCostUsd)}</div>
+              <div className="v" style={{ fontSize: 16 }}>{usd(baseCostNoFeeUsd)}</div>
               <div className="l">Costo base</div>
             </div>
           )}
+          {totalCostUsd > 0 && (
+            <div className="d-stat">
+              <div className="v" style={{ fontSize: 16 }}>{usd(totalCostUsd)}</div>
+              <div className="l">Costo base final</div>
+            </div>
+          )}
         </div>
+
+        {batch.supplierPayments.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+              Pago al proveedor
+            </div>
+            {batch.supplierPayments.map((p) => (
+              <div key={p.userId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                <span className="capitalize">{p.alias}</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>
+                  {usd(p.amountUsd)}{p.cardTaxPct ? ` +${p.cardTaxPct}%` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
           Items del pedido
@@ -475,7 +512,11 @@ function BuyDetailPanel({
           </thead>
           <tbody>
             {Array.from(groupMap.values())
-              .sort((a, b) => a.product.team.localeCompare(b.product.team))
+              .sort((a, b) =>
+                a.product.team.localeCompare(b.product.team) ||
+                a.product.season.localeCompare(b.product.season) ||
+                compareVersions(a.product.version, b.product.version)
+              )
               .map((g, i) => (
               <tr key={i}>
                 <td>
@@ -520,11 +561,22 @@ function BuyDetailPanel({
                 sh.shippingPaidByAlias ? `pagó ${sh.shippingPaidByAlias}` : null,
               ].filter(Boolean).join(' · ');
               return (
-                <div key={sh.id} className="ship-card">
-                  <div className="ship-card-head">
-                    #{i + 1} · {fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}
+                <div key={sh.id} className="ship-card" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="ship-card-head">
+                      #{i + 1} · {fmtDate(sh.date)} · {n} {n === 1 ? 'item' : 'items'}
+                    </div>
+                    {meta && <div className="ship-card-meta">{meta}</div>}
                   </div>
-                  {meta && <div className="ship-card-meta">{meta}</div>}
+                  <button
+                    type="button"
+                    className="iconbtn plain"
+                    style={{ width: 26, height: 26, flexShrink: 0 }}
+                    aria-label="Editar envío"
+                    onClick={() => onEditShipment(sh.id)}
+                  >
+                    <Pencil size={13} strokeWidth={1.8} />
+                  </button>
                 </div>
               );
             })}

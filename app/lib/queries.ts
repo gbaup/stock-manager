@@ -4,7 +4,7 @@ import { fmtDate } from './format';
 import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
-import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS } from './domain';
+import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS, INVENTORY_STATUS } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, TimelineEvent, SaleRecord, UserSummary,
@@ -119,6 +119,15 @@ export function batchToSummary(
   const shippingPaidByUserId = lastShipment?.shippingPaidByUserId ?? null;
   const shippingPaidByAlias = lastShipment?.shippingPaidByAlias ?? null;
 
+  const supplierPayments = b.supplierPayments.map((p) => ({
+    userId: p.userId,
+    alias: p.user.alias,
+    amountUsd: Number(p.amountUsd),
+    cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
+  }));
+  const totalCostUsd = items.reduce((s, i) => s + Number(i.basePriceUsd), 0);
+  const baseCostNoFeeUsd = supplierPayments.reduce((s, p) => s + p.amountUsd, 0);
+
   return {
     id: b.id,
     supplier: b.supplier,
@@ -132,12 +141,9 @@ export function batchToSummary(
     shippingPriceUyu: shippingPriceUyu || null,
     weight,
     status,
-    supplierPayments: b.supplierPayments.map((p) => ({
-      userId: p.userId,
-      alias: p.user.alias,
-      amountUsd: Number(p.amountUsd),
-      cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
-    })),
+    totalCostUsd,
+    baseCostNoFeeUsd,
+    supplierPayments,
     shippingPaidByUserId,
     shippingPaidByAlias,
     items: items.map((i) => ({
@@ -189,6 +195,7 @@ export async function getModels(): Promise<ModelWithStats[]> {
       ...productMeta(p),
       stock: c?.available ?? 0,
       inTransit: c?.inTransit ?? 0,
+      reserved: c?.reserved ?? 0,
       availableBySize: sizes.get(p.id) ?? [],
     };
   });
@@ -234,15 +241,27 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
   const counts = countStock(p.items);
   const stock = counts.available;
   const inTransit = counts.inTransit;
+  const reserved = counts.reserved;
 
-  // Sizes with available stock (shipped + not sold), with per-size counts.
+  // Items with available stock (shipped + not sold).
+  const availableItems = p.items.filter((i) => i.status === INVENTORY_STATUS.available && i.shipmentId !== null);
   const sizeCounts = new Map<string, number>();
-  for (const i of p.items) {
-    if (i.status === 'available' && i.shipmentId !== null) {
-      sizeCounts.set(i.size, (sizeCounts.get(i.size) ?? 0) + 1);
-    }
+  for (const i of availableItems) {
+    sizeCounts.set(i.size, (sizeCounts.get(i.size) ?? 0) + 1);
   }
   const availableBySize = [...sizeCounts].map(([size, count]) => ({ size, count }));
+
+  // Units reserved for a client — hidden from public stock, tracked here for
+  // the "Reservado" list (each with its own Vender/Liberar action).
+  const reservedItemsRaw = p.items.filter((i) => i.status === INVENTORY_STATUS.reserved);
+  const reservedSizeCounts = new Map<string, number>();
+  for (const i of reservedItemsRaw) {
+    reservedSizeCounts.set(i.size, (reservedSizeCounts.get(i.size) ?? 0) + 1);
+  }
+  const reservedBySize = [...reservedSizeCounts].map(([size, count]) => ({ size, count }));
+  const reservedItems = reservedItemsRaw
+    .map((i) => ({ id: i.id, size: i.size, note: i.reservedNote, reservedAt: toISODate(i.updatedAt)! }))
+    .sort((a, b) => b.reservedAt.localeCompare(a.reservedAt));
   // The include above filters to active sales, so sales[0] is the item's
   // current sale (or undefined for available / cancelled-and-restocked items).
   const soldItems = p.items.filter((i) => i.sales.length > 0);
@@ -259,10 +278,12 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
   const events: TimelineEvent[] = [];
 
-  // itemId -> allocated UYU shipping cost for that unit. Built per batch so the
+  // itemId -> allocated shipping cost for that unit. Built per batch so the
   // equal-split denominator counts every item in a shipment, not just this
   // model's. Items with no resolvable shipping (in transit) are simply absent.
+  // UYU feeds the profit calc below; USD is display-only (timeline "envío" line).
   const shippingShareByItem = new Map<string, number>();
+  const shippingShareUsdByItem = new Map<string, number>();
 
   // The summary needs ALL items of each batch (for accurate shipment grouping
   // and shipping totals), even though this page only renders this model's units.
@@ -287,13 +308,33 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
 
     if (batchData.shipments.length > 0) {
       for (const sh of batchData.shipments) {
-        const share = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
-        for (const itemId of sh.itemIds) shippingShareByItem.set(itemId, share);
+        const shareUyu = shippingShareUyu(sh.shippingPriceUyu, sh.itemIds.length);
+        const shareUsd = shippingShareUyu(sh.shippingPriceUsd, sh.itemIds.length);
+        for (const itemId of sh.itemIds) {
+          shippingShareByItem.set(itemId, shareUyu);
+          shippingShareUsdByItem.set(itemId, shareUsd);
+        }
       }
     }
 
     const arrivedForModel = items.reduce((s, i) => s + (i.shipmentId ? 1 : 0), 0);
     const transitForModel = items.length - arrivedForModel;
+
+    // The purchase order itself, independent of shipment/arrival status — kept
+    // visible even after every unit has arrived, so the timeline shows the full
+    // lifecycle (ordered, then received) instead of losing the order once the
+    // 'transit' event disappears.
+    // basePriceUsd/basePriceUyu are stored GROSS (card surcharge already baked
+    // in, see pricing.ts), so this average is the real per-unit price paid —
+    // no separate fee lookup needed.
+    events.push({
+      type: 'purchase',
+      date: toISODate(batch.purchaseDate)!,
+      data: batchData,
+      qty: items.length,
+      priceUyuPerUnit: items.reduce((s, i) => s + Number(i.basePriceUyu), 0) / items.length,
+      priceUsdPerUnit: items.reduce((s, i) => s + Number(i.basePriceUsd), 0) / items.length,
+    });
 
     if (transitForModel > 0) {
       events.push({
@@ -304,28 +345,70 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
       });
     }
     if (arrivedForModel > 0) {
-      const lastDate = batchData.shipments.length
-        ? batchData.shipments[batchData.shipments.length - 1].date
-        : toISODate(batch.purchaseDate)!;
+      // A batch can arrive across several partial shipments over time; this
+      // model's units may have come in an earlier one than the batch's overall
+      // last shipment. Use the latest shipment date among THIS model's arrived
+      // items, not the batch-wide last, so the date matches what actually
+      // happened to these units (and sorts correctly against sales of them).
+      const shipmentDateById = new Map(batchData.shipments.map((sh) => [sh.id, sh.date]));
+      const arrivedItems = items.filter((i) => i.shipmentId);
+      const lastDate = arrivedItems.reduce(
+        (max, i) => {
+          const d = shipmentDateById.get(i.shipmentId!);
+          return d && d > max ? d : max;
+        },
+        toISODate(batch.purchaseDate)!,
+      );
+      // Average this model's own per-unit shipping share, not the batch total —
+      // a shipment can carry many other models' units too.
+      const totalShipUyu = arrivedItems.reduce((s, i) => s + (shippingShareByItem.get(i.id) ?? 0), 0);
+      const totalShipUsd = arrivedItems.reduce((s, i) => s + (shippingShareUsdByItem.get(i.id) ?? 0), 0);
       events.push({
         type: 'arrived',
         date: lastDate,
         data: batchData,
         qty: arrivedForModel,
+        shipUyuPerUnit: totalShipUyu / arrivedForModel,
+        shipUsdPerUnit: totalShipUsd / arrivedForModel,
       });
     }
   }
 
-  // Landed cost of one sold unit, in UYU: its base price plus the shipping
-  // share resolved above (0 while in transit).
-  const itemCostUyu = (i: typeof soldItems[0]) =>
+  // Landed cost of one unit, base price plus the shipping share resolved
+  // above (0 while in transit). Shared by sold-item profit math and the
+  // available-stock cost summary below.
+  const itemCostUyu = (i: typeof p.items[0]) =>
     Number(i.basePriceUyu) + (shippingShareByItem.get(i.id) ?? 0);
+  const itemCostUsd = (i: typeof p.items[0]) =>
+    Number(i.basePriceUsd) + (shippingShareUsdByItem.get(i.id) ?? 0);
 
   const cost = soldItems.reduce((s, i) => s + itemCostUyu(i), 0);
   const profit = revenue - cost;
   // A unit sold before it arrived has no shipping share yet, so its profit is
   // provisional until its shipment lands.
   const profitPending = soldItems.some((i) => !i.shipmentId);
+
+  // Landed cost of currently available (arrived, unsold) stock — the capital
+  // tied up in this model right now — total, average, and broken down by size.
+  const stockCostUyu = availableItems.reduce((s, i) => s + itemCostUyu(i), 0);
+  const stockCostUsd = availableItems.reduce((s, i) => s + itemCostUsd(i), 0);
+  const avgCostUyu = availableItems.length ? stockCostUyu / availableItems.length : 0;
+  const avgCostUsd = availableItems.length ? stockCostUsd / availableItems.length : 0;
+
+  const costBySizeMap = new Map<string, { count: number; totalUyu: number; totalUsd: number }>();
+  for (const i of availableItems) {
+    const entry = costBySizeMap.get(i.size) ?? { count: 0, totalUyu: 0, totalUsd: 0 };
+    entry.count += 1;
+    entry.totalUyu += itemCostUyu(i);
+    entry.totalUsd += itemCostUsd(i);
+    costBySizeMap.set(i.size, entry);
+  }
+  const costBySize = [...costBySizeMap].map(([size, { count, totalUyu, totalUsd }]) => ({
+    size,
+    count,
+    avgCostUyu: totalUyu / count,
+    avgCostUsd: totalUsd / count,
+  }));
 
   // Group sales by (date, collectedByUserId, size) so each collector gets their
   // own event per day, split by size — sizes now carry distinct cost/profit.
@@ -368,11 +451,19 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     ...productMeta(p),
     stock,
     inTransit,
+    reserved,
     availableBySize,
+    reservedBySize,
+    reservedItems,
     sold,
     revenue,
     profit,
     profitPending,
+    stockCostUyu,
+    stockCostUsd,
+    avgCostUyu,
+    avgCostUsd,
+    costBySize,
     events,
   };
 }
@@ -390,7 +481,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
         orderBy: { date: 'asc' },
       },
     },
-    orderBy: { purchaseDate: 'desc' },
+    orderBy: [{ purchaseDate: 'desc' }, { id: 'desc' }],
   });
 
   return batches.map((b) =>
@@ -433,7 +524,7 @@ export async function getPublicModels() {
   const models = products
     .map((p) => {
       const availableItems = p.items.filter(
-        (i) => i.shipmentId !== null && i.status === 'available'
+        (i) => i.shipmentId !== null && i.status === INVENTORY_STATUS.available
       );
       // When showing all models, suppress sizes entirely (availability not guaranteed)
       const sizes = SHOW_ALL_MODELS
