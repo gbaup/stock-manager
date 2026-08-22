@@ -54,7 +54,7 @@ export function PurchasesScreen({
   // from "en camino" to "recibidas".
   const orderMap = new Map(
     [...batches]
-      .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate))
+      .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate) || a.id.localeCompare(b.id))
       .map((b, i) => [b.id, i + 1]),
   );
 

@@ -10,7 +10,7 @@ import { DModal } from '@/components/ui/d-modal';
 import { Modal } from '@/components/ui/modal';
 import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
-import { fmtType, compareSizes, sizeStockOf, costBySizeOf } from '@/app/lib/domain';
+import { fmtType, compareSizes, sizeStockOf, costBySizeOf, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { fetchModelDetail } from '@/app/actions/read';
@@ -58,15 +58,7 @@ export function InventoryScreen({
     });
   }
 
-  const q = query.trim().toLowerCase();
-  let list = models.filter((m) => {
-    if (!q) return true;
-    return [m.team, m.season, m.version, m.color, m.player, m.number, m.type]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .includes(q);
-  });
+  let list = models.filter((m) => matchesModel(m, query));
   if (filter === 'instock') list = list.filter((m) => m.stock > 0);
   else if (filter === 'out') list = list.filter((m) => m.stock === 0);
   else if (filter === 'transit') list = list.filter((m) => m.inTransit > 0);

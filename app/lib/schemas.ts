@@ -47,7 +47,7 @@ export type SaleFormValues = z.infer<typeof saleSchema>;
 
 const reserveFields = {
   ...claimFields,
-  note: z.string().optional(),
+  note: z.string().max(200, 'Máximo 200 caracteres').optional(),
 };
 
 export const reserveSchema = z.object(reserveFields);

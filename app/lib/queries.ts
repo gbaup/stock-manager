@@ -481,7 +481,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
         orderBy: { date: 'asc' },
       },
     },
-    orderBy: { purchaseDate: 'desc' },
+    orderBy: [{ purchaseDate: 'desc' }, { id: 'desc' }],
   });
 
   return batches.map((b) =>
