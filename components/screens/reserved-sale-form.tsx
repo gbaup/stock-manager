@@ -2,13 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import { Swatch, coverOf } from '@/components/ui/swatch';
-import { Field, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
-import { Segmented } from '@/components/ui/segmented';
 import { ModalFooter } from '@/components/ui/modal-footer';
-import { METHODS } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { todayISO } from '@/app/lib/format';
 import { sellReservedItem } from '@/app/actions/reservations';
+import { SaleMoneyFields } from '@/components/screens/sale-money-fields';
 
 // Finalizes a reserved unit as a sale: same price/date/method/collector
 // fields as editing a sale (saleEditSchema), since size/quantity are already
@@ -32,7 +30,6 @@ export function ReservedSaleForm({
   const [description, setDescription] = useState('');
   const [collectedByUserId, setCollectedByUserId] = useState('');
 
-  const collectedByAlias = users.find((u) => u.id === collectedByUserId)?.alias ?? '';
   const canSave = parseFloat(price) > 0 && !!date && !!collectedByUserId;
 
   function handleSave() {
@@ -72,30 +69,19 @@ export function ReservedSaleForm({
           </div>
         </div>
 
-        <div className="section-label" style={{ marginTop: 6 }}>Venta</div>
-        <Field label="Precio de venta (UYU)">
-          <MoneyInput value={price} onChange={setPrice} placeholder="2200" />
-        </Field>
-        <Field label="Fecha">
-          <input className="input mono" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-        <Field label="Método de pago" optional>
-          <SelectInput value={method} onChange={setMethod} options={METHODS} placeholder="Elegí un método…" />
-        </Field>
-
-        <div className="section-label">Cobro</div>
-        <Field label="¿Quién cobró?">
-          <Segmented
-            options={users.map((u) => u.alias)}
-            value={collectedByAlias}
-            onChange={(alias) => setCollectedByUserId(users.find((u) => u.alias === alias)?.id ?? '')}
-            full
-          />
-        </Field>
-
-        <Field label="Descripción" optional>
-          <TextAreaInput value={description} onChange={setDescription} placeholder="Comprador, notas…" />
-        </Field>
+        <SaleMoneyFields
+          price={price}
+          onPriceChange={setPrice}
+          date={date}
+          onDateChange={setDate}
+          method={method}
+          onMethodChange={setMethod}
+          description={description}
+          onDescriptionChange={setDescription}
+          collectedByUserId={collectedByUserId}
+          onCollectedByUserIdChange={setCollectedByUserId}
+          users={users}
+        />
 
         {saveError && (
           <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>

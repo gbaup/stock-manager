@@ -7,10 +7,31 @@ export function parseOrThrow<T>(schema: z.ZodSchema<T>, data: unknown): T {
   return result.data;
 }
 
-const saleFields = {
+// Shared by any schema that claims units from stock (a sale or a reservation).
+const claimFields = {
   size: z.string().min(1, 'Elegí un talle'),
-  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
   quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
+};
+
+// `sizeStock` maps each in-stock size to its available count. Quantity is
+// capped to the *selected* size's stock, not the model total.
+function capQuantityToStock(sizeStock: Record<string, number>) {
+  return (data: { size: string; quantity: string }, ctx: z.RefinementCtx) => {
+    const avail = sizeStock[data.size] ?? 0;
+    const qty = parseInt(data.quantity, 10);
+    if (qty > 0 && qty > avail) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['quantity'],
+        message: avail === 0 ? 'Sin stock en ese talle' : `Solo hay ${avail} en ese talle`,
+      });
+    }
+  };
+}
+
+const saleFields = {
+  ...claimFields,
+  price: z.string().refine((v) => parseFloat(v) > 0, 'Ingresá un precio válido'),
   date: z.string().min(1, 'Requerido'),
   method: z.string().optional(),
   description: z.string().optional(),
@@ -19,45 +40,20 @@ const saleFields = {
 
 export const saleSchema = z.object(saleFields);
 
-// `sizeStock` maps each in-stock size to its available count. Quantity is
-// capped to the *selected* size's stock, not the model total.
 export const makeSaleSchema = (sizeStock: Record<string, number>) =>
-  z.object(saleFields).superRefine((data, ctx) => {
-    const avail = sizeStock[data.size] ?? 0;
-    const qty = parseInt(data.quantity, 10);
-    if (qty > 0 && qty > avail) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['quantity'],
-        message: avail === 0 ? 'Sin stock en ese talle' : `Solo hay ${avail} en ese talle`,
-      });
-    }
-  });
+  z.object(saleFields).superRefine(capQuantityToStock(sizeStock));
 
 export type SaleFormValues = z.infer<typeof saleSchema>;
 
 const reserveFields = {
-  size: z.string().min(1, 'Elegí un talle'),
-  quantity: z.string().refine((v) => parseInt(v, 10) > 0, 'Debe ser mayor a 0'),
+  ...claimFields,
   note: z.string().optional(),
 };
 
 export const reserveSchema = z.object(reserveFields);
 
-// Same cap-to-available-stock pattern as makeSaleSchema — a reservation can
-// only claim units that are actually available.
 export const makeReserveSchema = (sizeStock: Record<string, number>) =>
-  z.object(reserveFields).superRefine((data, ctx) => {
-    const avail = sizeStock[data.size] ?? 0;
-    const qty = parseInt(data.quantity, 10);
-    if (qty > 0 && qty > avail) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['quantity'],
-        message: avail === 0 ? 'Sin stock en ese talle' : `Solo hay ${avail} en ese talle`,
-      });
-    }
-  });
+  z.object(reserveFields).superRefine(capQuantityToStock(sizeStock));
 
 export type ReserveFormValues = z.infer<typeof reserveSchema>;
 

@@ -119,6 +119,15 @@ export function batchToSummary(
   const shippingPaidByUserId = lastShipment?.shippingPaidByUserId ?? null;
   const shippingPaidByAlias = lastShipment?.shippingPaidByAlias ?? null;
 
+  const supplierPayments = b.supplierPayments.map((p) => ({
+    userId: p.userId,
+    alias: p.user.alias,
+    amountUsd: Number(p.amountUsd),
+    cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
+  }));
+  const totalCostUsd = items.reduce((s, i) => s + Number(i.basePriceUsd), 0);
+  const baseCostNoFeeUsd = supplierPayments.reduce((s, p) => s + p.amountUsd, 0);
+
   return {
     id: b.id,
     supplier: b.supplier,
@@ -132,12 +141,9 @@ export function batchToSummary(
     shippingPriceUyu: shippingPriceUyu || null,
     weight,
     status,
-    supplierPayments: b.supplierPayments.map((p) => ({
-      userId: p.userId,
-      alias: p.user.alias,
-      amountUsd: Number(p.amountUsd),
-      cardTaxPct: p.cardTaxPct != null ? Number(p.cardTaxPct) : null,
-    })),
+    totalCostUsd,
+    baseCostNoFeeUsd,
+    supplierPayments,
     shippingPaidByUserId,
     shippingPaidByAlias,
     items: items.map((i) => ({

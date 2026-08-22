@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUserId } from '@/app/lib/auth';
 import { reserveSchema, saleEditSchema, parseOrThrow, type SaleEditFormValues } from '@/app/lib/schemas';
 import {
-  reserveItems, NotEnoughStockError,
+  reserveItems, NotEnoughStockError, ReservationResolvedError,
   releaseReservation as releaseReservationInventory,
   sellReservedItem as sellReservedItemInventory,
 } from '@/app/lib/inventory';
@@ -55,7 +55,7 @@ export async function sellReservedItem(itemId: string, data: SaleEditFormValues)
       userId,
     );
   } catch (e) {
-    if (e instanceof NotEnoughStockError) throw new Error('El item ya no está reservado');
+    if (e instanceof ReservationResolvedError) throw new Error(e.message);
     throw e;
   }
 }

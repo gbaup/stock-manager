@@ -243,7 +243,7 @@ function PurchaseCard({
       batch.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
         <Tag kind="ok">recibida</Tag>;
 
-  const totalShippingUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
+  const totalShippingUsd = batch.shippingPriceUsd ?? 0;
   const arrivalDate = batch.arrivalDate;
   const arriveLabel = isPartial ? 'Llegó más' : 'Llegó';
 
@@ -359,7 +359,7 @@ function BuyTable({
           const qty = b.items.length;
           const isPartial = b.status === 'partial';
           const detail = b.supplier || b.description || '';
-          const rowValueUsd = b.items.reduce((s, i) => s + i.basePriceUsd, 0);
+          const rowValueUsd = b.totalCostUsd;
           const tag =
             b.status === 'transit' ? <Tag kind="transit">en camino</Tag> :
             b.status === 'partial' ? <Tag kind="partial">parcial</Tag> :
@@ -405,9 +405,9 @@ function BuyDetailPanel({
   const isArrived = batch.status === 'arrived';
   const isPartial = batch.status === 'partial';
   const qty = batch.items.length;
-  const totalShipUsd = batch.shipments.reduce((s, sh) => s + (sh.shippingPriceUsd ?? 0), 0);
-  const totalCostUsd = batch.items.reduce((s, i) => s + i.basePriceUsd, 0);
-  const baseCostNoFeeUsd = batch.supplierPayments.reduce((s, p) => s + p.amountUsd, 0);
+  const totalShipUsd = batch.shippingPriceUsd ?? 0;
+  const totalCostUsd = batch.totalCostUsd;
+  const baseCostNoFeeUsd = batch.baseCostNoFeeUsd;
 
   const tag =
     batch.status === 'transit' ? <Tag kind="transit">en camino</Tag> :

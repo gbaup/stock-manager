@@ -185,6 +185,11 @@ export type BatchSummary = {
   shippingPriceUyu: number | null;
   weight: number | null;
   status: PurchaseStatus;
+  // Sum of items' basePriceUsd (gross, card surcharge baked in) and of
+  // supplierPayments' amountUsd — computed once here so callers don't each
+  // re-derive the same sums from items/supplierPayments.
+  totalCostUsd: number;
+  baseCostNoFeeUsd: number;
   supplierPayments: Array<{ userId: string; alias: string; amountUsd: number; cardTaxPct: number | null }>;
   shippingPaidByUserId: string | null;
   shippingPaidByAlias: string | null;

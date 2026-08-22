@@ -10,9 +10,9 @@ import type { ShipmentRecord, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { updateShipment } from '@/app/actions/purchases';
 import { shipmentEditSchema, type ShipmentEditFormValues } from '@/app/lib/schemas';
-import { Modal } from '@/components/ui/modal';
 import { ModalFooter } from '@/components/ui/modal-footer';
-import { useConfirmGate } from '@/app/lib/hooks';
+import { useShippingPayerConfirm } from '@/app/lib/hooks';
+import { ShippingPayerConfirmModal } from '@/components/ui/shipping-payer-confirm-modal';
 
 // Reconstructs a display-only USD/kg rate from the stored price + weight —
 // the rate itself isn't persisted, only weight and the computed prices are.
@@ -47,7 +47,6 @@ export function ShipmentEditForm({
 
   const watchedShipUsd = useWatch({ control, name: 'shippingRateUsd' });
   const watchedWeight = useWatch({ control, name: 'weight' });
-  const hasShip = (parseFloat(watchedShipUsd || '') || 0) > 0 && (parseFloat(watchedWeight || '') || 0) > 0;
 
   function doSubmit(data: ShipmentEditFormValues) {
     startTransition(async () => {
@@ -62,15 +61,9 @@ export function ShipmentEditForm({
     });
   }
 
-  const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
-
-  function onSubmit(data: ShipmentEditFormValues) {
-    if (hasShip && !data.shippingPaidByUserId) {
-      requestConfirm(data);
-      return;
-    }
-    doSubmit(data);
-  }
+  const { hasShip, onSubmit, showConfirm, confirm, cancel } = useShippingPayerConfirm(
+    watchedShipUsd, watchedWeight, doSubmit,
+  );
 
   return (
     <>
@@ -128,16 +121,7 @@ export function ShipmentEditForm({
         pendingLabel="Guardando…"
       />
       {showConfirm && (
-        <Modal
-          icon={null}
-          title="Sin responsable de envío"
-          confirmLabel={pending ? 'Guardando…' : 'Confirmar igual'}
-          cancelLabel="Volver"
-          onConfirm={confirm}
-          onCancel={cancel}
-        >
-          El costo del envío no se va a descontar del saldo de nadie.
-        </Modal>
+        <ShippingPayerConfirmModal pending={pending} onConfirm={confirm} onCancel={cancel} />
       )}
     </>
   );

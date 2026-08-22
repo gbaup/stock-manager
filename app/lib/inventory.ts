@@ -1,7 +1,6 @@
-import { updateTag } from 'next/cache';
 import { prisma } from './prisma';
 import { money } from './money';
-import { invalidateSale, CACHE_TAGS } from './cache-tags';
+import { invalidateSale, invalidateReservation } from './cache-tags';
 import { compareSizes, SALE_STATUS, INVENTORY_STATUS } from './domain';
 
 // Narrow write interfaces: only the delegates each helper needs.
@@ -31,6 +30,16 @@ export class NotEnoughStockError extends Error {
   constructor() {
     super('Stock insuficiente');
     this.name = 'NotEnoughStockError';
+  }
+}
+
+// Distinct from NotEnoughStockError: the FIFO pool wasn't short on stock —
+// this specific reservation was already sold or released by someone else
+// between the caller reading it and submitting.
+export class ReservationResolvedError extends Error {
+  constructor() {
+    super('El item ya no está reservado');
+    this.name = 'ReservationResolvedError';
   }
 }
 
@@ -311,7 +320,7 @@ export async function reserveItems(
     return ids;
   });
 
-  updateTag(CACHE_TAGS.models);
+  invalidateReservation();
   return { itemIds };
 }
 
@@ -323,7 +332,7 @@ export async function releaseReservation(itemId: string): Promise<void> {
   });
   if (count === 0) throw new Error('El item no está reservado');
 
-  updateTag(CACHE_TAGS.models);
+  invalidateReservation();
 }
 
 // Finalizes a reservation as a sale, going straight from 'reserved' to 'sold'
@@ -345,7 +354,7 @@ export async function sellReservedItem(
       where: { id: itemId, status: INVENTORY_STATUS.reserved },
       data: { status: INVENTORY_STATUS.sold, reservedNote: null },
     });
-    if (count === 0) throw new NotEnoughStockError();
+    if (count === 0) throw new ReservationResolvedError();
 
     const sale = await tx.sale.create({
       data: {

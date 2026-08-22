@@ -14,9 +14,9 @@ import type { BatchSummary, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { markArrived } from '@/app/actions/purchases';
 import { arrivalSchema, type ArrivalFormValues } from '@/app/lib/schemas';
-import { Modal } from '@/components/ui/modal';
 import { ModalFooter } from '@/components/ui/modal-footer';
-import { useConfirmGate } from '@/app/lib/hooks';
+import { useShippingPayerConfirm } from '@/app/lib/hooks';
+import { ShippingPayerConfirmModal } from '@/components/ui/shipping-payer-confirm-modal';
 
 export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummary; users: UserSummary[]; rate: RateResult; onDone?: () => void }) {
   const router = useRouter();
@@ -53,7 +53,6 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
 
   const watchedShipUsd = useWatch({ control, name: 'shippingRateUsd' });
   const watchedWeight = useWatch({ control, name: 'weight' });
-  const hasShip = (parseFloat(watchedShipUsd || '') || 0) > 0 && (parseFloat(watchedWeight || '') || 0) > 0;
 
   useEffect(() => {
     setValue('itemIds', [...picked], { shouldValidate: false });
@@ -90,15 +89,12 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
     });
   }
 
-  const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
+  const { hasShip, onSubmit: onSubmitWithConfirm, showConfirm, confirm, cancel } = useShippingPayerConfirm(
+    watchedShipUsd, watchedWeight, doSubmit,
+  );
 
   function onSubmit(data: ArrivalFormValues) {
-    const payload: ArrivalFormValues = { ...data, itemIds: [...picked] };
-    if (hasShip && !payload.shippingPaidByUserId) {
-      requestConfirm(payload);
-      return;
-    }
-    doSubmit(payload);
+    onSubmitWithConfirm({ ...data, itemIds: [...picked] });
   }
 
   // Keep itemIds field in sync for zod validation
@@ -246,16 +242,7 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
   );
 
   const confirmModal = showConfirm ? (
-    <Modal
-      icon={null}
-      title="Sin responsable de envío"
-      confirmLabel={pending ? 'Guardando…' : 'Confirmar igual'}
-      cancelLabel="Volver"
-      onConfirm={confirm}
-      onCancel={cancel}
-    >
-      El costo del envío no se va a descontar del saldo de nadie.
-    </Modal>
+    <ShippingPayerConfirmModal pending={pending} onConfirm={confirm} onCancel={cancel} />
   ) : null;
 
   if (onDone) {

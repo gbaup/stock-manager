@@ -1,20 +1,19 @@
 'use client';
 
 import { useTransition, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Swatch, coverOf } from '@/components/ui/swatch';
-import { SizePicker } from '@/components/ui/size-picker';
 import { Field, TextInput } from '@/components/ui/field';
 import { sizeStockOf } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { reserveStock } from '@/app/actions/reservations';
 import { makeReserveSchema, type ReserveFormValues } from '@/app/lib/schemas';
 import { ModalFooter } from '@/components/ui/modal-footer';
+import { ClaimFields } from '@/components/screens/claim-fields';
 
 // Reserves N units of a size for a client (bought but not yet delivered).
-// Same size+quantity, auto-FIFO shape as SaleForm, minus money/collector
-// fields — reserving isn't a sale, just a hold on stock.
+// Shares its hero+size+quantity block with SaleForm via ClaimFields, minus
+// money/collector fields — reserving isn't a sale, just a hold on stock.
 export function ReserveForm({ model, onDone }: { model: ModelWithStats; onDone: () => void }) {
   const [pending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -28,6 +27,9 @@ export function ReserveForm({ model, onDone }: { model: ModelWithStats; onDone: 
     resolver: zodResolver(makeReserveSchema(sizeStock)),
     defaultValues: { size: onlySize, quantity: '1', note: '' },
   });
+
+  const { field: sizeField } = useController({ name: 'size', control });
+  const { field: quantityField } = useController({ name: 'quantity', control });
 
   function onSubmit(data: ReserveFormValues) {
     setSaveError(null);
@@ -44,43 +46,16 @@ export function ReserveForm({ model, onDone }: { model: ModelWithStats; onDone: 
   return (
     <>
       <div className="dm-body">
-        <div className="detail-hero" style={{ marginBottom: 4 }}>
-          <Swatch
-            color={model.color}
-            number={model.number}
-            photo={coverOf(model)}
-            style={{ width: 64, height: 74, fontSize: 24 }}
-          />
-          <div>
-            <div className="detail-team" style={{ fontSize: 19 }}>{model.team}</div>
-            <div className="detail-meta">{model.season} · {model.version} · {model.stock} en stock</div>
-          </div>
-        </div>
-
-        <Field label="Talle" error={errors.size?.message}>
-          <Controller
-            name="size"
-            control={control}
-            render={({ field }) => (
-              <SizePicker availableBySize={model.availableBySize} value={field.value} onChange={field.onChange} />
-            )}
-          />
-        </Field>
-
-        <Field label="Cantidad" error={errors.quantity?.message}>
-          <Controller
-            name="quantity"
-            control={control}
-            render={({ field }) => (
-              <TextInput
-                value={field.value}
-                onChange={(v) => field.onChange(v.replace(/[^\d]/g, ''))}
-                mono
-                inputMode="numeric"
-              />
-            )}
-          />
-        </Field>
+        <ClaimFields
+          model={model}
+          stock={model.stock}
+          size={sizeField.value}
+          onSizeChange={sizeField.onChange}
+          sizeError={errors.size?.message}
+          quantity={quantityField.value}
+          onQuantityChange={quantityField.onChange}
+          quantityError={errors.quantity?.message}
+        />
 
         <Field label="Nota" optional>
           <Controller
