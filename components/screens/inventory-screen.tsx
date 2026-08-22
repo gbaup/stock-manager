@@ -8,7 +8,7 @@ import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
 import { Modal } from '@/components/ui/modal';
-import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark } from 'lucide-react';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark, Share2 } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf, costBySizeOf, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
@@ -18,6 +18,7 @@ import { ModelForm } from '@/components/screens/model-form';
 import { SaleForm } from '@/components/screens/sale-form';
 import { ReserveForm } from '@/components/screens/reserve-form';
 import { ReservedSaleForm } from '@/components/screens/reserved-sale-form';
+import { ShareStockModal } from '@/components/screens/share-stock-modal';
 import { releaseReservation } from '@/app/actions/reservations';
 
 type Layout = 'cards' | 'rows' | 'grid';
@@ -47,6 +48,7 @@ export function InventoryScreen({
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
+  const [showShareStock, setShowShareStock] = useState(false);
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => new Set());
 
   function toggleTeam(team: string) {
@@ -143,6 +145,14 @@ export function InventoryScreen({
                 ? <List size={16} strokeWidth={1.8} />
                 : <LayoutGrid size={16} strokeWidth={1.8} />
               }
+            </button>
+            <button
+              className="iconbtn plain"
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowShareStock(true)}
+              title="Compartir stock"
+            >
+              <Share2 size={16} strokeWidth={1.8} />
             </button>
             <button className="btn btn-primary" onClick={() => setShowNewModel(true)}>
               Nuevo modelo
@@ -241,6 +251,9 @@ export function InventoryScreen({
             />
           </DModal>
         )}
+        {showShareStock && (
+          <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
+        )}
 
         <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
@@ -267,6 +280,14 @@ export function InventoryScreen({
                 {l === 'cards' ? <Package size={16} strokeWidth={1.8} /> : l === 'rows' ? <List size={16} strokeWidth={1.8} /> : <LayoutGrid size={16} strokeWidth={1.8} />}
               </button>
             ))}
+            <button
+              className="iconbtn plain"
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowShareStock(true)}
+              title="Compartir stock"
+            >
+              <Share2 size={16} strokeWidth={1.8} />
+            </button>
           </div>
         }
       />
@@ -315,6 +336,9 @@ export function InventoryScreen({
       <button className="fab" onClick={() => router.push('/inventory/new')} aria-label="Agregar modelo">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      {showShareStock && (
+        <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
+      )}
       <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>

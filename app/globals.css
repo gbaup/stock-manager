@@ -5888,6 +5888,20 @@ body {
   padding: 0 18px;
 }
 
+.share-preview {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  padding: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dm-card { animation: none; }
 }

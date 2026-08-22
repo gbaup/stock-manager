@@ -1,4 +1,5 @@
-import { ITEM_TYPES, sizesForType } from './domain';
+import { ITEM_TYPES, sizesForType, compareSizes, compareVersions, matchesModel, fmtType, fmtVersion, fmtSize } from './domain';
+import type { ModelWithStats } from './domain';
 
 type ItemType = typeof ITEM_TYPES[number];
 
@@ -49,4 +50,47 @@ export function modelMatchesFacets(model: CatalogModel, selected: Facets): boole
   if (selected.versions.length > 0 && !selected.versions.includes(model.version ?? '')) return false;
   if (selected.sizes.length > 0 && !selected.sizes.some((s) => hasSize(model, s))) return false;
   return true;
+}
+
+// ---- "Compartir stock" text generation ----
+// Builds a price-free, WhatsApp-pasteable summary of in-stock models matching
+// a type/size/search filter. Pure, no React/DOM — lives here (rather than
+// domain.ts) so it can reuse modelMatchesFacets without a circular import.
+
+export type ShareStockFilters = { types: string[]; sizes: string[]; query: string };
+
+export type ShareStockBlock = {
+  model: ModelWithStats;
+  sizeEntries: { size: string; count: number }[];
+};
+
+// Team names are stored/rendered lowercase and only capitalized via a CSS
+// class elsewhere — plain clipboard text has no CSS, so title-case it here.
+const titleCase = (s: string): string => s.replace(/\b\w/g, (c) => c.toUpperCase());
+
+export function shareStockBlocks(
+  models: ModelWithStats[],
+  filters: ShareStockFilters,
+): ShareStockBlock[] {
+  return models
+    .filter((m) => modelMatchesFacets(m, { types: filters.types, sizes: filters.sizes, versions: [] }))
+    .filter((m) => matchesModel(m, filters.query))
+    .map((m) => ({
+      model: m,
+      sizeEntries: m.availableBySize
+        .filter((s) => s.count > 0 && (filters.sizes.length === 0 || filters.sizes.includes(s.size)))
+        .sort((a, b) => compareSizes(a.size, b.size)),
+    }))
+    .filter((b) => b.sizeEntries.length > 0)
+    .sort((a, b) => a.model.team.localeCompare(b.model.team) || compareVersions(a.model.version, b.model.version));
+}
+
+export function shareStockText(blocks: ShareStockBlock[]): string {
+  return blocks
+    .map(({ model: m, sizeEntries }) => {
+      const header = [titleCase(m.team), fmtVersion(m.version), fmtType(m.type)].filter(Boolean).join(' · ');
+      const sizesLine = 'Talles disponibles: ' + sizeEntries.map((s) => `${fmtSize(s.size)} (${s.count})`).join(', ');
+      return `${header}\n${sizesLine}`;
+    })
+    .join('\n\n');
 }
