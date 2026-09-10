@@ -8,7 +8,7 @@ import { shippingShareUyu, derivePurchaseStatus, SALE_STATUS } from './domain';
 import type {
   ModelWithStats, ModelDetail, BatchSummary,
   ModelMeta, TimelineEvent, SaleRecord, UserSummary,
-  ShipmentRecord, SaleStatus,
+  ShipmentRecord, SaleStatus, ExpenseRecord,
 } from './domain';
 
 export type HomeSaleItem = {
@@ -524,6 +524,33 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       collectedByAlias: s.collectedByUser?.alias ?? null,
     };
   });
+}
+
+export async function getExpensesForMetrics(): Promise<ExpenseRecord[]> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag(CACHE_TAGS.saldos);
+  const rows = await prisma.expense.findMany({
+    select: {
+      id: true,
+      title: true,
+      amount: true,
+      currency: true,
+      date: true,
+      paidByUserId: true,
+      paidByUser: { select: { alias: true } },
+    },
+    orderBy: { date: 'desc' },
+  });
+  return rows.map((e) => ({
+    id: e.id,
+    title: e.title,
+    amount: Number(e.amount),
+    currency: e.currency as 'UYU' | 'USD',
+    paidByUserId: e.paidByUserId,
+    paidByAlias: e.paidByUser.alias,
+    date: toISODate(e.date)!,
+  }));
 }
 
 export type LedgerSaleRow = {

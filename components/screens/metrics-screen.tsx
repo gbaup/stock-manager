@@ -5,15 +5,18 @@ import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { todayISO } from '@/app/lib/format';
-import type { UserSummary } from '@/app/lib/domain';
+import type { UserSummary, ExpenseRecord } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { useIsDesktop } from '@/app/lib/hooks';
 import {
   defaultFrom, monthKey, monthsBetween, activeInRange, methodBucket,
   buildTopModels, buildClubBreakdown, buildSizeBreakdown,
+  buildCashflowSeries, buildCashflowByPerson,
 } from '@/components/screens/metrics/aggregations';
 import type { SortKey } from '@/components/screens/metrics/aggregations';
 import { SellerLineChart } from '@/components/screens/metrics/seller-line-chart';
+import { CashflowChart } from '@/components/screens/metrics/cashflow-chart';
+import { CashflowByPersonChart } from '@/components/screens/metrics/cashflow-by-person-chart';
 import { MarginChart } from '@/components/screens/metrics/margin-chart';
 import { PaymentMethodChart } from '@/components/screens/metrics/payment-method-chart';
 import { SizeBarChart } from '@/components/screens/metrics/size-bar-chart';
@@ -24,10 +27,14 @@ export function MetricsScreen({
   sales,
   users,
   transitCount,
+  expenses,
+  exchangeRate,
 }: {
   sales: HomeSaleItem[];
   users: UserSummary[];
   transitCount: number;
+  expenses: ExpenseRecord[];
+  exchangeRate: number;
 }) {
   const isDesktop = useIsDesktop();
   const [range, setRange] = useState({ from: defaultFrom(), to: todayISO() });
@@ -84,6 +91,16 @@ export function MetricsScreen({
   const clubData = useMemo(() => buildClubBreakdown(activeSales), [activeSales]);
   const sizeData = useMemo(() => buildSizeBreakdown(activeSales), [activeSales]);
 
+  const cashflowSeries = useMemo(
+    () => buildCashflowSeries(activeSales, expenses, months, range.from, range.to, exchangeRate),
+    [activeSales, expenses, months, range.from, range.to, exchangeRate],
+  );
+
+  const cashflowByPerson = useMemo(
+    () => buildCashflowByPerson(activeSales, expenses, months, users, range.from, range.to, exchangeRate),
+    [activeSales, expenses, months, users, range.from, range.to, exchangeRate],
+  );
+
   const toggle = (key: string) => setHidden((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -127,6 +144,13 @@ export function MetricsScreen({
             monthlySeries={monthlySeries}
             users={users}
             hasUnassigned={hasUnassigned}
+            hidden={hidden}
+            onToggle={toggle}
+          />
+          <CashflowChart cashflowSeries={cashflowSeries} />
+          <CashflowByPersonChart
+            cashflowByPerson={cashflowByPerson}
+            users={users}
             hidden={hidden}
             onToggle={toggle}
           />
