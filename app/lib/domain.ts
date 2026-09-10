@@ -112,10 +112,25 @@ export function modelHaystack(m: ModelMeta): string {
   );
 }
 
-// Does a model match a free-text query? Empty query matches everything.
+// Words that only ever describe a searchable field (mirroring the search
+// placeholders' own copy — "Buscá equipo, jugador, color…") but never appear
+// as literal data. Dropped from the query so typing the field name itself
+// doesn't zero out real matches.
+const LABEL_WORDS = new Set(['equipo', 'jugador', 'color', 'numero', 'nro']);
+
+function queryTokens(query: string): string[] {
+  const all = normalizeText(query).trim().split(/\s+/).filter(Boolean);
+  const meaningful = all.filter((t) => !LABEL_WORDS.has(t));
+  return meaningful.length > 0 ? meaningful : all;
+}
+
+// Does a model match a free-text query? Every token must appear somewhere in
+// the haystack, in any order. Empty query matches everything.
 export function matchesModel(m: ModelMeta, query: string): boolean {
-  const q = normalizeText(query.trim());
-  return q === '' || modelHaystack(m).includes(q);
+  const tokens = queryTokens(query);
+  if (tokens.length === 0) return true;
+  const haystack = modelHaystack(m);
+  return tokens.every((t) => haystack.includes(t));
 }
 
 // Size -> available unit count, the shape the sale schema validates against.

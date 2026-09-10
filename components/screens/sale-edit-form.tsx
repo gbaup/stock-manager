@@ -59,7 +59,7 @@ export function SaleEditForm({
   const results = models
     .filter((m) => matchesModel(m, query))
     .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
-    .slice(0, 7);
+    .slice(0, 50);
 
   function run(action: () => Promise<void>, fallback: string) {
     setSaveError(null);
