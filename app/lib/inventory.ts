@@ -226,6 +226,12 @@ export async function recordMeliOrder(
   loggedByUserId: string,
 ): Promise<{ alreadyRecorded: boolean; saleIds: string[] }> {
   return prisma.$transaction(async (tx) => {
+    // Serialize concurrent imports of the same order: under READ COMMITTED two
+    // transactions would both see "no sale yet" and both claim stock. The
+    // transaction-scoped advisory lock makes the second one wait, then see the
+    // first one's committed sales below.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meliOrderId}))`;
+
     const existing = await tx.sale.findMany({
       where: { meliOrderId, status: SALE_STATUS.active },
       select: { id: true },

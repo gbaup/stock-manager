@@ -7,7 +7,7 @@ import { invalidateSaleFromRoute } from '@/app/lib/cache-tags';
 const bodySchema = z.object({
   orderId: z.string().min(1).max(30),
   sellerId: z.string().min(1),
-  date: z.string().min(1),
+  date: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha inválida'),
   items: z.array(z.object({
     meliItemId: z.string().min(1).max(20),
     // Set only when a human confirmed the AI's guess; it is then saved as the
@@ -17,6 +17,15 @@ const bodySchema = z.object({
     quantity: z.number().int().positive(),
     unitPrice: z.number().positive(),
   })).min(1),
+}).superRefine((body, ctx) => {
+  // The same listing can't be linked to two different models in one order.
+  const seen = new Map<string, string | undefined>();
+  for (const it of body.items) {
+    if (it.modelId && seen.get(it.meliItemId) && seen.get(it.meliItemId) !== it.modelId) {
+      ctx.addIssue({ code: 'custom', message: `Modelos en conflicto para ${it.meliItemId}` });
+    }
+    if (it.modelId) seen.set(it.meliItemId, it.modelId);
+  }
 });
 
 export async function POST(request: Request) {
@@ -54,12 +63,14 @@ export async function POST(request: Request) {
 
   try {
     const result = await recordMeliOrder(orderId, lines, user.id);
-    if (!result.alreadyRecorded) {
-      // Save links only once the sale went through, so a rejected order
-      // doesn't persist a guess.
-      await Promise.all(resolved.filter((it) => it.modelId).map((it) => linkListing(it.meliItemId, it.modelId!)));
-      invalidateSaleFromRoute();
-    }
+    // Runs on alreadyRecorded too: a retry after a failed link/invalidation
+    // must still repair both. Links are best-effort (the sale is already
+    // committed) and only written once the sale went through, so a rejected
+    // order doesn't persist a guess.
+    invalidateSaleFromRoute();
+    const links = new Map(resolved.filter((it) => it.modelId).map((it) => [it.meliItemId, it.modelId!]));
+    const outcomes = await Promise.allSettled([...links].map(([itemId, modelId]) => linkListing(itemId, modelId)));
+    for (const o of outcomes) if (o.status === 'rejected') console.error('meli: could not save listing link', o.reason);
     return NextResponse.json({ ok: true, alreadyRecorded: result.alreadyRecorded, sales: result.saleIds.length });
   } catch (e) {
     if (e instanceof NotEnoughStockError) return NextResponse.json({ error: 'not_enough_stock' }, { status: 409 });
