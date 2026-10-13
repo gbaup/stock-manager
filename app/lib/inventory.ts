@@ -18,6 +18,8 @@ export type SaleIntent = {
   method: string | null;
   description: string | null;
   collectedByUserId: string | null;
+  // MercadoLibre order the sale was imported from (null for manual sales).
+  meliOrderId?: string | null;
 };
 
 export type NewBatchItem = {
@@ -198,6 +200,7 @@ export async function recordSale(
           method: intent.method,
           description: intent.description,
           collectedByUserId: intent.collectedByUserId,
+          meliOrderId: intent.meliOrderId ?? null,
         },
         select: { id: true },
       });
@@ -208,6 +211,55 @@ export async function recordSale(
 
   invalidateSale();
   return { saleIds };
+}
+
+// Imports a MercadoLibre order: every line (model+size, quantity) is claimed
+// and recorded inside ONE transaction, so an order with a short line sells
+// nothing. Idempotent per order — if an active Sale already carries this
+// `meliOrderId` the call is a no-op (`alreadyRecorded: true`), so a retried
+// confirmation can't double-sell. Unlike recordSale it does NOT invalidate
+// caches: it runs from a Route Handler where `updateTag` is unavailable, so
+// the caller revalidates (see invalidateSaleFromRoute).
+export async function recordMeliOrder(
+  meliOrderId: string,
+  lines: Array<{ intent: SaleIntent; quantity: number }>,
+  loggedByUserId: string,
+): Promise<{ alreadyRecorded: boolean; saleIds: string[] }> {
+  return prisma.$transaction(async (tx) => {
+    // Serialize concurrent imports of the same order: under READ COMMITTED two
+    // transactions would both see "no sale yet" and both claim stock. The
+    // transaction-scoped advisory lock makes the second one wait, then see the
+    // first one's committed sales below.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meliOrderId}))`;
+
+    const existing = await tx.sale.findMany({
+      where: { meliOrderId, status: SALE_STATUS.active },
+      select: { id: true },
+    });
+    if (existing.length > 0) return { alreadyRecorded: true, saleIds: existing.map((s) => s.id) };
+
+    const ids: string[] = [];
+    for (const { intent, quantity } of lines) {
+      for (let i = 0; i < quantity; i++) {
+        const itemId = await claimAvailableItem(tx, intent.modelId, intent.size, INVENTORY_STATUS.sold);
+        const sale = await tx.sale.create({
+          data: {
+            inventoryItemId: itemId,
+            userId: loggedByUserId,
+            price: intent.priceUyu,
+            date: intent.date,
+            method: intent.method,
+            description: intent.description,
+            collectedByUserId: intent.collectedByUserId,
+            meliOrderId,
+          },
+          select: { id: true },
+        });
+        ids.push(sale.id);
+      }
+    }
+    return { alreadyRecorded: false, saleIds: ids };
+  });
 }
 
 // Edits an active sale's details (price, date, method, collector). Details
