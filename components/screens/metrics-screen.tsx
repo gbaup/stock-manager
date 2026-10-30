@@ -161,6 +161,7 @@ export function MetricsScreen({
           onStepMonth={(delta) => setMonthOffset((o) => Math.min(0, o + delta))}
         />
         <div className="metrics-grid">
+          <CashflowChart cashflowSeries={cashflowSeries} />
           <SellerLineChart
             monthlySeries={monthlySeries}
             users={users}
@@ -168,7 +169,6 @@ export function MetricsScreen({
             hidden={hidden}
             onToggle={toggle}
           />
-          <CashflowChart cashflowSeries={cashflowSeries} />
           <MarginChart marginSeries={marginSeries} />
           <PaymentMethodChart methodData={methodData} />
           <SizeBarChart sizeData={sizeData} />

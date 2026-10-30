@@ -14,13 +14,9 @@ export function monthLabel(key: string): string {
   return `${MONTHS_SHORT[Number(m) - 1]} ${y.slice(2)}`;
 }
 
-// Six months back from today, inclusive of the current month — the default
-// window is wide enough to show a trend without listing years of history.
+// Year to date: January 1st of the current year.
 export function defaultFrom(): string {
-  const d = new Date();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() - 5);
-  return d.toISOString().slice(0, 10);
+  return `${new Date().getUTCFullYear()}-01-01`;
 }
 
 export function monthsBetween(from: string, to: string): string[] {
@@ -142,10 +138,7 @@ function monthlyRates(movements: Movement[], fallback: number): (month: string) 
 export type CashflowPoint = {
   month: string;
   income: number;
-  // Supplier and shipping payments — buying stock.
-  purchases: number;
-  // Everything else logged as an expense.
-  expenses: number;
+  outflow: number;
   net: number;
 };
 
@@ -162,20 +155,16 @@ export function buildCashflowSeries(
   fallbackRate: number,
 ): CashflowPoint[] {
   const rateFor = monthlyRates(movements, fallbackRate);
-  const outflows = movements.filter((m) => inRange(m.date, from, to));
+  const outflows = movements.filter((m) =>
+    (m.kind === 'pago-prov' || m.kind === 'pago-envio' || m.kind === 'gasto') && inRange(m.date, from, to));
   return months.map((key) => {
     const rate = rateFor(key);
-    const toUyu = (m: Movement) => Math.abs(m.uyu) + money.toUyu(Math.abs(m.usd), rate);
-    const monthOut = outflows.filter((m) => monthKey(m.date) === key);
     const income = activeSales
       .filter((s) => monthKey(s.date) === key)
       .reduce((a, s) => a + s.price, 0);
-    const purchases = monthOut
-      .filter((m) => m.kind === 'pago-prov' || m.kind === 'pago-envio')
-      .reduce((a, m) => a + toUyu(m), 0);
-    const expenses = monthOut
-      .filter((m) => m.kind === 'gasto')
-      .reduce((a, m) => a + toUyu(m), 0);
-    return { month: key, income, purchases, expenses, net: income - purchases - expenses };
+    const outflow = outflows
+      .filter((m) => monthKey(m.date) === key)
+      .reduce((a, m) => a + Math.abs(m.uyu) + money.toUyu(Math.abs(m.usd), rate), 0);
+    return { month: key, income, outflow, net: income - outflow };
   });
 }

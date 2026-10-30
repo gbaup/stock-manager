@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ComposedChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip, ReferenceLine,
 } from 'recharts';
 import type { TooltipValueType } from 'recharts';
 import { Empty } from '@/components/ui/empty';
@@ -14,7 +14,7 @@ export function CashflowChart({
 }: {
   cashflowSeries: CashflowPoint[];
 }) {
-  const hasData = cashflowSeries.some((m) => m.income > 0 || m.purchases > 0 || m.expenses > 0);
+  const hasData = cashflowSeries.some((m) => m.income > 0 || m.outflow > 0);
 
   return (
     <div className="chart-card span-2">
@@ -30,15 +30,16 @@ export function CashflowChart({
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={cashflowSeries}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" />
-            <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 11 }} />
+            {/* Axis line hidden: the zero line below stands in for it, so it sits at 0 when net goes negative. */}
+            <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 11 }} axisLine={false} />
             <YAxis tickFormatter={compactUyu} tick={{ fontSize: 11 }} width={56} />
             <Tooltip
               labelFormatter={(v: React.ReactNode) => monthLabel(String(v))}
               formatter={(v: TooltipValueType | undefined) => uyu(Number(v))}
             />
             <Bar dataKey="income" name="Ingresos" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="purchases" name="Compras y envíos" stackId="out" fill="var(--danger)" />
-            <Bar dataKey="expenses" name="Gastos" stackId="out" fill="var(--warn)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="outflow" name="Egresos" fill="var(--danger)" radius={[4, 4, 0, 0]} />
+            <ReferenceLine y={0} stroke="var(--border-strong)" />
             <Line dataKey="net" name="Neto" stroke="var(--ok)" strokeWidth={2.5} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
