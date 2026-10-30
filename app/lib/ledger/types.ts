@@ -10,6 +10,8 @@ export type Movement = {
   sub: string;
   uyu: number;
   usd: number;
+  // Other side of a 'cambio'. Equal to `person` for a self currency swap.
+  counterparty?: string;
 };
 
 export type PersonBalance = {

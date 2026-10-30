@@ -5743,6 +5743,56 @@ body {
     grid-column: span 2;
   }
 
+  /* table bleeds to the card's side borders (cancels .chart-card's 18px padding) */
+  .chart-card > .dtable {
+    width: calc(100% + 36px);
+    margin: 0 -18px;
+  }
+
+  .flows-section {
+    margin-bottom: 16px;
+  }
+
+  .flows-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .flow-person {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .flow-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .flow-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+  }
+
+  .flow-big {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .flow-note {
+    font-size: 11.5px;
+    color: var(--text-faint);
+    font-weight: 500;
+    margin-top: 6px;
+  }
+
   .chart-card-head {
     display: flex;
     align-items: baseline;

@@ -5,8 +5,13 @@ import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { todayISO } from '@/app/lib/format';
+import { SALE_STATUS } from '@/app/lib/domain';
 import type { UserSummary, ExpenseRecord } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
+import type { Movement } from '@/app/lib/ledger';
+import { buildMonthlyFlows } from '@/app/lib/ledger/monthly-flows';
+import { monthFromOffset } from '@/components/ui/month-nav';
+import { PersonFlowsSection } from '@/components/screens/metrics/person-flows';
 import { useIsDesktop } from '@/app/lib/hooks';
 import {
   defaultFrom, monthKey, monthsBetween, activeInRange, methodBucket,
@@ -29,15 +34,33 @@ export function MetricsScreen({
   transitCount,
   expenses,
   exchangeRate,
+  movements,
 }: {
   sales: HomeSaleItem[];
   users: UserSummary[];
   transitCount: number;
   expenses: ExpenseRecord[];
   exchangeRate: number;
+  movements: Movement[];
 }) {
   const isDesktop = useIsDesktop();
   const [range, setRange] = useState({ from: defaultFrom(), to: todayISO() });
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, negative = past
+  const flowMonth = monthFromOffset(monthOffset).key;
+
+  const personFlows = useMemo(
+    () => buildMonthlyFlows(movements, flowMonth, users),
+    [movements, flowMonth, users],
+  );
+
+  // The ledger drops sales with no collector, so surface them from the sales list.
+  const unassignedUyu = useMemo(
+    () => sales
+      .filter((s) => s.status === SALE_STATUS.active && !s.collectedByUserId && monthKey(s.date) === flowMonth)
+      .reduce((a, s) => a + s.price, 0),
+    [sales, flowMonth],
+  );
+
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>('quantity');
 
@@ -139,6 +162,12 @@ export function MetricsScreen({
       </header>
 
       <div className="page">
+        <PersonFlowsSection
+          flows={personFlows}
+          unassignedUyu={unassignedUyu}
+          monthOffset={monthOffset}
+          onStepMonth={(delta) => setMonthOffset((o) => Math.min(0, o + delta))}
+        />
         <div className="metrics-grid">
           <SellerLineChart
             monthlySeries={monthlySeries}
