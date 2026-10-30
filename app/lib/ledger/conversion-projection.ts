@@ -12,6 +12,10 @@ export function projectConversion(c: ConversionRecord): Movement[] {
       ? 'Cambio · Pesos → Dólares'
       : 'Cambio · Dólares → Pesos';
   const sub = sameCur ? '' : `TC ${fmtRate(c.rate)}`;
+  const fx = sameCur ? undefined : {
+    uyu: c.fromCur === 'UYU' ? c.fromAmount : c.toAmount,
+    usd: c.fromCur === 'USD' ? c.fromAmount : c.toAmount,
+  };
 
   return [
     {
@@ -24,6 +28,7 @@ export function projectConversion(c: ConversionRecord): Movement[] {
       sub,
       uyu: c.fromCur === 'UYU' ? -c.fromAmount : 0,
       usd: c.fromCur === 'USD' ? -c.fromAmount : 0,
+      fx,
     },
     {
       id: `cambio-${c.id}-to`,

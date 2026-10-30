@@ -1,6 +1,6 @@
 import { SALE_STATUS, fmtVersion, compareSizes } from '@/app/lib/domain';
-import type { ExpenseRecord } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
+import type { Movement } from '@/app/lib/ledger';
 import { money } from '@/app/lib/money';
 
 const MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
@@ -120,29 +120,62 @@ export function buildSizeBreakdown(sales: HomeSaleItem[]): { size: string; quant
 
 export type SortKey = 'quantity' | 'revenue' | 'profit';
 
-// Expense amounts have no historical exchange rate in this app (BCU only
-// exposes today's rate), so USD expenses are approximated at the current
-// rate regardless of when they happened.
-function expenseInUyu(e: ExpenseRecord, rate: number): number {
-  return money.convert(e.amount, e.currency, 'UYU', rate);
+// UYU per USD for each month, from the pesos↔dollars swaps the partners
+// logged that month (amount-weighted). Months without swaps fall back to
+// today's rate — an approximation, but the only one available.
+function monthlyRates(movements: Movement[], fallback: number): (month: string) => number {
+  const sums = new Map<string, { uyu: number; usd: number }>();
+  for (const m of movements) {
+    if (!m.fx || m.fx.usd <= 0) continue;
+    const key = monthKey(m.date);
+    const acc = sums.get(key) ?? { uyu: 0, usd: 0 };
+    acc.uyu += m.fx.uyu;
+    acc.usd += m.fx.usd;
+    sums.set(key, acc);
+  }
+  return (month) => {
+    const acc = sums.get(month);
+    return acc ? acc.uyu / acc.usd : fallback;
+  };
 }
 
+export type CashflowPoint = {
+  month: string;
+  income: number;
+  // Supplier and shipping payments — buying stock.
+  purchases: number;
+  // Everything else logged as an expense.
+  expenses: number;
+  net: number;
+};
+
+// Cash in vs. cash out per month, in pesos. Out is every real payment —
+// supplier, shipping and expenses — on the date it was paid, so a month that
+// buys a batch can show a negative net even if it sold well. Transfers and
+// swaps between partners don't leave the business, so they're left out.
 export function buildCashflowSeries(
   activeSales: HomeSaleItem[],
-  expenses: ExpenseRecord[],
+  movements: Movement[],
   months: string[],
   from: string,
   to: string,
-  rate: number,
-): { month: string; income: number; expenses: number; net: number }[] {
-  const expensesInRange = expenses.filter((e) => inRange(e.date, from, to));
+  fallbackRate: number,
+): CashflowPoint[] {
+  const rateFor = monthlyRates(movements, fallbackRate);
+  const outflows = movements.filter((m) => inRange(m.date, from, to));
   return months.map((key) => {
+    const rate = rateFor(key);
+    const toUyu = (m: Movement) => Math.abs(m.uyu) + money.toUyu(Math.abs(m.usd), rate);
+    const monthOut = outflows.filter((m) => monthKey(m.date) === key);
     const income = activeSales
       .filter((s) => monthKey(s.date) === key)
       .reduce((a, s) => a + s.price, 0);
-    const expenseTotal = expensesInRange
-      .filter((e) => monthKey(e.date) === key)
-      .reduce((a, e) => a + expenseInUyu(e, rate), 0);
-    return { month: key, income, expenses: expenseTotal, net: income - expenseTotal };
+    const purchases = monthOut
+      .filter((m) => m.kind === 'pago-prov' || m.kind === 'pago-envio')
+      .reduce((a, m) => a + toUyu(m), 0);
+    const expenses = monthOut
+      .filter((m) => m.kind === 'gasto')
+      .reduce((a, m) => a + toUyu(m), 0);
+    return { month: key, income, purchases, expenses, net: income - purchases - expenses };
   });
 }

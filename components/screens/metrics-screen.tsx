@@ -6,7 +6,7 @@ import { Empty } from '@/components/ui/empty';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { todayISO } from '@/app/lib/format';
 import { SALE_STATUS } from '@/app/lib/domain';
-import type { UserSummary, ExpenseRecord } from '@/app/lib/domain';
+import type { UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import type { Movement } from '@/app/lib/ledger';
 import { buildMonthlyFlows } from '@/app/lib/ledger/monthly-flows';
@@ -31,14 +31,12 @@ export function MetricsScreen({
   sales,
   users,
   transitCount,
-  expenses,
   exchangeRate,
   movements,
 }: {
   sales: HomeSaleItem[];
   users: UserSummary[];
   transitCount: number;
-  expenses: ExpenseRecord[];
   exchangeRate: number;
   movements: Movement[];
 }) {
@@ -114,8 +112,8 @@ export function MetricsScreen({
   const sizeData = useMemo(() => buildSizeBreakdown(activeSales), [activeSales]);
 
   const cashflowSeries = useMemo(
-    () => buildCashflowSeries(activeSales, expenses, months, range.from, range.to, exchangeRate),
-    [activeSales, expenses, months, range.from, range.to, exchangeRate],
+    () => buildCashflowSeries(activeSales, movements, months, range.from, range.to, exchangeRate),
+    [activeSales, movements, months, range.from, range.to, exchangeRate],
   );
 
   const toggle = (key: string) => setHidden((prev) => {

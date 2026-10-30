@@ -12,6 +12,10 @@ export type Movement = {
   usd: number;
   // Other side of a 'cambio'. Equal to `person` for a self currency swap.
   counterparty?: string;
+  // Amounts swapped in a pesos↔dollars 'cambio', set on the sending side only
+  // so summing over movements counts each swap once. Gives the rate the
+  // partners actually paid, which beats today's rate for past months.
+  fx?: { uyu: number; usd: number };
 };
 
 export type PersonBalance = {
