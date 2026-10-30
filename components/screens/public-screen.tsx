@@ -169,7 +169,7 @@ export function PublicScreen({
         </div>
 
         {viewer && (
-          <GalleryViewer model={viewer.model} startIdx={viewer.idx} onClose={() => setViewer(null)} />
+          <GalleryViewer models={list} startModel={viewer.model} startIdx={viewer.idx} onClose={() => setViewer(null)} />
         )}
 
         {whatsappNumber && <WhatsAppButton phone={whatsappNumber} message={whatsappMessage} />}
@@ -291,7 +291,8 @@ export function PublicScreen({
 
       {viewer && (
         <GalleryViewer
-          model={viewer.model}
+          models={list}
+          startModel={viewer.model}
           startIdx={viewer.idx}
           onClose={() => setViewer(null)}
         />
@@ -421,30 +422,55 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
 }
 
 function GalleryViewer({
-  model,
+  models,
+  startModel,
   startIdx,
   onClose,
 }: {
-  model: PublicModel;
+  models: PublicModel[];
+  startModel: PublicModel;
   startIdx: number;
   onClose: () => void;
 }) {
-  const [idx, setIdx] = useState(startIdx);
+  // Arrows walk a single strip: every photo of the current model, then on to
+  // the next model in the visible (filtered + sorted) list.
+  const [pos, setPos] = useState(() => ({
+    m: Math.max(0, models.findIndex((x) => x.id === startModel.id)),
+    p: startIdx,
+  }));
+  const model = models[pos.m] ?? startModel;
+  const idx = pos.p;
   const photos = model.photos;
   const c = colorByName(model.color);
 
-  const hasPrev = idx > 0;
-  const hasNext = idx < photos.length - 1;
+  const hasPrev = idx > 0 || pos.m > 0;
+  const hasNext = idx < photos.length - 1 || pos.m < models.length - 1;
+
+  function setIdx(p: number) {
+    setPos((cur) => ({ ...cur, p }));
+  }
+
+  function step(dir: 1 | -1) {
+    setPos(({ m, p }) => {
+      const count = models[m]?.photos.length ?? 0;
+      if (dir === 1) {
+        if (p < count - 1) return { m, p: p + 1 };
+        return m < models.length - 1 ? { m: m + 1, p: 0 } : { m, p };
+      }
+      if (p > 0) return { m, p: p - 1 };
+      return m > 0 ? { m: m - 1, p: Math.max(0, models[m - 1].photos.length - 1) } : { m, p };
+    });
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
-      else if (e.key === 'ArrowLeft') setIdx((i) => Math.max(0, i - 1));
-      else if (e.key === 'ArrowRight') setIdx((i) => Math.min(photos.length - 1, i + 1));
+      else if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'ArrowRight') step(1);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, photos.length]);
+  });
 
   return (
     <div className="pub-viewer" onClick={onClose}>
@@ -467,12 +493,12 @@ function GalleryViewer({
           </div>
         )}
         {hasPrev && (
-          <button className="viewer-nav prev" onClick={() => setIdx(idx - 1)}>
+          <button className="viewer-nav prev" aria-label="Anterior" onClick={() => step(-1)}>
             <ChevronLeft size={20} strokeWidth={1.8} />
           </button>
         )}
         {hasNext && (
-          <button className="viewer-nav next" onClick={() => setIdx(idx + 1)}>
+          <button className="viewer-nav next" aria-label="Siguiente" onClick={() => step(1)}>
             <ChevronRight size={20} strokeWidth={1.8} />
           </button>
         )}
@@ -494,6 +520,9 @@ function GalleryViewer({
       )}
 
       <div className="viewer-info" onClick={(e) => e.stopPropagation()}>
+        {models.length > 1 && (
+          <div className="viewer-pos">{pos.m + 1} / {models.length}</div>
+        )}
         <div className="viewer-team">{model.team}</div>
         <div className="viewer-meta">
           {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''}
