@@ -29,6 +29,11 @@ export function invalidateSaleFromRoute() {
   revalidateTag(CACHE_TAGS.saldos, { expire: 0 });
 }
 
+// Same as above for Route Handlers that only move money between currencies.
+export function invalidateSaldosFromRoute() {
+  revalidateTag(CACHE_TAGS.saldos, { expire: 0 });
+}
+
 // A reservation only moves an item's status, no money — unlike invalidateSale,
 // saldos isn't touched.
 export function invalidateReservation() {
