@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
 import { WhatsAppButton } from '@/components/ui/whatsapp-button';
-import { fmtSize, fmtType } from '@/app/lib/domain';
+import { fmtSize, fmtType, fmtVersionEs } from '@/app/lib/domain';
 import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
 import { colorByName } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
@@ -61,7 +61,7 @@ export function PublicScreen({
 
   let list = models.filter((m) => {
     if (q) {
-      const haystack = [m.team, m.season, m.version, m.color, m.player, m.number, m.type]
+      const haystack = [m.team, m.season, m.version, fmtVersionEs(m.version), m.color, m.player, m.number, m.type]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
@@ -347,7 +347,7 @@ function FilterGroups({
           <div className="multi-chips">
             {versions.map((v) => (
               <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
-                onClick={() => onToggleVersion(v)}>{v}</button>
+                onClick={() => onToggleVersion(v)}>{fmtVersionEs(v)}</button>
             ))}
           </div>
         </div>
@@ -380,7 +380,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
       <div className="pub-card-body">
         <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
-          {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''} {model.number ? ` · ${model.number}` : ''} {model.player ? ` ${model.player}` : ''}
+          {[model.season, fmtVersionEs(model.version), model.type, [model.number, model.player].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
         </div>
         <SizeChips sizes={model.sizes} />
         <div className="avail-badge"><span className="avail-dot" />Disponible</div>
@@ -407,7 +407,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
         )}
       </div>
       <div className="pub-row-main">
-        <div className="pub-row-team">{model.team} · {model.version}</div>
+        <div className="pub-row-team">{model.team} · {fmtVersionEs(model.version)}</div>
         <div className="pub-row-meta">
           {model.season}{model.type ? ` · ${model.type}` : ''}{model.player ? ` · ${model.player}` : ''}
         </div>
@@ -525,7 +525,7 @@ function GalleryViewer({
         )}
         <div className="viewer-team">{model.team}</div>
         <div className="viewer-meta">
-          {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''}
+          {model.season} · {fmtVersionEs(model.version)}{model.type ? ` · ${model.type}` : ''}
           {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
         </div>
         <div className="viewer-tags">

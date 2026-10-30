@@ -3173,6 +3173,12 @@ body {
   cursor: pointer;
 }
 
+/* public filters read as UI labels, not codes */
+.pub-filters .mchip,
+.pub-desk-side .mchip {
+  font-family: var(--font-ui);
+}
+
 .filter-results {
   font-size: 12.5px;
   color: var(--text-muted);
@@ -5883,7 +5889,7 @@ body {
   }
 
   .pub-desk-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 20px;
     padding: 0;
   }
