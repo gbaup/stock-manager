@@ -1,5 +1,5 @@
 import { SALE_STATUS, fmtVersion, compareSizes } from '@/app/lib/domain';
-import type { ExpenseRecord, UserSummary } from '@/app/lib/domain';
+import type { ExpenseRecord } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { money } from '@/app/lib/money';
 
@@ -144,40 +144,5 @@ export function buildCashflowSeries(
       .filter((e) => monthKey(e.date) === key)
       .reduce((a, e) => a + expenseInUyu(e, rate), 0);
     return { month: key, income, expenses: expenseTotal, net: income - expenseTotal };
-  });
-}
-
-// Net cash flow (income collected minus expenses paid) per user per month.
-// Expenses always have a payer, but sales can lack a collector — that income
-// surfaces in `unassigned` and is never netted against anything.
-export function buildCashflowByPerson(
-  activeSales: HomeSaleItem[],
-  expenses: ExpenseRecord[],
-  months: string[],
-  users: UserSummary[],
-  from: string,
-  to: string,
-  rate: number,
-): Record<string, number | string>[] {
-  const expensesInRange = expenses.filter((e) => inRange(e.date, from, to));
-  return months.map((key) => {
-    const monthSales = activeSales.filter((s) => monthKey(s.date) === key);
-    const monthExpenses = expensesInRange.filter((e) => monthKey(e.date) === key);
-    const row: Record<string, number | string> = { month: key };
-    users.forEach((u) => {
-      const income = monthSales
-        .filter((s) => s.collectedByUserId === u.id)
-        .reduce((a, s) => a + s.price, 0);
-      const expenseTotal = monthExpenses
-        .filter((e) => e.paidByUserId === u.id)
-        .reduce((a, e) => a + expenseInUyu(e, rate), 0);
-      row[u.id] = income - expenseTotal;
-    });
-    if (monthSales.some((s) => !s.collectedByUserId)) {
-      row.unassigned = monthSales
-        .filter((s) => !s.collectedByUserId)
-        .reduce((a, s) => a + s.price, 0);
-    }
-    return row;
   });
 }

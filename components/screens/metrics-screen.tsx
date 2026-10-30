@@ -16,12 +16,11 @@ import { useIsDesktop } from '@/app/lib/hooks';
 import {
   defaultFrom, monthKey, monthsBetween, activeInRange, methodBucket,
   buildTopModels, buildClubBreakdown, buildSizeBreakdown,
-  buildCashflowSeries, buildCashflowByPerson,
+  buildCashflowSeries,
 } from '@/components/screens/metrics/aggregations';
 import type { SortKey } from '@/components/screens/metrics/aggregations';
 import { SellerLineChart } from '@/components/screens/metrics/seller-line-chart';
 import { CashflowChart } from '@/components/screens/metrics/cashflow-chart';
-import { CashflowByPersonChart } from '@/components/screens/metrics/cashflow-by-person-chart';
 import { MarginChart } from '@/components/screens/metrics/margin-chart';
 import { PaymentMethodChart } from '@/components/screens/metrics/payment-method-chart';
 import { SizeBarChart } from '@/components/screens/metrics/size-bar-chart';
@@ -119,11 +118,6 @@ export function MetricsScreen({
     [activeSales, expenses, months, range.from, range.to, exchangeRate],
   );
 
-  const cashflowByPerson = useMemo(
-    () => buildCashflowByPerson(activeSales, expenses, months, users, range.from, range.to, exchangeRate),
-    [activeSales, expenses, months, users, range.from, range.to, exchangeRate],
-  );
-
   const toggle = (key: string) => setHidden((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -177,12 +171,6 @@ export function MetricsScreen({
             onToggle={toggle}
           />
           <CashflowChart cashflowSeries={cashflowSeries} />
-          <CashflowByPersonChart
-            cashflowByPerson={cashflowByPerson}
-            users={users}
-            hidden={hidden}
-            onToggle={toggle}
-          />
           <MarginChart marginSeries={marginSeries} />
           <PaymentMethodChart methodData={methodData} />
           <SizeBarChart sizeData={sizeData} />
