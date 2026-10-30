@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
@@ -85,168 +85,86 @@ export function PublicScreen({
   }
 
 
+  const filterGroups = (
+    <FilterGroups
+      types={allTypes} sizes={allSizes} versions={allVersions}
+      filterTypes={filterTypes} filterSizes={filterSizes} filterVersions={filterVersions}
+      onToggleType={(t) => toggleFilter(filterTypes, setFilterTypes, t)}
+      onToggleSize={(s) => toggleFilter(filterSizes, setFilterSizes, s)}
+      onToggleVersion={(v) => toggleFilter(filterVersions, setFilterVersions, v)}
+    />
+  );
+
   if (isDesktop) {
-    const filterPanel = filtersOpen ? (
-      <div className="pub-filters">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>Filtrar por</span>
-          {activeFilters > 0 && (
-            <button className="pub-filter-clear" onClick={clearFilters}>
-              Limpiar filtros ({activeFilters})
-            </button>
-          )}
-        </div>
-        {allTypes.length > 0 && (
-          <div className="pub-filter-group">
-            <div className="pub-filter-label">Tipo</div>
-            <div className="multi-chips">
-              {allTypes.map((t) => (
-                <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
-                  onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{fmtType(t)}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {allSizes.length > 0 && (
-          <div className="pub-filter-group">
-            <div className="pub-filter-label">Talle</div>
-            <div className="multi-chips">
-              {allSizes.map((s) => (
-                <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
-                  onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{fmtSize(s)}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {allVersions.length > 0 && (
-          <div className="pub-filter-group">
-            <div className="pub-filter-label">Versión</div>
-            <div className="multi-chips">
-              {allVersions.map((v) => (
-                <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
-                  onClick={() => toggleFilter(filterVersions, setFilterVersions, v)}>{v}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    ) : null;
-
     return (
-      <div className="screen" style={{ marginLeft: 0, background: 'var(--bg)' }}>
-        <header style={{
-          display: 'flex', alignItems: 'center', gap: 16,
-          padding: '0 28px', height: 'var(--header-h)',
-          borderBottom: '1px solid var(--border)', flexShrink: 0,
-          background: 'var(--surface)',
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              RetroPilchas
+      <div className="screen pub-desk">
+        <header className="pub-desk-head">
+          <div className="pub-desk-inner pub-desk-head-row">
+            <div className="pub-desk-brand">
+              <span className="pub-desk-logo"><Shirt size={20} strokeWidth={1.8} /></span>
+              <div>
+                <div className="pub-desk-name">RetroPilchas</div>
+                <div className="pub-desk-tag">Camisetas de fútbol</div>
+              </div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1.1 }}>
-              Catálogo público
-            </div>
-          </div>
-          {loggedIn && (
-            <button className="btn btn-secondary" style={{ height: 32, fontSize: 13 }} onClick={() => router.push('/inventory')}>
-              <ChevronLeft size={16} strokeWidth={1.8} /> Volver
-            </button>
-          )}
-          <div className="public-strip">
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
-            Vista de acceso libre
-          </div>
-        </header>
-
-        <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '14px 0' }}>
-            <div className="search" style={{ flex: 1 }}>
+            <div className="search pub-desk-search">
               <Search size={19} strokeWidth={1.8} />
-              <input value={query} placeholder="Buscar camiseta…" onChange={(e) => setQuery(e.target.value)} />
+              <input value={query} placeholder="Buscar por equipo, temporada, jugador…" onChange={(e) => setQuery(e.target.value)} />
               {query && (
                 <button className="iconbtn plain" style={{ width: 26, height: 26 }} aria-label="Limpiar búsqueda" onClick={() => setQuery('')}>
                   <X size={16} strokeWidth={1.8} />
                 </button>
               )}
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {([{ id: 'team', label: 'Equipo' }, { id: 'newest', label: 'Más nuevas' }] as const).map(({ id, label }) => (
-                <button key={id} className={`chip${sort === id ? ' is-active' : ''}`} style={{ height: 30, fontSize: 13 }} onClick={() => setSort(id)}>
-                  {label}
+            {loggedIn && (
+              <button className="btn btn-secondary pub-desk-back" onClick={() => router.push('/inventory')}>
+                <ChevronLeft size={16} strokeWidth={1.8} /> Volver
+              </button>
+            )}
+          </div>
+        </header>
+
+        <div className="pub-desk-scroll">
+          <div className="pub-desk-inner pub-desk-body">
+            <aside className="pub-desk-side">
+              <div className="pub-filter-group">
+                <div className="pub-filter-label">Ordenar por</div>
+                <div className="multi-chips">
+                  {([{ id: 'team', label: 'Equipo' }, { id: 'newest', label: 'Más nuevas' }] as const).map(({ id, label }) => (
+                    <button key={id} className={`mchip${sort === id ? ' is-active' : ''}`} onClick={() => setSort(id)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filterGroups}
+              {activeFilters > 0 && (
+                <button className="pub-filter-clear" onClick={clearFilters}>
+                  Limpiar filtros ({activeFilters})
                 </button>
-              ))}
-            </div>
-            <button className={`pub-filter-btn${activeFilters > 0 ? ' has-filters' : ''}`} onClick={() => setFiltersOpen((o) => !o)}>
-              <Filter size={15} strokeWidth={1.8} />
-              Filtrar
-              {activeFilters > 0 && <span className="filter-count-badge">{activeFilters}</span>}
-            </button>
-          </div>
+              )}
+            </aside>
 
-          {filterPanel}
+            <main className="pub-desk-main">
+              <div className="pub-desk-title-row">
+                <h1 className="pub-desk-title">Camisetas disponibles</h1>
+                <div className="pub-desk-count">
+                  {list.length} {list.length === 1 ? 'modelo' : 'modelos'}
+                </div>
+              </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>Camisetas disponibles</div>
-            <div style={{ fontSize: 13, color: 'var(--text-faint)' }}>
-              {list.length} {list.length === 1 ? 'modelo' : 'modelos'} · al {today}
-            </div>
-          </div>
+              {list.length === 0 ? (
+                <Empty icon="search" title="Sin resultados" desc={activeFilters > 0 ? 'Probá quitando algún filtro.' : 'Volvé a consultar más tarde.'} />
+              ) : (
+                <div className="pub-grid pub-desk-grid">
+                  {list.map((m) => (
+                    <PublicCard key={m.id} model={m} onOpen={() => setViewer({ model: m, idx: 0 })} />
+                  ))}
+                </div>
+              )}
 
-          {list.length === 0 ? (
-            <Empty icon="search" title="Sin resultados" desc={activeFilters > 0 ? 'Probá quitando algún filtro.' : 'Volvé a consultar más tarde.'} />
-          ) : (
-            <table className="dtable">
-              <thead>
-                <tr>
-                  <th>Equipo</th>
-                  <th>Temporada</th>
-                  <th>Versión / Color</th>
-                  <th>Talles</th>
-                  <th className="num">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((m) => {
-                  const c = colorByName(m.color);
-                  const cover = m.photos[0]?.url ?? null;
-                  return (
-                    <tr key={m.id} style={{ cursor: 'pointer' }} onClick={() => setViewer({ model: m, idx: 0 })}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{
-                            width: 30, height: 36, borderRadius: 6, flexShrink: 0,
-                            background: c.bg, color: c.fg, overflow: 'hidden',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-mono)',
-                          }}>
-                            {cover
-                              // eslint-disable-next-line @next/next/no-img-element
-                              ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : (m.number || <Shirt size={16} strokeWidth={1.5} />)
-                            }
-                          </div>
-                          <div>
-                            <div className="dt-team capitalize">{m.team}</div>
-                            {m.player && <div className="dt-meta capitalize">{m.player}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>{m.season}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }} className="capitalize">
-                        {m.version}{m.color ? ` · ${m.color}` : ''}
-                      </td>
-                      <td><SizeChips sizes={m.sizes} /></td>
-                      <td className="num"><span className="stock-pill">{m.stock}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-
-          <div style={{ fontSize: 12, color: 'var(--text-faint)', textAlign: 'center', marginTop: 24 }}>
-            Stock actualizado al {today}
+              <div className="pub-desk-foot">Stock actualizado al {today}</div>
+            </main>
           </div>
         </div>
 
@@ -335,39 +253,7 @@ export function PublicScreen({
               </button>
             )}
           </div>
-          {allTypes.length > 0 && (
-            <div className="pub-filter-group">
-              <div className="pub-filter-label">Tipo</div>
-              <div className="multi-chips">
-                {allTypes.map((t) => (
-                  <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{fmtType(t)}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {allSizes.length > 0 && (
-            <div className="pub-filter-group">
-              <div className="pub-filter-label">Talle</div>
-              <div className="multi-chips">
-                {allSizes.map((s) => (
-                  <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{fmtSize(s)}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {allVersions.length > 0 && (
-            <div className="pub-filter-group">
-              <div className="pub-filter-label">Versión</div>
-              <div className="multi-chips">
-                {allVersions.map((v) => (
-                  <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterVersions, setFilterVersions, v)}>{v}</button>
-                ))}
-              </div>
-            </div>
-          )}
+          {filterGroups}
         </div>
       )}
 
@@ -413,6 +299,59 @@ export function PublicScreen({
 
       {whatsappNumber && <WhatsAppButton phone={whatsappNumber} message={whatsappMessage} />}
     </div>
+  );
+}
+
+function FilterGroups({
+  types, sizes, versions, filterTypes, filterSizes, filterVersions,
+  onToggleType, onToggleSize, onToggleVersion,
+}: {
+  types: string[];
+  sizes: string[];
+  versions: string[];
+  filterTypes: string[];
+  filterSizes: string[];
+  filterVersions: string[];
+  onToggleType: (v: string) => void;
+  onToggleSize: (v: string) => void;
+  onToggleVersion: (v: string) => void;
+}) {
+  return (
+    <>
+      {types.length > 0 && (
+        <div className="pub-filter-group">
+          <div className="pub-filter-label">Tipo</div>
+          <div className="multi-chips">
+            {types.map((t) => (
+              <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
+                onClick={() => onToggleType(t)}>{fmtType(t)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {sizes.length > 0 && (
+        <div className="pub-filter-group">
+          <div className="pub-filter-label">Talle</div>
+          <div className="multi-chips">
+            {sizes.map((s) => (
+              <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
+                onClick={() => onToggleSize(s)}>{fmtSize(s)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {versions.length > 0 && (
+        <div className="pub-filter-group">
+          <div className="pub-filter-label">Versión</div>
+          <div className="multi-chips">
+            {versions.map((v) => (
+              <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
+                onClick={() => onToggleVersion(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -496,6 +435,16 @@ function GalleryViewer({
 
   const hasPrev = idx > 0;
   const hasNext = idx < photos.length - 1;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') setIdx((i) => Math.max(0, i - 1));
+      else if (e.key === 'ArrowRight') setIdx((i) => Math.min(photos.length - 1, i + 1));
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, photos.length]);
 
   return (
     <div className="pub-viewer" onClick={onClose}>
