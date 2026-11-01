@@ -26,7 +26,7 @@ export function catalogFilterOptions(
     models.some((m) => (m.type ?? '').toLowerCase() === t)
   );
 
-  const versions = [...new Set(models.map((m) => m.version).filter(Boolean) as string[])];
+  const versions = [...new Set(models.map((m) => m.version).filter(Boolean) as string[])].sort(compareVersions);
 
   // Kid sizes only apply to kidkit; show them only when that type is selected,
   // and regular sizes otherwise. Reuses sizesForType so the split lives once.
