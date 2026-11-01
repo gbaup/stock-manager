@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
@@ -23,6 +23,30 @@ function SizeChips({ sizes }: { sizes: string[] }) {
       {sizes.map((s) => <span key={s} className="size-chip">{fmtSize(s)}</span>)}
     </div>
   );
+}
+
+// With SHOW_ALL_MODELS the catalog includes 0-stock models; don't promise those.
+function AvailBadge({ stock, style }: { stock: number; style?: React.CSSProperties }) {
+  return stock > 0 ? (
+    <div className="avail-badge" style={style}><span className="avail-dot" />Disponible</div>
+  ) : (
+    <div className="avail-badge is-ask" style={style}><span className="avail-dot" />Consultar</div>
+  );
+}
+
+// Cards and rows are clickable divs; make them reachable and openable by keyboard.
+function openable(onOpen: () => void) {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onClick: onOpen,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onOpen();
+      }
+    },
+  };
 }
 
 export function PublicScreen({
@@ -360,7 +384,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
   const c = colorByName(model.color);
   const cover = model.photos[0]?.url ?? null;
   return (
-    <div className="pub-card" onClick={onOpen}>
+    <div className="pub-card" {...openable(onOpen)}>
       <div className="pub-card-img" style={{ background: c.bg, color: c.fg }}>
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -380,10 +404,10 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
       <div className="pub-card-body">
         <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
-          {[model.season, fmtVersionEs(model.version), model.type, [model.number, model.player].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
+          {[model.season, fmtVersionEs(model.version), fmtType(model.type), [model.number, model.player].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
         </div>
         <SizeChips sizes={model.sizes} />
-        <div className="avail-badge"><span className="avail-dot" />Disponible</div>
+        <AvailBadge stock={model.stock} />
       </div>
     </div>
   );
@@ -393,7 +417,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
   const c = colorByName(model.color);
   const cover = model.photos[0]?.url ?? null;
   return (
-    <div className="pub-row" onClick={onOpen}>
+    <div className="pub-row" {...openable(onOpen)}>
       <div style={{
         width: 46, height: 54, borderRadius: 'var(--r-sm)', flexShrink: 0,
         background: c.bg, color: c.fg, overflow: 'hidden', position: 'relative',
@@ -409,7 +433,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
       <div className="pub-row-main">
         <div className="pub-row-team">{model.team} · {fmtVersionEs(model.version)}</div>
         <div className="pub-row-meta">
-          {model.season}{model.type ? ` · ${model.type}` : ''}{model.player ? ` · ${model.player}` : ''}
+          {model.season}{model.type ? ` · ${fmtType(model.type)}` : ''}{model.player ? ` · ${model.player}` : ''}
         </div>
         <SizeChips sizes={model.sizes} />
       </div>
@@ -433,44 +457,49 @@ function GalleryViewer({
   onClose: () => void;
 }) {
   // Arrows walk a single strip: every photo of the current model, then on to
-  // the next model in the visible (filtered + sorted) list.
-  const [pos, setPos] = useState(() => ({
-    m: Math.max(0, models.findIndex((x) => x.id === startModel.id)),
-    p: startIdx,
-  }));
-  const model = models[pos.m] ?? startModel;
-  const idx = pos.p;
+  // the next model in the visible (filtered + sorted) list. The current model
+  // is tracked by identity, so a list change can't swap it out from under us.
+  const [pos, setPos] = useState({ model: startModel, p: startIdx });
+  const { model } = pos;
   const photos = model.photos;
+  const idx = Math.min(pos.p, Math.max(0, photos.length - 1));
   const c = colorByName(model.color);
 
-  const hasPrev = idx > 0 || pos.m > 0;
-  const hasNext = idx < photos.length - 1 || pos.m < models.length - 1;
+  const m = models.findIndex((x) => x.id === model.id);
+  const prevModel = m > 0 ? models[m - 1] : null;
+  const nextModel = m >= 0 && m < models.length - 1 ? models[m + 1] : null;
+
+  const hasPrev = idx > 0 || prevModel !== null;
+  const hasNext = idx < photos.length - 1 || nextModel !== null;
 
   function setIdx(p: number) {
-    setPos((cur) => ({ ...cur, p }));
+    setPos({ model, p });
   }
 
   function step(dir: 1 | -1) {
-    setPos(({ m, p }) => {
-      const count = models[m]?.photos.length ?? 0;
-      if (dir === 1) {
-        if (p < count - 1) return { m, p: p + 1 };
-        return m < models.length - 1 ? { m: m + 1, p: 0 } : { m, p };
-      }
-      if (p > 0) return { m, p: p - 1 };
-      return m > 0 ? { m: m - 1, p: Math.max(0, models[m - 1].photos.length - 1) } : { m, p };
-    });
+    if (dir === 1) {
+      if (idx < photos.length - 1) setPos({ model, p: idx + 1 });
+      else if (nextModel) setPos({ model: nextModel, p: 0 });
+    } else if (idx > 0) {
+      setPos({ model, p: idx - 1 });
+    } else if (prevModel) {
+      setPos({ model: prevModel, p: Math.max(0, prevModel.photos.length - 1) });
+    }
   }
 
+  const onKey = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+    if (e.key === 'Escape') onClose();
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  });
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-      else if (e.key === 'ArrowLeft') step(-1);
-      else if (e.key === 'ArrowRight') step(1);
-    }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, []);
 
   return (
     <div className="pub-viewer" onClick={onClose}>
@@ -520,12 +549,12 @@ function GalleryViewer({
       )}
 
       <div className="viewer-info" onClick={(e) => e.stopPropagation()}>
-        {models.length > 1 && (
-          <div className="viewer-pos">{pos.m + 1} / {models.length}</div>
+        {m >= 0 && models.length > 1 && (
+          <div className="viewer-pos">{m + 1} / {models.length}</div>
         )}
         <div className="viewer-team">{model.team}</div>
         <div className="viewer-meta">
-          {model.season} · {fmtVersionEs(model.version)}{model.type ? ` · ${model.type}` : ''}
+          {model.season} · {fmtVersionEs(model.version)}{model.type ? ` · ${fmtType(model.type)}` : ''}
           {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
         </div>
         <div className="viewer-tags">
@@ -550,9 +579,7 @@ function GalleryViewer({
             {model.description}
           </div>
         )}
-        <div className="avail-badge" style={{ marginTop: 10, color: 'var(--accent)' }}>
-          <span className="avail-dot" />Disponible
-        </div>
+        <AvailBadge stock={model.stock} style={{ marginTop: 10 }} />
       </div>
     </div>
   );
