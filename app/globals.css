@@ -3173,6 +3173,12 @@ body {
   cursor: pointer;
 }
 
+/* public filters read as UI labels, not codes */
+.pub-filters .mchip,
+.pub-desk-side .mchip {
+  font-family: var(--font-ui);
+}
+
 .filter-results {
   font-size: 12.5px;
   color: var(--text-muted);
@@ -3341,6 +3347,20 @@ body {
   background: var(--accent);
 }
 
+.avail-badge.is-ask {
+  color: var(--text-muted);
+}
+
+.avail-badge.is-ask .avail-dot {
+  background: var(--text-faint);
+}
+
+.pub-card:focus-visible,
+.pub-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* gallery viewer / lightbox */
 .pub-viewer {
   position: fixed;
@@ -3454,10 +3474,20 @@ body {
   color: #fff;
 }
 
+.viewer-pos {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
 .viewer-team {
   font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.03em;
+  text-transform: capitalize;
 }
 
 .viewer-meta {
@@ -5712,24 +5742,281 @@ body {
   .ledger-amt-chip.zero { color: var(--text-faint); }
 
   /* ---- public desktop ---- */
-  .public-strip {
+  .pub-desk {
+    margin-left: 0;
+    background: var(--bg);
+  }
+
+  .pub-desk-inner {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  .pub-desk-head {
+    flex-shrink: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pub-desk-head-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent-press);
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-line);
-    border-radius: var(--r-pill);
-    padding: 4px 12px;
-    white-space: nowrap;
+    gap: 24px;
+    height: 72px;
+  }
+
+  .pub-desk-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 248px;
     flex-shrink: 0;
   }
 
-  .pub-page {
-    max-width: 1100px;
-    margin: 0 auto;
+  .pub-desk-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pub-desk-name {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .pub-desk-tag {
+    font-size: 12px;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+
+  .pub-desk-search {
+    flex: 1;
+    max-width: 560px;
+    margin-top: 0;
+    box-shadow: none;
+    background: var(--surface-2);
+  }
+
+  .pub-desk-search:focus-within {
+    border-color: var(--accent-line);
+    background: var(--surface);
+  }
+
+  .pub-desk-back {
+    margin-left: auto;
+    height: 36px;
+    font-size: 13px;
+    width: auto;
+  }
+
+  .pub-desk-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .pub-desk-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+    padding-top: 28px;
+    padding-bottom: 48px;
+  }
+
+  .pub-desk-side {
+    position: sticky;
+    top: 28px;
+    max-height: calc(100dvh - 72px - 56px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    width: 248px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .pub-desk-side .pub-filter-group {
+    margin-bottom: 0;
+  }
+
+  .pub-desk-side .mchip {
+    height: 30px;
+    padding: 0 11px;
+    font-size: 13px;
+  }
+
+  .pub-desk-side .pub-filter-clear {
+    align-self: flex-start;
+    padding: 0;
+  }
+
+  .pub-desk-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pub-desk-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .pub-desk-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .pub-desk-count {
+    font-size: 14px;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+
+  .pub-desk-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 0;
+  }
+
+  .pub-desk-grid .pub-card {
+    display: flex;
+    flex-direction: column;
+    box-shadow: none;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s;
+  }
+
+  .pub-desk-grid .pub-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--sh-lg);
+    border-color: var(--border-strong);
+  }
+
+  .pub-desk-grid .pub-card-img {
+    aspect-ratio: 4 / 5;
+  }
+
+  .pub-desk-grid .pub-card-img img {
+    transition: transform .35s ease;
+  }
+
+  .pub-desk-grid .pub-card:hover .pub-card-img img {
+    transform: scale(1.04);
+  }
+
+  .pub-desk-grid .pub-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 13px 14px 14px;
+  }
+
+  .pub-desk-grid .pub-card-team {
+    font-size: 15.5px;
+  }
+
+  .pub-desk-grid .pub-card-meta {
+    font-size: 12.5px;
+  }
+
+  .pub-desk-grid .avail-badge {
+    margin-top: auto;
+    padding-top: 10px;
+    font-size: 12.5px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pub-desk-grid .pub-card,
+    .pub-desk-grid .pub-card-img img {
+      transition: none;
+    }
+
+    .pub-desk-grid .pub-card:hover {
+      transform: none;
+    }
+
+    .pub-desk-grid .pub-card:hover .pub-card-img img {
+      transform: none;
+    }
+  }
+
+  .pub-desk-foot {
+    font-size: 12px;
+    color: var(--text-faint);
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  /* lightbox: photo left, details right */
+  .pub-viewer {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    grid-template-rows: 1fr auto;
+    grid-template-areas:
+      "img info"
+      "thumbs info";
+  }
+
+  .pub-viewer .viewer-head {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 0;
+    z-index: 3;
+  }
+
+  .pub-viewer .viewer-img-wrap {
+    grid-area: img;
+    padding: 40px 72px 16px;
+  }
+
+  .pub-viewer .viewer-thumbs {
+    grid-area: thumbs;
+    justify-content: center;
+    padding: 0 16px 24px;
+  }
+
+  .pub-viewer .viewer-thumb {
+    width: 64px;
+    height: 64px;
+  }
+
+  .pub-viewer .viewer-nav {
+    width: 46px;
+    height: 46px;
+  }
+
+  .pub-viewer .viewer-nav.prev { left: 16px; }
+  .pub-viewer .viewer-nav.next { right: 16px; }
+
+  .pub-viewer .viewer-info {
+    grid-area: info;
+    align-self: center;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding: 72px 36px 36px 8px;
+  }
+
+  .pub-viewer .viewer-team {
+    font-size: 28px;
+  }
+
+  .pub-viewer .viewer-meta {
+    font-size: 14px;
+    margin-top: 6px;
   }
 
   /* ---- swatch stack (purchase list rows) ---- */

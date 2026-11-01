@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/month-close", "schedule": "55 2 1 * *" }
+  ]
+}

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
 import { WhatsAppButton } from '@/components/ui/whatsapp-button';
-import { fmtSize, fmtType } from '@/app/lib/domain';
+import { fmtSize, fmtType, fmtVersionEs } from '@/app/lib/domain';
 import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
 import { colorByName } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
@@ -23,6 +23,30 @@ function SizeChips({ sizes }: { sizes: string[] }) {
       {sizes.map((s) => <span key={s} className="size-chip">{fmtSize(s)}</span>)}
     </div>
   );
+}
+
+// With SHOW_ALL_MODELS the catalog includes 0-stock models; don't promise those.
+function AvailBadge({ stock, style }: { stock: number; style?: React.CSSProperties }) {
+  return stock > 0 ? (
+    <div className="avail-badge" style={style}><span className="avail-dot" />Disponible</div>
+  ) : (
+    <div className="avail-badge is-ask" style={style}><span className="avail-dot" />Consultar</div>
+  );
+}
+
+// Cards and rows are clickable divs; make them reachable and openable by keyboard.
+function openable(onOpen: () => void) {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onClick: onOpen,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onOpen();
+      }
+    },
+  };
 }
 
 export function PublicScreen({
@@ -61,7 +85,7 @@ export function PublicScreen({
 
   let list = models.filter((m) => {
     if (q) {
-      const haystack = [m.team, m.season, m.version, m.color, m.player, m.number, m.type]
+      const haystack = [m.team, m.season, m.version, fmtVersionEs(m.version), m.color, m.player, m.number, m.type]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
@@ -85,173 +109,91 @@ export function PublicScreen({
   }
 
 
+  const filterGroups = (
+    <FilterGroups
+      types={allTypes} sizes={allSizes} versions={allVersions}
+      filterTypes={filterTypes} filterSizes={filterSizes} filterVersions={filterVersions}
+      onToggleType={(t) => toggleFilter(filterTypes, setFilterTypes, t)}
+      onToggleSize={(s) => toggleFilter(filterSizes, setFilterSizes, s)}
+      onToggleVersion={(v) => toggleFilter(filterVersions, setFilterVersions, v)}
+    />
+  );
+
   if (isDesktop) {
-    const filterPanel = filtersOpen ? (
-      <div className="pub-filters">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>Filtrar por</span>
-          {activeFilters > 0 && (
-            <button className="pub-filter-clear" onClick={clearFilters}>
-              Limpiar filtros ({activeFilters})
-            </button>
-          )}
-        </div>
-        {allTypes.length > 0 && (
-          <div className="pub-filter-group">
-            <div className="pub-filter-label">Tipo</div>
-            <div className="multi-chips">
-              {allTypes.map((t) => (
-                <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
-                  onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{fmtType(t)}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {allSizes.length > 0 && (
-          <div className="pub-filter-group">
-            <div className="pub-filter-label">Talle</div>
-            <div className="multi-chips">
-              {allSizes.map((s) => (
-                <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
-                  onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{fmtSize(s)}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {allVersions.length > 0 && (
-          <div className="pub-filter-group">
-            <div className="pub-filter-label">Versión</div>
-            <div className="multi-chips">
-              {allVersions.map((v) => (
-                <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
-                  onClick={() => toggleFilter(filterVersions, setFilterVersions, v)}>{v}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    ) : null;
-
     return (
-      <div className="screen" style={{ marginLeft: 0, background: 'var(--bg)' }}>
-        <header style={{
-          display: 'flex', alignItems: 'center', gap: 16,
-          padding: '0 28px', height: 'var(--header-h)',
-          borderBottom: '1px solid var(--border)', flexShrink: 0,
-          background: 'var(--surface)',
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              RetroPilchas
+      <div className="screen pub-desk">
+        <header className="pub-desk-head">
+          <div className="pub-desk-inner pub-desk-head-row">
+            <div className="pub-desk-brand">
+              <span className="pub-desk-logo"><Shirt size={20} strokeWidth={1.8} /></span>
+              <div>
+                <div className="pub-desk-name">RetroPilchas</div>
+                <div className="pub-desk-tag">Camisetas de fútbol</div>
+              </div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)', lineHeight: 1.1 }}>
-              Catálogo público
-            </div>
-          </div>
-          {loggedIn && (
-            <button className="btn btn-secondary" style={{ height: 32, fontSize: 13 }} onClick={() => router.push('/inventory')}>
-              <ChevronLeft size={16} strokeWidth={1.8} /> Volver
-            </button>
-          )}
-          <div className="public-strip">
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
-            Vista de acceso libre
-          </div>
-        </header>
-
-        <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '14px 0' }}>
-            <div className="search" style={{ flex: 1 }}>
+            <div className="search pub-desk-search">
               <Search size={19} strokeWidth={1.8} />
-              <input value={query} placeholder="Buscar camiseta…" onChange={(e) => setQuery(e.target.value)} />
+              <input value={query} placeholder="Buscar por equipo, temporada, jugador…" onChange={(e) => setQuery(e.target.value)} />
               {query && (
                 <button className="iconbtn plain" style={{ width: 26, height: 26 }} aria-label="Limpiar búsqueda" onClick={() => setQuery('')}>
                   <X size={16} strokeWidth={1.8} />
                 </button>
               )}
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {([{ id: 'team', label: 'Equipo' }, { id: 'newest', label: 'Más nuevas' }] as const).map(({ id, label }) => (
-                <button key={id} className={`chip${sort === id ? ' is-active' : ''}`} style={{ height: 30, fontSize: 13 }} onClick={() => setSort(id)}>
-                  {label}
+            {loggedIn && (
+              <button className="btn btn-secondary pub-desk-back" onClick={() => router.push('/inventory')}>
+                <ChevronLeft size={16} strokeWidth={1.8} /> Volver
+              </button>
+            )}
+          </div>
+        </header>
+
+        <div className="pub-desk-scroll">
+          <div className="pub-desk-inner pub-desk-body">
+            <aside className="pub-desk-side">
+              <div className="pub-filter-group">
+                <div className="pub-filter-label">Ordenar por</div>
+                <div className="multi-chips">
+                  {([{ id: 'team', label: 'Equipo' }, { id: 'newest', label: 'Más nuevas' }] as const).map(({ id, label }) => (
+                    <button key={id} className={`mchip${sort === id ? ' is-active' : ''}`} onClick={() => setSort(id)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filterGroups}
+              {activeFilters > 0 && (
+                <button className="pub-filter-clear" onClick={clearFilters}>
+                  Limpiar filtros ({activeFilters})
                 </button>
-              ))}
-            </div>
-            <button className={`pub-filter-btn${activeFilters > 0 ? ' has-filters' : ''}`} onClick={() => setFiltersOpen((o) => !o)}>
-              <Filter size={15} strokeWidth={1.8} />
-              Filtrar
-              {activeFilters > 0 && <span className="filter-count-badge">{activeFilters}</span>}
-            </button>
-          </div>
+              )}
+            </aside>
 
-          {filterPanel}
+            <main className="pub-desk-main">
+              <div className="pub-desk-title-row">
+                <h1 className="pub-desk-title">Camisetas disponibles</h1>
+                <div className="pub-desk-count">
+                  {list.length} {list.length === 1 ? 'modelo' : 'modelos'}
+                </div>
+              </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>Camisetas disponibles</div>
-            <div style={{ fontSize: 13, color: 'var(--text-faint)' }}>
-              {list.length} {list.length === 1 ? 'modelo' : 'modelos'} · al {today}
-            </div>
-          </div>
+              {list.length === 0 ? (
+                <Empty icon="search" title="Sin resultados" desc={activeFilters > 0 ? 'Probá quitando algún filtro.' : 'Volvé a consultar más tarde.'} />
+              ) : (
+                <div className="pub-grid pub-desk-grid">
+                  {list.map((m) => (
+                    <PublicCard key={m.id} model={m} onOpen={() => setViewer({ model: m, idx: 0 })} />
+                  ))}
+                </div>
+              )}
 
-          {list.length === 0 ? (
-            <Empty icon="search" title="Sin resultados" desc={activeFilters > 0 ? 'Probá quitando algún filtro.' : 'Volvé a consultar más tarde.'} />
-          ) : (
-            <table className="dtable">
-              <thead>
-                <tr>
-                  <th>Equipo</th>
-                  <th>Temporada</th>
-                  <th>Versión / Color</th>
-                  <th>Talles</th>
-                  <th className="num">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((m) => {
-                  const c = colorByName(m.color);
-                  const cover = m.photos[0]?.url ?? null;
-                  return (
-                    <tr key={m.id} style={{ cursor: 'pointer' }} onClick={() => setViewer({ model: m, idx: 0 })}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{
-                            width: 30, height: 36, borderRadius: 6, flexShrink: 0,
-                            background: c.bg, color: c.fg, overflow: 'hidden',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-mono)',
-                          }}>
-                            {cover
-                              // eslint-disable-next-line @next/next/no-img-element
-                              ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : (m.number || <Shirt size={16} strokeWidth={1.5} />)
-                            }
-                          </div>
-                          <div>
-                            <div className="dt-team capitalize">{m.team}</div>
-                            {m.player && <div className="dt-meta capitalize">{m.player}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ color: 'var(--text-faint)', fontSize: 13 }}>{m.season}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }} className="capitalize">
-                        {m.version}{m.color ? ` · ${m.color}` : ''}
-                      </td>
-                      <td><SizeChips sizes={m.sizes} /></td>
-                      <td className="num"><span className="stock-pill">{m.stock}</span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-
-          <div style={{ fontSize: 12, color: 'var(--text-faint)', textAlign: 'center', marginTop: 24 }}>
-            Stock actualizado al {today}
+              <div className="pub-desk-foot">Stock actualizado al {today}</div>
+            </main>
           </div>
         </div>
 
         {viewer && (
-          <GalleryViewer model={viewer.model} startIdx={viewer.idx} onClose={() => setViewer(null)} />
+          <GalleryViewer models={list} startModel={viewer.model} startIdx={viewer.idx} onClose={() => setViewer(null)} />
         )}
 
         {whatsappNumber && <WhatsAppButton phone={whatsappNumber} message={whatsappMessage} />}
@@ -335,39 +277,7 @@ export function PublicScreen({
               </button>
             )}
           </div>
-          {allTypes.length > 0 && (
-            <div className="pub-filter-group">
-              <div className="pub-filter-label">Tipo</div>
-              <div className="multi-chips">
-                {allTypes.map((t) => (
-                  <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}>{fmtType(t)}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {allSizes.length > 0 && (
-            <div className="pub-filter-group">
-              <div className="pub-filter-label">Talle</div>
-              <div className="multi-chips">
-                {allSizes.map((s) => (
-                  <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterSizes, setFilterSizes, s)}>{fmtSize(s)}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          {allVersions.length > 0 && (
-            <div className="pub-filter-group">
-              <div className="pub-filter-label">Versión</div>
-              <div className="multi-chips">
-                {allVersions.map((v) => (
-                  <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
-                    onClick={() => toggleFilter(filterVersions, setFilterVersions, v)}>{v}</button>
-                ))}
-              </div>
-            </div>
-          )}
+          {filterGroups}
         </div>
       )}
 
@@ -405,7 +315,8 @@ export function PublicScreen({
 
       {viewer && (
         <GalleryViewer
-          model={viewer.model}
+          models={list}
+          startModel={viewer.model}
           startIdx={viewer.idx}
           onClose={() => setViewer(null)}
         />
@@ -416,11 +327,64 @@ export function PublicScreen({
   );
 }
 
+function FilterGroups({
+  types, sizes, versions, filterTypes, filterSizes, filterVersions,
+  onToggleType, onToggleSize, onToggleVersion,
+}: {
+  types: string[];
+  sizes: string[];
+  versions: string[];
+  filterTypes: string[];
+  filterSizes: string[];
+  filterVersions: string[];
+  onToggleType: (v: string) => void;
+  onToggleSize: (v: string) => void;
+  onToggleVersion: (v: string) => void;
+}) {
+  return (
+    <>
+      {types.length > 0 && (
+        <div className="pub-filter-group">
+          <div className="pub-filter-label">Tipo</div>
+          <div className="multi-chips">
+            {types.map((t) => (
+              <button key={t} className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
+                onClick={() => onToggleType(t)}>{fmtType(t)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {sizes.length > 0 && (
+        <div className="pub-filter-group">
+          <div className="pub-filter-label">Talle</div>
+          <div className="multi-chips">
+            {sizes.map((s) => (
+              <button key={s} className={`mchip${filterSizes.includes(s) ? ' is-active' : ''}`}
+                onClick={() => onToggleSize(s)}>{fmtSize(s)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {versions.length > 0 && (
+        <div className="pub-filter-group">
+          <div className="pub-filter-label">Versión</div>
+          <div className="multi-chips">
+            {versions.map((v) => (
+              <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
+                onClick={() => onToggleVersion(v)}>{fmtVersionEs(v)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void }) {
   const c = colorByName(model.color);
   const cover = model.photos[0]?.url ?? null;
   return (
-    <div className="pub-card" onClick={onOpen}>
+    <div className="pub-card" {...openable(onOpen)}>
       <div className="pub-card-img" style={{ background: c.bg, color: c.fg }}>
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -440,10 +404,10 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
       <div className="pub-card-body">
         <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
-          {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''} {model.number ? ` · ${model.number}` : ''} {model.player ? ` ${model.player}` : ''}
+          {[model.season, fmtVersionEs(model.version), fmtType(model.type), [model.number, model.player].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
         </div>
         <SizeChips sizes={model.sizes} />
-        <div className="avail-badge"><span className="avail-dot" />Disponible</div>
+        <AvailBadge stock={model.stock} />
       </div>
     </div>
   );
@@ -453,7 +417,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
   const c = colorByName(model.color);
   const cover = model.photos[0]?.url ?? null;
   return (
-    <div className="pub-row" onClick={onOpen}>
+    <div className="pub-row" {...openable(onOpen)}>
       <div style={{
         width: 46, height: 54, borderRadius: 'var(--r-sm)', flexShrink: 0,
         background: c.bg, color: c.fg, overflow: 'hidden', position: 'relative',
@@ -467,9 +431,9 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
         )}
       </div>
       <div className="pub-row-main">
-        <div className="pub-row-team">{model.team} · {model.version}</div>
+        <div className="pub-row-team">{model.team} · {fmtVersionEs(model.version)}</div>
         <div className="pub-row-meta">
-          {model.season}{model.type ? ` · ${model.type}` : ''}{model.player ? ` · ${model.player}` : ''}
+          {model.season}{model.type ? ` · ${fmtType(model.type)}` : ''}{model.player ? ` · ${model.player}` : ''}
         </div>
         <SizeChips sizes={model.sizes} />
       </div>
@@ -482,20 +446,60 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
 }
 
 function GalleryViewer({
-  model,
+  models,
+  startModel,
   startIdx,
   onClose,
 }: {
-  model: PublicModel;
+  models: PublicModel[];
+  startModel: PublicModel;
   startIdx: number;
   onClose: () => void;
 }) {
-  const [idx, setIdx] = useState(startIdx);
+  // Arrows walk a single strip: every photo of the current model, then on to
+  // the next model in the visible (filtered + sorted) list. The current model
+  // is tracked by identity, so a list change can't swap it out from under us.
+  const [pos, setPos] = useState({ model: startModel, p: startIdx });
+  const { model } = pos;
   const photos = model.photos;
+  const idx = Math.min(pos.p, Math.max(0, photos.length - 1));
   const c = colorByName(model.color);
 
-  const hasPrev = idx > 0;
-  const hasNext = idx < photos.length - 1;
+  const m = models.findIndex((x) => x.id === model.id);
+  const prevModel = m > 0 ? models[m - 1] : null;
+  const nextModel = m >= 0 && m < models.length - 1 ? models[m + 1] : null;
+
+  const hasPrev = idx > 0 || prevModel !== null;
+  const hasNext = idx < photos.length - 1 || nextModel !== null;
+
+  function setIdx(p: number) {
+    setPos({ model, p });
+  }
+
+  function step(dir: 1 | -1) {
+    if (dir === 1) {
+      if (idx < photos.length - 1) setPos({ model, p: idx + 1 });
+      else if (nextModel) setPos({ model: nextModel, p: 0 });
+    } else if (idx > 0) {
+      setPos({ model, p: idx - 1 });
+    } else if (prevModel) {
+      setPos({ model: prevModel, p: Math.max(0, prevModel.photos.length - 1) });
+    }
+  }
+
+  const onKey = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+    if (e.key === 'Escape') onClose();
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  });
+
+  useEffect(() => {
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className="pub-viewer" onClick={onClose}>
@@ -518,12 +522,12 @@ function GalleryViewer({
           </div>
         )}
         {hasPrev && (
-          <button className="viewer-nav prev" onClick={() => setIdx(idx - 1)}>
+          <button className="viewer-nav prev" aria-label="Anterior" onClick={() => step(-1)}>
             <ChevronLeft size={20} strokeWidth={1.8} />
           </button>
         )}
         {hasNext && (
-          <button className="viewer-nav next" onClick={() => setIdx(idx + 1)}>
+          <button className="viewer-nav next" aria-label="Siguiente" onClick={() => step(1)}>
             <ChevronRight size={20} strokeWidth={1.8} />
           </button>
         )}
@@ -545,9 +549,12 @@ function GalleryViewer({
       )}
 
       <div className="viewer-info" onClick={(e) => e.stopPropagation()}>
+        {m >= 0 && models.length > 1 && (
+          <div className="viewer-pos">{m + 1} / {models.length}</div>
+        )}
         <div className="viewer-team">{model.team}</div>
         <div className="viewer-meta">
-          {model.season} · {model.version}{model.type ? ` · ${model.type}` : ''}
+          {model.season} · {fmtVersionEs(model.version)}{model.type ? ` · ${fmtType(model.type)}` : ''}
           {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
         </div>
         <div className="viewer-tags">
@@ -572,9 +579,7 @@ function GalleryViewer({
             {model.description}
           </div>
         )}
-        <div className="avail-badge" style={{ marginTop: 10, color: 'var(--accent)' }}>
-          <span className="avail-dot" />Disponible
-        </div>
+        <AvailBadge stock={model.stock} style={{ marginTop: 10 }} />
       </div>
     </div>
   );

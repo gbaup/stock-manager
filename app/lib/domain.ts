@@ -65,6 +65,11 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 };
 export const fmtType = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS[t] ?? cap(t) : '');
 export const fmtVersion = (v: string | null | undefined): string => (v ? cap(v) : '');
+// Public catalog shows versions in Spanish; stored values and admin labels stay as-is.
+const VERSION_LABELS_ES: Record<string, string> = {
+  home: 'Titular', away: 'Suplente', third: 'Tercera', fourth: 'Cuarta', arquero: 'Arquero',
+};
+export const fmtVersionEs = (v: string | null | undefined): string => (v ? VERSION_LABELS_ES[v] ?? cap(v) : '');
 export const fmtSleeve = (s: string | null | undefined): string => (s ? cap(s) : '');
 
 export const JERSEY_COLORS = [
