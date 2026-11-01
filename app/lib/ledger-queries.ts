@@ -85,6 +85,12 @@ export async function getBuiltSaldos(): Promise<BuiltSaldos> {
   cacheTag(CACHE_TAGS.purchases);
   cacheTag(CACHE_TAGS.users);
 
+  return buildSaldos();
+}
+
+// Uncached read, for writers that act on the balances (the month-close cron)
+// and can't risk a stale cache entry.
+export async function buildSaldos(): Promise<BuiltSaldos> {
   const [batchRows, saleRows, expenses, convRows, adjRows, userRows] = await Promise.all([
     prisma.batch.findMany({
       select: {
