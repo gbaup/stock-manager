@@ -6192,3 +6192,55 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dm-card { animation: none; }
 }
+
+/* ---- spinner ---- */
+.spinner {
+  display: inline-block;
+  border-style: solid;
+  border-color: var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.6s; }
+}
+
+/* ---- sale detail modal ---- */
+.sd-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.sd-swatch {
+  width: 48px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 10px;
+}
+.sd-head-tx { flex: 1; min-width: 0; }
+.sd-team { font-size: 15px; font-weight: 700; color: var(--text); }
+.sd-meta { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.sd-amt { text-align: right; }
+.sd-price { font-size: 17px; font-weight: 700; color: var(--accent); }
+.sd-profit { font-size: 12px; margin-top: 2px; }
+.sd-list { margin: 0; }
+.sd-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px;
+}
+.sd-row:last-child { border-bottom: none; }
+.sd-row dt { color: var(--text-faint); flex-shrink: 0; }
+.sd-row dd { margin: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
+.sd-who { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }

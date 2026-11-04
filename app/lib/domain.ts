@@ -104,6 +104,9 @@ export type ModelMeta = {
   photos: Photo[];
   sizes: string[];  // derived from in-stock InventoryItem.size values
   description: string | null;
+  // Marked as a one-off purchase (bought once, e.g. for a specific client).
+  // Sold-out one-offs are hidden from the inventory list by default.
+  isOneOff: boolean;
 };
 
 export type ModelWithStats = ModelMeta & {
@@ -112,6 +115,9 @@ export type ModelWithStats = ModelMeta & {
   // Units bought for a client but not yet handed over — excluded from `stock`
   // and from the public catalog, but tracked separately so they aren't lost.
   reserved: number;
+  // Units ever purchased for this model (all sizes, all statuses). Drives the
+  // "compra puntual" suggestion on the purchase form.
+  totalUnits: number;
   // Sizes that currently have stock, with their available unit counts. Drives
   // the size picker on the sale forms so a sale consumes the right size (FIFO
   // is applied *within* the chosen size).

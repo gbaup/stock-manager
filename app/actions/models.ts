@@ -21,7 +21,7 @@ export async function createModel(
   const result = modelSchema.safeParse(data);
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { teamId, season, version, type, sleeve, color, number, player, description, photos } = result.data;
+  const { teamId, season, version, type, sleeve, color, number, player, description, photos, isOneOff } = result.data;
 
   let modelId: string;
   try {
@@ -37,6 +37,7 @@ export async function createModel(
         player: player ? n(player) : null,
         description: description ? n(description) : null,
         photos,
+        isOneOff,
       },
     });
     modelId = model.id;
@@ -60,7 +61,7 @@ export async function updateModel(
   const result = modelSchema.safeParse(data);
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { teamId, season, version, type, sleeve, color, number, player, description, photos } = result.data;
+  const { teamId, season, version, type, sleeve, color, number, player, description, photos, isOneOff } = result.data;
 
   try {
     await prisma.catalogProduct.update({
@@ -76,6 +77,7 @@ export async function updateModel(
         player: player ? n(player) : null,
         description: description ? n(description) : null,
         photos,
+        isOneOff,
       },
     });
   } catch (e) {

@@ -95,6 +95,7 @@ export function ModelDetailScreen({
                 {model.sleeve && <Tag>Manga {model.sleeve}</Tag>}
                 {model.player && <Tag kind="player">{model.player}</Tag>}
                 {model.number && <Tag kind="player">#{model.number}</Tag>}
+                {model.isOneOff && <Tag>Compra puntual</Tag>}
               </div>
             </div>
           </div>

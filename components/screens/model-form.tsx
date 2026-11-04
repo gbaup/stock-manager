@@ -51,6 +51,7 @@ export function ModelForm({
       player: initial?.player ?? '',
       description: initial?.description ?? '',
       photos: initial?.photos ?? [],
+      isOneOff: initial?.isOneOff ?? false,
     },
   });
 
@@ -195,6 +196,21 @@ export function ModelForm({
               value={field.value ?? ''}
               onChange={field.onChange}
               placeholder="Detalles, edición especial, observaciones…"
+            />
+          )}
+        />
+      </Field>
+      <Field label="Compra puntual">
+        <Controller
+          name="isOneOff"
+          control={control}
+          render={({ field }) => (
+            <Segmented
+              options={['no', 'si']}
+              value={field.value ? 'si' : 'no'}
+              onChange={(v) => field.onChange(v === 'si')}
+              renderLabel={(v) => (v === 'si' ? 'Sí' : 'No')}
+              full
             />
           )}
         />

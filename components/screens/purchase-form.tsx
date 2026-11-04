@@ -8,7 +8,7 @@ import { FormHead } from '@/components/ui/chrome';
 import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
-import { ChevronRight, Plus, Shirt, X, Truck } from 'lucide-react';
+import { ChevronRight, Plus, Shirt, X, Truck, Check } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
 import { applyCardTax } from '@/app/lib/pricing';
@@ -98,6 +98,22 @@ export function PurchaseForm({
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
+
+  // "Compra puntual" suggestion, per model (sizes ignored): suggested when the
+  // model was never bought before and this purchase brings a single unit. A
+  // model already flagged as one-off also shows the toggle, unchecked — buying
+  // it again suggests it isn't a one-off anymore. User overrides win.
+  const [oneOffOverrides, setOneOffOverrides] = useState<Record<string, boolean>>({});
+  const qtyByModel = new Map<string, number>();
+  for (const it of validItems) qtyByModel.set(it.modelId, (qtyByModel.get(it.modelId) ?? 0) + (it.quantity ?? 1));
+  const oneOffToggles = new Map<string, boolean>(); // modelId -> effective value, only for models showing the toggle
+  for (const [modelId, qty] of qtyByModel) {
+    const m = models.find((x) => x.id === modelId);
+    if (!m) continue;
+    const suggested = m.totalUnits === 0 && qty === 1;
+    if (!suggested && !m.isOneOff) continue;
+    oneOffToggles.set(modelId, oneOffOverrides[modelId] ?? suggested);
+  }
   const totalQty = validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
   const totalUsd = baseCostUsd(
     validItems.map((it) => ({ basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0, quantity: it.quantity ?? 1 })),
@@ -141,6 +157,7 @@ export function PurchaseForm({
             basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
             quantity: it.quantity ?? 1,
           })),
+        oneOffFlags: [...oneOffToggles].map(([modelId, isOneOff]) => ({ modelId, isOneOff })),
       }, { skipRedirect: !!onDone });
       onDone?.();
     });
@@ -241,6 +258,10 @@ export function PurchaseForm({
         {fields.map((field, index) => {
           const modelId = watchedItems[index]?.modelId;
           const m = models.find((x) => x.id === modelId);
+          // The toggle is per model, so show it only on that model's first line.
+          const showOneOff = !!modelId && oneOffToggles.has(modelId)
+            && watchedItems.findIndex((it) => it.modelId === modelId) === index;
+          const oneOff = showOneOff && oneOffToggles.get(modelId);
           return (
             <div key={field.id} className="item-card">
               <div className="item-head">
@@ -320,6 +341,19 @@ export function PurchaseForm({
                   />
                 </Field>
               </div>
+              {showOneOff && (
+                <button
+                  type="button"
+                  className={`chip${oneOff ? ' is-active' : ''}`}
+                  style={{ marginTop: 8 }}
+                  aria-pressed={oneOff}
+                  onClick={() => setOneOffOverrides((o) => ({ ...o, [modelId]: !oneOff }))}
+                  title="Se oculta del inventario cuando se agota"
+                >
+                  {oneOff && <Check size={14} strokeWidth={2.2} />}
+                  Compra puntual
+                </button>
+              )}
             </div>
           );
         })}

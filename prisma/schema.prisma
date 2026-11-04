@@ -119,6 +119,9 @@ model CatalogProduct {
   type        String? @db.VarChar(20)
   sleeve      String? @db.VarChar(10)
   photos      Json    @default("[]")
+  // One-off purchase (e.g. a single unit bought for a specific client). Once
+  // sold out, these are hidden from the inventory list by default.
+  isOneOff    Boolean @default(false) @map("is_one_off")
   items       InventoryItem[]
   meliListings MeliListing[]
 

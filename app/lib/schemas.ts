@@ -177,6 +177,7 @@ export const modelFormSchema = z.object({
     url: z.string().min(1),
     publicId: z.string(),
   })),
+  isOneOff: z.boolean(),
 });
 
 export type ModelFormValues = z.infer<typeof modelFormSchema>;
