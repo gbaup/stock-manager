@@ -47,3 +47,8 @@ next-env.d.ts
 # unlighthouse reports
 .unlighthouse/
 .unlighthouse-session/
+# Claude Code plan files
+.claude/plans/
+
+# npm is the package manager (package-lock.json)
+pnpm-lock.yaml
