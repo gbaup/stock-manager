@@ -71,7 +71,6 @@ export function PurchaseEditForm({
 }) {
   const router = useRouter();
   const isDesktop = useIsDesktop();
-  const finish = onDone ?? (() => router.push('/purchases'));
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -88,6 +87,7 @@ export function PurchaseEditForm({
     control,
     handleSubmit,
     register,
+    reset,
     formState: { errors },
   } = useForm<PurchaseEditFormValues>({
     resolver: zodResolver(purchaseEditSchema),
@@ -109,6 +109,16 @@ export function PurchaseEditForm({
   });
 
   const { fields, prepend, append, remove } = useFieldArray({ control, name: 'items' });
+
+  // Page mode: Next keeps visited routes mounted (cacheComponents → <Activity>),
+  // so clear local state before leaving or it comes back on the next visit.
+  // Fresh server data after a save remounts the form via the page's `key`.
+  const finish = onDone ?? (() => {
+    reset();
+    setConfirmDelete(false);
+    setSaveError(null);
+    router.push('/purchases');
+  });
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);

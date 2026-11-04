@@ -26,6 +26,17 @@ import { PurchaseItemsTable } from '@/components/purchase/purchase-items-table';
 import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
 
 const DRAFT_KEY = 'purchase-draft';
+
+function emptyValues(presetModelId?: string): PurchaseFormValues {
+  return {
+    purchaseDate: todayISO(),
+    supplier: '',
+    description: '',
+    supplierPayments: {},
+    supplierCardTaxPcts: {},
+    items: presetModelId ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }] : [],
+  };
+}
 const PAY_HINT =
   'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.';
 
@@ -59,16 +70,7 @@ export function PurchaseForm({
     formState: { errors },
   } = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
-    defaultValues: {
-      purchaseDate: todayISO(),
-      supplier: '',
-      description: '',
-      supplierPayments: {},
-      supplierCardTaxPcts: {},
-      items: presetModelId
-        ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }]
-        : [],
-    },
+    defaultValues: emptyValues(presetModelId),
   });
 
   const { fields, prepend, append, remove } = useFieldArray({ control, name: 'items' });
@@ -149,9 +151,23 @@ export function PurchaseForm({
     append({ modelId, size: '', basePriceUsd: last?.basePriceUsd ?? '', quantity: 1 });
   }
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Bumped on reset so the catalog (search box) remounts clean too.
+  const [resetKey, setResetKey] = useState(0);
+
+  // With cacheComponents, Next keeps visited routes mounted (React <Activity>)
+  // and restores their state on return — so leaving /purchases/new must clear
+  // it, or the next "Nueva compra" reopens the old batch (and any open modal).
+  function resetAndExit() {
+    reset(emptyValues());
+    setStep(1);
+    setOneOffOverrides({});
+    setConfirmLeave(false);
+    setResetKey((k) => k + 1);
+    router.push('/purchases');
+  }
   function leave() {
     if (fields.length > 0) setConfirmLeave(true);
-    else router.push('/purchases');
+    else resetAndExit();
   }
 
   async function handleNextStep() {
@@ -180,7 +196,8 @@ export function PurchaseForm({
             quantity: it.quantity ?? 1,
           })),
         oneOffFlags: [...oneOffToggles].map(([modelId, isOneOff]) => ({ modelId, isOneOff })),
-      });
+      }, { skipRedirect: true });
+      resetAndExit();
     });
   }
 
@@ -421,7 +438,7 @@ export function PurchaseForm({
               </button>
             </>
           }
-          catalog={<PurchaseCatalog models={models} teams={teams} counts={countsById} onAdd={addModel} />}
+          catalog={<PurchaseCatalog key={resetKey} models={models} teams={teams} counts={countsById} onAdd={addModel} />}
         >
           <div className="pb-info">
             <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
@@ -506,7 +523,7 @@ export function PurchaseForm({
             title="¿Descartar la compra?"
             confirmLabel="Descartar"
             cancelLabel="Seguir editando"
-            onConfirm={() => router.push('/purchases')}
+            onConfirm={resetAndExit}
             onCancel={() => setConfirmLeave(false)}
           >
             Los items cargados no se van a guardar.

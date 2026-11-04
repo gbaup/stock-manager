@@ -13,5 +13,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
     getTeams(),
   ]);
   if (!batch) notFound();
-  return <PurchaseEditForm batch={batch} models={models} users={users} rate={rate} teams={teams} />;
+  // Keyed by version: after a save, revisiting remounts with the new values
+  // instead of restoring the kept-alive form's stale defaults.
+  return <PurchaseEditForm key={batch.updatedAt} batch={batch} models={models} users={users} rate={rate} teams={teams} />;
 }
