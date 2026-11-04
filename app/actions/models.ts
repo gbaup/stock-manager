@@ -17,7 +17,7 @@ function parseNumber(s: string | undefined): number | null {
 export async function createModel(
   data: ModelFormValues,
   opts?: { fromPurchase?: boolean; skipRedirect?: boolean },
-): Promise<{ errors: Record<string, string[]> } | void> {
+): Promise<{ errors: Record<string, string[]> } | { id: string } | void> {
   const result = modelSchema.safeParse(data);
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
@@ -48,7 +48,7 @@ export async function createModel(
     throw e;
   }
   updateTag('models');
-  if (opts?.skipRedirect) return;
+  if (opts?.skipRedirect) return { id: modelId };
   if (opts?.fromPurchase) redirect(`/purchases/new?newModelId=${modelId}`);
   redirect(`/inventory/${modelId}`);
 }

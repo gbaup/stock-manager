@@ -26,7 +26,8 @@ export function ModelForm({
   teams: { id: string; name: string }[];
   prefillTeam?: string;
   fromPurchase?: boolean;
-  onDone?: () => void;
+  // Receives the new model's id after a create (undefined on edit or cancel).
+  onDone?: (createdId?: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -64,13 +65,13 @@ export function ModelForm({
       const result = initial?.id
         ? await updateModel(initial.id, data, { skipRedirect: !!onDone })
         : await createModel(data, { fromPurchase, skipRedirect: !!onDone });
-      if (result?.errors) {
+      if (result && 'errors' in result) {
         for (const [field, messages] of Object.entries(result.errors)) {
           setError(field as keyof ModelFormValues, { message: (messages as string[])[0] });
         }
         return;
       }
-      onDone?.();
+      onDone?.(result && 'id' in result ? result.id : undefined);
     });
   }
 
@@ -230,7 +231,7 @@ export function ModelForm({
         <div className="dm-body">{formFields}</div>
         <ModalFooter
           pending={pending}
-          onCancel={onDone}
+          onCancel={() => onDone()}
           onConfirm={handleSubmit(onSubmit)}
           confirmLabel={initial ? 'Guardar cambios' : 'Crear modelo'}
           pendingLabel={initial ? 'Guardando…' : 'Creando…'}

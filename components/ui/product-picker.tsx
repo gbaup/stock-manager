@@ -4,41 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Plus, ChevronRight, Search, X } from 'lucide-react';
 import { Swatch, coverOf } from './swatch';
-import { matchesModel, type ModelWithStats } from '@/app/lib/domain';
-
-// ---------- helpers ----------
-const ppLabel = (m: ModelWithStats) => [m.team, m.season, m.number, m.player].filter(Boolean).join(' · ');
-
-type PpGroup = { key: string; label: string; items: ModelWithStats[] };
-
-function ppByTeam(list: ModelWithStats[]): PpGroup[] {
-  const map: Record<string, ModelWithStats[]> = {};
-  list.forEach((m) => {
-    (map[m.team] = map[m.team] || []).push(m);
-  });
-  return Object.keys(map)
-    .sort((a, b) => a.localeCompare(b, 'es'))
-    .map((team) => ({
-      key: 'team-' + team,
-      label: team,
-      items: map[team].sort((a, b) =>
-        ((a.version ?? '') + a.season).localeCompare((b.version ?? '') + b.season, 'es'),
-      ),
-    }));
-}
-
-// agrupa por equipo; sin búsqueda, "En este batch" arriba.
-function ppGroups(models: ModelWithStats[], q: string, recentIds: string[]): PpGroup[] {
-  if (q.trim()) return ppByTeam(models.filter((m) => matchesModel(m, q)));
-
-  const seen = new Set<string>();
-  const recents = recentIds
-    .map((id) => models.find((m) => m.id === id))
-    .filter((m): m is ModelWithStats => !!m && !seen.has(m.id) && !!seen.add(m.id));
-  const rset = new Set(recents.map((m) => m.id));
-  const groups: PpGroup[] = recents.length ? [{ key: 'recent', label: 'En este batch', items: recents }] : [];
-  return groups.concat(ppByTeam(models.filter((m) => !rset.has(m.id))));
-}
+import type { ModelWithStats } from '@/app/lib/domain';
+import { groupModels, modelLabel, type ModelGroup } from '@/app/lib/model-groups';
 
 // ---------- fila de resultado ----------
 function PpRow({ m, selected, onPick }: { m: ModelWithStats; selected: boolean; onPick: (id: string) => void }) {
@@ -71,7 +38,7 @@ function PpResults({
   onPick,
   query,
 }: {
-  groups: PpGroup[];
+  groups: ModelGroup[];
   value: string;
   onPick: (id: string) => void;
   query: string;
@@ -153,7 +120,7 @@ export function ProductPicker({
     };
   }, [open]);
 
-  const groups = ppGroups(models, q, recentIds);
+  const groups = groupModels(models, q, recentIds);
   const pick = (id: string) => {
     onChange(id);
     setOpen(false);
@@ -173,7 +140,7 @@ export function ProductPicker({
           setOpen(true);
         }}
       >
-        <span className="it-label capitalize">{selected ? ppLabel(selected) : 'Elegí un producto…'}</span>
+        <span className="it-label capitalize">{selected ? modelLabel(selected) : 'Elegí un producto…'}</span>
         <ChevronRight size={15} strokeWidth={2} style={{ transform: 'rotate(90deg)', flexShrink: 0, color: 'var(--text-faint)' }} />
       </button>
 

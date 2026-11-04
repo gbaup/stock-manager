@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Empty } from '@/components/ui/empty';
@@ -19,7 +20,14 @@ import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseEditSchema, type PurchaseEditFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
 import { ModalFooter } from '@/components/ui/modal-footer';
-import { useConfirmGate } from '@/app/lib/hooks';
+import { useConfirmGate, useIsDesktop } from '@/app/lib/hooks';
+import { FormHead } from '@/components/ui/chrome';
+import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
+import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
+import { PurchaseItemsTable } from '@/components/purchase/purchase-items-table';
+import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
+
+const PAY_HINT = 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó.';
 
 // Collapses per-unit rows into quantity lines the form can edit. Prices shown
 // are PRE-TAX (the supplier's price): stored prices carry the card-surcharge
@@ -44,19 +52,26 @@ function toQuantityLines(
 
 // Edits a batch after creation: metadata, unshipped items (replace/delete/add)
 // and supplier payments. Shipped items are locked and shown read-only.
+// With `onDone` it renders inside a modal (mobile); without it, it's the
+// /purchases/[id]/edit page — full-screen catalog + batch on desktop.
 export function PurchaseEditForm({
   batch,
   models,
   users,
   rate,
+  teams = [],
   onDone,
 }: {
   batch: BatchSummary;
   models: ModelWithStats[];
   users: UserSummary[];
   rate: RateResult;
-  onDone: () => void;
+  teams?: { id: string; name: string }[];
+  onDone?: () => void;
 }) {
+  const router = useRouter();
+  const isDesktop = useIsDesktop();
+  const finish = onDone ?? (() => router.push('/purchases'));
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -93,7 +108,7 @@ export function PurchaseEditForm({
     },
   });
 
-  const { fields, prepend, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, prepend, append, remove } = useFieldArray({ control, name: 'items' });
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
@@ -105,9 +120,27 @@ export function PurchaseEditForm({
   const needsSupplierPayer = totalUsd > 0;
 
   const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
-  const { paidSum, status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
+  const { status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
   const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
   const noItemsLeft = lockedItems.length + validItems.length === 0;
+
+  // Desktop builder: catalog badges, append + focus the new row's size.
+  const countsById = new Map<string, number>();
+  for (const it of validItems) countsById.set(it.modelId, (countsById.get(it.modelId) ?? 0) + (it.quantity ?? 1));
+  const focusRowRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusRowRef.current === null) return;
+    const row = document.querySelector<HTMLElement>(`[data-prow="${focusRowRef.current}"] select`);
+    if (row) {
+      row.focus();
+      focusRowRef.current = null;
+    }
+  });
+  function addModel(modelId: string) {
+    const last = [...watchedItems].reverse().find((it) => it.modelId === modelId);
+    focusRowRef.current = fields.length;
+    append({ modelId, size: '', basePriceUsd: last?.basePriceUsd ?? '', quantity: 1 });
+  }
 
   function doSubmit(data: PurchaseEditFormValues) {
     setSaveError(null);
@@ -133,7 +166,7 @@ export function PurchaseEditForm({
             })),
           expectedUpdatedAt: batch.updatedAt,
         }, { skipRedirect: true });
-        onDone();
+        finish();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al guardar la compra');
       }
@@ -157,7 +190,7 @@ export function PurchaseEditForm({
     startTransition(async () => {
       try {
         await deleteBatch(batch.id, { skipRedirect: true });
-        onDone();
+        finish();
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al eliminar la compra');
       }
@@ -175,7 +208,7 @@ export function PurchaseEditForm({
 
   const canSave = !pending && !payMismatch && !noItemsLeft;
 
-  const body = (
+  const infoFields = (
     <>
       <div className="section-label">Info del batch</div>
       <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
@@ -199,7 +232,11 @@ export function PurchaseEditForm({
           )}
         />
       </Field>
+    </>
+  );
 
+  const lockedSection = (
+    <>
       {lockedItems.length > 0 && (
         <>
           <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -222,7 +259,67 @@ export function PurchaseEditForm({
           </div>
         </>
       )}
+    </>
+  );
 
+  const deleteBtn = (
+    <>
+      {canDelete && (
+        <button
+          className="btn"
+          type="button"
+          style={{ width: '100%', marginTop: 12, color: 'var(--danger)', background: 'var(--danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          onClick={() => setConfirmDelete(true)}
+        >
+          <Trash2 size={15} strokeWidth={2} />
+          Eliminar compra
+        </button>
+      )}
+    </>
+  );
+
+  const saveErrorNode = (
+    <>
+      {saveError && (
+        <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
+          {saveError}
+        </div>
+      )}
+    </>
+  );
+
+  const summaryAndRate = (
+    <>
+      <div className="batch-summary" style={{ marginTop: 14 }}>
+        <div className="bs-row">
+          <span>Cantidad</span>
+          <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
+        </div>
+        <div className="bs-row">
+          <span>Costo base total</span>
+          <strong>{usd(totalUsd)}</strong>
+        </div>
+      </div>
+
+      <Field label="Tipo de cambio" error={errors.exchangeRate?.message}>
+        <Controller
+          name="exchangeRate"
+          control={control}
+          render={({ field: f }) => (
+            <MoneyInput prefix="$U" value={f.value ?? ''} onChange={f.onChange} placeholder="40" />
+          )}
+        />
+      </Field>
+      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
+        Se aplica a los items pendientes al guardar; los recibidos no cambian.
+      </div>
+    </>
+  );
+
+  const body = (
+    <>
+      {infoFields}
+      {lockedSection}
       <div className="section-label">Items pendientes</div>
       <button
         className="btn btn-secondary"
@@ -326,86 +423,14 @@ export function PurchaseEditForm({
         })}
       </div>
 
-      <div className="batch-summary" style={{ marginTop: 14 }}>
-        <div className="bs-row">
-          <span>Cantidad</span>
-          <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
-        </div>
-        <div className="bs-row">
-          <span>Costo base total</span>
-          <strong>{usd(totalUsd)}</strong>
-        </div>
+      {summaryAndRate}
+
+      <div style={{ marginTop: 14 }}>
+        <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
       </div>
 
-      <Field label="Tipo de cambio" error={errors.exchangeRate?.message}>
-        <Controller
-          name="exchangeRate"
-          control={control}
-          render={({ field: f }) => (
-            <MoneyInput prefix="$U" value={f.value ?? ''} onChange={f.onChange} placeholder="40" />
-          )}
-        />
-      </Field>
-      <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: -6, marginBottom: 8 }}>
-        Se aplica a los items pendientes al guardar; los recibidos no cambian.
-      </div>
-
-      {needsSupplierPayer && (
-        <div style={{ marginTop: 14 }}>
-          <div className="section-label" style={{ margin: '0 0 8px' }}>
-            Pago al proveedor · {usd(totalUsd)}
-          </div>
-          {users.map((u) => (
-            <div key={u.id} className="field-row" style={{ alignItems: 'flex-end', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <Field label={u.alias} optional>
-                  <Controller
-                    name={`supplierPayments.${u.id}` as const}
-                    control={control}
-                    render={({ field: f }) => (
-                      <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                    )}
-                  />
-                </Field>
-              </div>
-              <div style={{ width: 112 }}>
-                <Field label="Recargo tarjeta" optional>
-                  <Controller
-                    name={`supplierCardTaxPcts.${u.id}` as const}
-                    control={control}
-                    render={({ field: f }) => (
-                      <MoneyInput prefix="%" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                    )}
-                  />
-                </Field>
-              </div>
-            </div>
-          ))}
-          <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
-            {paidSum > 0
-              ? `Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`
-              : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó.'}
-          </div>
-        </div>
-      )}
-
-      {canDelete && (
-        <button
-          className="btn"
-          type="button"
-          style={{ width: '100%', marginTop: 12, color: 'var(--danger)', background: 'var(--danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          onClick={() => setConfirmDelete(true)}
-        >
-          <Trash2 size={15} strokeWidth={2} />
-          Eliminar compra
-        </button>
-      )}
-
-      {saveError && (
-        <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
-          {saveError}
-        </div>
-      )}
+      {deleteBtn}
+      {saveErrorNode}
     </>
   );
 
@@ -437,6 +462,78 @@ export function PurchaseEditForm({
       )}
     </>
   );
+
+  if (!onDone && isDesktop) {
+    return (
+      <>
+        <PurchaseBuilder
+          title="Editar compra"
+          sub={`${totalQty} ${totalQty === 1 ? 'item' : 'items'} · ${usd(totalUsd)}`}
+          onBack={finish}
+          actions={
+            <>
+              {canDelete && (
+                <button className="btn btn-danger" type="button" onClick={() => setConfirmDelete(true)}>
+                  <Trash2 size={15} strokeWidth={2} />Eliminar
+                </button>
+              )}
+              <button className="btn btn-secondary" type="button" onClick={finish}>Cancelar</button>
+              <button className="btn btn-primary" type="button" disabled={!canSave} onClick={handleSubmit(onSubmit)}>
+                {pending ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </>
+          }
+          catalog={<PurchaseCatalog models={models} teams={teams} counts={countsById} onAdd={addModel} />}
+        >
+          {infoFields}
+          {lockedSection}
+          <div className="section-label">Items pendientes</div>
+          {noItemsLeft && (
+            <span className="field-error" style={{ marginBottom: 8, display: 'block' }}>
+              La compra debe tener al menos un item — para borrarla usá &quot;Eliminar&quot;.
+            </span>
+          )}
+          {fields.length === 0 ? (
+            <Empty title="Sin items pendientes" desc="Agregá modelos desde el catálogo de la izquierda." icon="box" />
+          ) : (
+            <PurchaseItemsTable
+              control={control}
+              rowKeys={fields.map((f) => f.id)}
+              items={watchedItems}
+              models={models}
+              onRemove={remove}
+              errorOf={(i) => errors.items?.[i]?.size?.message ?? errors.items?.[i]?.modelId?.message}
+            />
+          )}
+          {summaryAndRate}
+          <div style={{ marginTop: 14 }}>
+            <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
+          </div>
+          {saveErrorNode}
+        </PurchaseBuilder>
+        {modals}
+      </>
+    );
+  }
+
+  if (!onDone) {
+    return (
+      <div className="screen">
+        <FormHead
+          onCancel={finish}
+          title="Editar compra"
+          onSave={handleSubmit(onSubmit)}
+          saveLabel="Guardar"
+          isSaving={pending}
+          savingLabel="Guardando…"
+        />
+        <div className="body">
+          <div className="body-pad">{body}</div>
+        </div>
+        {modals}
+      </div>
+    );
+  }
 
   return (
     <>

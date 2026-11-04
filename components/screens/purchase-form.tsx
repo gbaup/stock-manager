@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +11,6 @@ import { Swatch } from '@/components/ui/swatch';
 import { ChevronRight, Plus, Shirt, X, Truck, Check } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
-import { applyCardTax } from '@/app/lib/pricing';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
@@ -20,9 +19,15 @@ import { coverOf } from '@/components/ui/swatch';
 import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
-import { useConfirmGate } from '@/app/lib/hooks';
+import { useConfirmGate, useIsDesktop } from '@/app/lib/hooks';
+import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
+import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
+import { PurchaseItemsTable } from '@/components/purchase/purchase-items-table';
+import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
 
 const DRAFT_KEY = 'purchase-draft';
+const PAY_HINT =
+  'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.';
 
 export function PurchaseForm({
   models,
@@ -30,16 +35,17 @@ export function PurchaseForm({
   newModelId,
   users,
   rate,
-  onDone,
+  teams,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
   newModelId?: string;
   users: UserSummary[];
   rate: RateResult;
-  onDone?: () => void;
+  teams: { id: string; name: string }[];
 }) {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
 
@@ -65,7 +71,7 @@ export function PurchaseForm({
     },
   });
 
-  const { fields, prepend, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, prepend, append, remove } = useFieldArray({ control, name: 'items' });
 
   // Restaura el borrador al volver de "Nuevo modelo" (la navegación desmonta el form).
   useEffect(() => {
@@ -121,16 +127,32 @@ export function PurchaseForm({
   const needsSupplierPayer = totalUsd > 0;
 
   const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
-  const watchedCardTaxPcts = useWatch({ control, name: 'supplierCardTaxPcts' }) ?? {};
-  const { paidSum, status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
+  const { status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
   const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
 
-  const grossPayments = toSupplierPaymentArray(watchedPayments).map((p) => {
-    const pct = parseFloat(watchedCardTaxPcts[p.userId] ?? '') || 0;
-    return { ...p, grossUsd: applyCardTax(p.amountUsd, pct) };
+  // Desktop: units per model (catalog badges) and focus on a freshly added row.
+  const countsById = new Map<string, number>();
+  for (const it of validItems) countsById.set(it.modelId, (countsById.get(it.modelId) ?? 0) + (it.quantity ?? 1));
+  const focusRowRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusRowRef.current === null) return;
+    const row = document.querySelector<HTMLElement>(`[data-prow="${focusRowRef.current}"] select`);
+    if (row) {
+      row.focus();
+      focusRowRef.current = null;
+    }
   });
-  const totalGrossUsd = grossPayments.reduce((s, p) => s + p.grossUsd, 0);
-  const hasTax = grossPayments.some((p) => p.grossUsd > p.amountUsd);
+  // A repeated model starts at the price of its last line — usually the same.
+  function addModel(modelId: string) {
+    const last = [...watchedItems].reverse().find((it) => it.modelId === modelId);
+    focusRowRef.current = fields.length;
+    append({ modelId, size: '', basePriceUsd: last?.basePriceUsd ?? '', quantity: 1 });
+  }
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  function leave() {
+    if (fields.length > 0) setConfirmLeave(true);
+    else router.push('/purchases');
+  }
 
   async function handleNextStep() {
     const valid = await trigger(['purchaseDate']);
@@ -158,8 +180,7 @@ export function PurchaseForm({
             quantity: it.quantity ?? 1,
           })),
         oneOffFlags: [...oneOffToggles].map(([modelId, isOneOff]) => ({ modelId, isOneOff })),
-      }, { skipRedirect: !!onDone });
-      onDone?.();
+      });
     });
   }
 
@@ -208,12 +229,10 @@ export function PurchaseForm({
         El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
       </div>
 
-      {!onDone && (
-        <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
-          Siguiente: agregar items
-          <ChevronRight size={18} strokeWidth={1.8} />
-        </button>
-      )}
+      <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
+        Siguiente: agregar items
+        <ChevronRight size={18} strokeWidth={1.8} />
+      </button>
     </>
   );
 
@@ -359,58 +378,18 @@ export function PurchaseForm({
         })}
       </div>
 
-      {needsSupplierPayer && (
-        <div style={{ marginTop: 14 }}>
-          <div className="section-label" style={{ margin: '0 0 8px' }}>
-            Pago al proveedor · {usd(totalUsd)}
-          </div>
-          {users.map((u) => (
-            <div key={u.id} className="field-row" style={{ alignItems: 'flex-end', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <Field label={u.alias} optional>
-                  <Controller
-                    name={`supplierPayments.${u.id}` as const}
-                    control={control}
-                    render={({ field: f }) => (
-                      <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                    )}
-                  />
-                </Field>
-              </div>
-              <div style={{ width: 112 }}>
-                <Field label="Recargo tarjeta" optional>
-                  <Controller
-                    name={`supplierCardTaxPcts.${u.id}` as const}
-                    control={control}
-                    render={({ field: f }) => (
-                      <MoneyInput prefix="%" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                    )}
-                  />
-                </Field>
-              </div>
-            </div>
-          ))}
-          <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
-            {paidSum > 0
-              ? <>
-                  {`Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`}
-                  {hasTax && !payMismatch && ` · Costo real ${usd(totalGrossUsd)}`}
-                </>
-              : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
-          </div>
-        </div>
-      )}
+      <div style={{ marginTop: 14 }}>
+        <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
+      </div>
 
       <div className="callout callout-warn">
         <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
         <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
       </div>
 
-      {!onDone && (
-        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
-          {pending ? 'Registrando…' : 'Registrar compra'}
-        </button>
-      )}
+      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+        {pending ? 'Registrando…' : 'Registrar compra'}
+      </button>
     </>
   );
 
@@ -427,30 +406,112 @@ export function PurchaseForm({
     </Modal>
   ) : null;
 
-  if (onDone) {
+  if (isDesktop) {
     return (
       <>
-        <div className="dm-body">
-          {step === 1 ? step1Body : step2Body}
-        </div>
-        <div className="dm-foot">
-          {step === 1 ? (
+        <PurchaseBuilder
+          title="Nueva compra"
+          sub={validItems.length ? `${totalQty} ${totalQty === 1 ? 'item' : 'items'} · ${usd(totalUsd)}` : 'Sin items todavía'}
+          onBack={leave}
+          actions={
             <>
-              <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleNextStep}>
-                Siguiente <ChevronRight size={16} strokeWidth={1.8} />
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="btn btn-secondary" onClick={() => setStep(1)}>← Volver</button>
-              <button className="btn btn-primary" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+              <button className="btn btn-secondary" type="button" onClick={leave}>Cancelar</button>
+              <button className="btn btn-primary" type="button" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
                 {pending ? 'Registrando…' : 'Registrar compra'}
               </button>
             </>
+          }
+          catalog={<PurchaseCatalog models={models} teams={teams} counts={countsById} onAdd={addModel} />}
+        >
+          <div className="pb-info">
+            <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
+              <input className="input mono" type="date" {...register('purchaseDate')} />
+            </Field>
+            <Field label="Proveedor" optional>
+              <Controller
+                name="supplier"
+                control={control}
+                render={({ field }) => (
+                  <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
+                )}
+              />
+            </Field>
+          </div>
+          <Field label="Descripción" optional>
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Notas del pedido…" />
+              )}
+            />
+          </Field>
+
+          <div className="section-label">Items del batch</div>
+          {errors.items?.root?.message && (
+            <span className="field-error" style={{ marginBottom: 8, display: 'block' }}>
+              {errors.items.root.message}
+            </span>
           )}
-        </div>
+          {fields.length === 0 ? (
+            <Empty title="Sin items todavía" desc="Elegí modelos del catálogo de la izquierda para agregarlos." icon="box" />
+          ) : (
+            <PurchaseItemsTable
+              control={control}
+              rowKeys={fields.map((f) => f.id)}
+              items={watchedItems}
+              models={models}
+              onRemove={remove}
+              errorOf={(i) => errors.items?.[i]?.size?.message ?? errors.items?.[i]?.modelId?.message}
+              oneOff={{
+                values: oneOffToggles,
+                toggle: (modelId, next) => setOneOffOverrides((o) => ({ ...o, [modelId]: next })),
+              }}
+            />
+          )}
+
+          {validItems.length > 0 && (
+            <div className="batch-summary">
+              <div className="bs-row">
+                <span>Cantidad</span>
+                <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
+              </div>
+              <div className="bs-row">
+                <span>Costo base total</span>
+                <strong>{usd(totalUsd)}</strong>
+              </div>
+              <div className="bs-row">
+                <span>Tipo de cambio</span>
+                <strong>$U {fmtRate(rate.value)}</strong>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
+          </div>
+
+          <div className="callout callout-warn" style={{ marginTop: 8 }}>
+            <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>
+              Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada (con el nº de seguimiento) y suma al stock.
+            </span>
+          </div>
+        </PurchaseBuilder>
         {confirmModal}
+        {confirmLeave && (
+          <Modal
+            icon="trash"
+            tone="danger"
+            title="¿Descartar la compra?"
+            confirmLabel="Descartar"
+            cancelLabel="Seguir editando"
+            onConfirm={() => router.push('/purchases')}
+            onCancel={() => setConfirmLeave(false)}
+          >
+            Los items cargados no se van a guardar.
+          </Modal>
+        )}
       </>
     );
   }
