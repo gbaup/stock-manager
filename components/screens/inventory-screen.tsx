@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
+import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
@@ -289,7 +289,6 @@ export function InventoryScreen({
           <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
         )}
 
-        <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
       </div>
     );
@@ -374,7 +373,6 @@ export function InventoryScreen({
       {showShareStock && (
         <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
       )}
-      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );

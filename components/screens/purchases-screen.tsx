@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
+import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
@@ -158,7 +158,6 @@ export function PurchasesScreen({
         {editModal}
         {shipmentEditModal}
 
-        <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
       </div>
     );
@@ -208,7 +207,6 @@ export function PurchasesScreen({
       </button>
       {editModal}
       {shipmentEditModal}
-      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );
