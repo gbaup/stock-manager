@@ -149,7 +149,6 @@ export function InventoryScreen({
     const params = new URLSearchParams(window.location.search);
     const modelId = params.get('model');
     if (!modelId) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     selectModel(modelId);
     params.delete('model');
     const qs = params.toString();
