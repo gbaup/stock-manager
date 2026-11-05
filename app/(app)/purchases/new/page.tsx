@@ -11,6 +11,9 @@ export default async function NewPurchasePage({
   const [models, users, rate, teams] = await Promise.all([getModels(), getUsers(), getRate(), getTeams()]);
   return (
     <PurchaseForm
+      // A different preset model must start a fresh form: useForm only reads
+      // defaultValues on mount, and Next keeps this route's instance alive.
+      key={modelId ?? 'new'}
       models={models}
       presetModelId={modelId}
       newModelId={newModelId}

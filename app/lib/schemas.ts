@@ -197,7 +197,7 @@ const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
   size: z.string().min(1, 'Elegí un talle'),
   basePriceUsd: z.string().optional(),
-  quantity: z.number().int().min(1),
+  quantity: z.number({ error: 'Cantidad inválida' }).int('Cantidad inválida').min(1, 'La cantidad debe ser al menos 1'),
 });
 
 export const purchaseSchema = z

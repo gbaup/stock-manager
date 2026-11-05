@@ -23,7 +23,7 @@ import { Modal } from '@/components/ui/modal';
 import { useConfirmGate, useIsDesktop } from '@/app/lib/hooks';
 import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
 import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
-import { PurchaseItemsTable } from '@/components/purchase/purchase-items-table';
+import { PurchaseItemsTable, rowError } from '@/components/purchase/purchase-items-table';
 import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
 
 const DRAFT_KEY = 'purchase-draft';
@@ -109,18 +109,20 @@ export function PurchaseForm({
 
   // "Compra puntual" suggestion, per model (sizes ignored): suggested when the
   // model was never bought before and this purchase brings a single unit. A
-  // model already flagged as one-off also shows the toggle, unchecked — buying
-  // it again suggests it isn't a one-off anymore. User overrides win.
+  // model already flagged as one-off also shows the toggle, checked — the flag
+  // is kept unless the user unchecks it. User overrides win.
   const [oneOffOverrides, setOneOffOverrides] = useState<Record<string, boolean>>({});
   const qtyByModel = new Map<string, number>();
   for (const it of validItems) qtyByModel.set(it.modelId, (qtyByModel.get(it.modelId) ?? 0) + (it.quantity ?? 1));
   const oneOffToggles = new Map<string, boolean>(); // modelId -> effective value, only for models showing the toggle
+  const currentOneOff = new Map<string, boolean>(); // modelId -> flag stored today, to send only real changes
   for (const [modelId, qty] of qtyByModel) {
     const m = models.find((x) => x.id === modelId);
     if (!m) continue;
     const suggested = m.totalUnits === 0 && qty === 1;
     if (!suggested && !m.isOneOff) continue;
-    oneOffToggles.set(modelId, oneOffOverrides[modelId] ?? suggested);
+    oneOffToggles.set(modelId, oneOffOverrides[modelId] ?? (m.isOneOff || suggested));
+    currentOneOff.set(modelId, m.isOneOff);
   }
   const totalQty = validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
   const totalUsd = baseCostUsd(
@@ -155,17 +157,25 @@ export function PurchaseForm({
   const [resetKey, setResetKey] = useState(0);
   // Desktop-only "Importar Excel" entry point; the importer itself is pending.
   const [showImport, setShowImport] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // With cacheComponents, Next keeps visited routes mounted (React <Activity>)
   // and restores their state on return — so leaving /purchases/new must clear
   // it, or the next "Nueva compra" reopens the old batch (and any open modal).
-  function resetAndExit() {
-    reset(emptyValues());
+  // Keeps the preset model, in case the same /purchases/new?modelId=X is
+  // reopened on this kept-alive instance (a different modelId remounts it
+  // via the page's `key`).
+  function resetForm() {
+    reset(emptyValues(presetModelId));
     setStep(1);
     setOneOffOverrides({});
     setConfirmLeave(false);
     setShowImport(false);
+    setSaveError(null);
     setResetKey((k) => k + 1);
+  }
+  function resetAndExit() {
+    resetForm();
     router.push('/purchases');
   }
   function leave() {
@@ -179,30 +189,44 @@ export function PurchaseForm({
   }
 
   function doSubmit(data: PurchaseFormValues) {
+    setSaveError(null);
     startTransition(async () => {
-      const cardTaxPcts = data.supplierCardTaxPcts ?? {};
-      await createPurchase({
-        purchaseDate: data.purchaseDate,
-        supplier: data.supplier || undefined,
-        description: data.description || undefined,
-        supplierPayments: toSupplierPaymentArray(data.supplierPayments).map((p) => ({
-          ...p,
-          cardTaxPct: parseFloat(cardTaxPcts[p.userId] ?? '') || undefined,
-        })),
-        exchangeRate: rate.value,
-        items: data.items
-          .filter((it) => it.modelId)
-          .map((it) => ({
-            modelId: it.modelId,
-            size: it.size,
-            basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
-            quantity: it.quantity ?? 1,
+      try {
+        const cardTaxPcts = data.supplierCardTaxPcts ?? {};
+        await createPurchase({
+          purchaseDate: data.purchaseDate,
+          supplier: data.supplier || undefined,
+          description: data.description || undefined,
+          supplierPayments: toSupplierPaymentArray(data.supplierPayments).map((p) => ({
+            ...p,
+            cardTaxPct: parseFloat(cardTaxPcts[p.userId] ?? '') || undefined,
           })),
-        oneOffFlags: [...oneOffToggles].map(([modelId, isOneOff]) => ({ modelId, isOneOff })),
-      }, { skipRedirect: true });
-      resetAndExit();
+          exchangeRate: rate.value,
+          items: data.items
+            .filter((it) => it.modelId)
+            .map((it) => ({
+              modelId: it.modelId,
+              size: it.size,
+              basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
+              quantity: it.quantity ?? 1,
+            })),
+          oneOffFlags: [...oneOffToggles]
+            .filter(([modelId, isOneOff]) => currentOneOff.get(modelId) !== isOneOff)
+            .map(([modelId, isOneOff]) => ({ modelId, isOneOff })),
+        }, { skipRedirect: true });
+        resetAndExit();
+      } catch (e) {
+        // Keep the batch on screen so it can be retried.
+        setSaveError(e instanceof Error ? e.message : 'Error al registrar la compra');
+      }
     });
   }
+
+  const saveErrorNode = saveError ? (
+    <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
+      {saveError}
+    </div>
+  ) : null;
 
   const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
 
@@ -351,7 +375,7 @@ export function PurchaseForm({
                     )}
                   />
                 </Field>
-                <Field label="Cantidad">
+                <Field label="Cantidad" error={errors.items?.[index]?.quantity?.message}>
                   <Controller
                     name={`items.${index}.quantity`}
                     control={control}
@@ -407,6 +431,7 @@ export function PurchaseForm({
         <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
       </div>
 
+      {saveErrorNode}
       <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
         {pending ? 'Registrando…' : 'Registrar compra'}
       </button>
@@ -485,7 +510,7 @@ export function PurchaseForm({
               items={watchedItems}
               models={models}
               onRemove={remove}
-              errorOf={(i) => errors.items?.[i]?.size?.message ?? errors.items?.[i]?.modelId?.message}
+              errorOf={(i) => rowError(errors.items?.[i])}
               oneOff={{
                 values: oneOffToggles,
                 toggle: (modelId, next) => setOneOffOverrides((o) => ({ ...o, [modelId]: next })),
@@ -513,6 +538,7 @@ export function PurchaseForm({
           <div style={{ marginTop: 14 }}>
             <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
           </div>
+          {saveErrorNode}
 
           <div className="callout callout-warn" style={{ marginTop: 8 }}>
             <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -558,7 +584,7 @@ export function PurchaseForm({
   return (
     <div className="screen">
       <FormHead
-        onCancel={step === 1 ? () => router.back() : () => setStep(1)}
+        onCancel={step === 1 ? () => { resetForm(); router.back(); } : () => setStep(1)}
         title={step === 1 ? 'Nueva compra · info' : 'Nueva compra · items'}
         onSave={step === 1 ? handleNextStep : handleSubmit(onSubmit)}
         saveLabel={step === 1 ? 'Siguiente' : 'Registrar'}

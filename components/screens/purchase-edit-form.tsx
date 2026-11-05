@@ -24,7 +24,7 @@ import { useConfirmGate, useIsDesktop } from '@/app/lib/hooks';
 import { FormHead } from '@/components/ui/chrome';
 import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
 import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
-import { PurchaseItemsTable } from '@/components/purchase/purchase-items-table';
+import { PurchaseItemsTable, rowError } from '@/components/purchase/purchase-items-table';
 import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
 
 const PAY_HINT = 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó.';
@@ -112,12 +112,17 @@ export function PurchaseEditForm({
 
   // Page mode: Next keeps visited routes mounted (cacheComponents → <Activity>),
   // so clear local state before leaving or it comes back on the next visit.
-  // Fresh server data after a save remounts the form via the page's `key`.
+  // After a save, the fields are left alone (resetting would flash the
+  // pre-edit values while navigating); the new `updatedAt` remounts the form
+  // via the page's `key`. Only a cancel discards the edits.
   const finish = onDone ?? (() => {
-    reset();
     setConfirmDelete(false);
     setSaveError(null);
     router.push('/purchases');
+  });
+  const cancelEdit = onDone ?? (() => {
+    reset();
+    finish();
   });
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
@@ -399,7 +404,7 @@ export function PurchaseEditForm({
                     )}
                   />
                 </Field>
-                <Field label="Cantidad">
+                <Field label="Cantidad" error={errors.items?.[index]?.quantity?.message}>
                   <Controller
                     name={`items.${index}.quantity`}
                     control={control}
@@ -479,7 +484,7 @@ export function PurchaseEditForm({
         <PurchaseBuilder
           title="Editar compra"
           sub={`${totalQty} ${totalQty === 1 ? 'item' : 'items'} · ${usd(totalUsd)}`}
-          onBack={finish}
+          onBack={cancelEdit}
           actions={
             <>
               {canDelete && (
@@ -487,7 +492,7 @@ export function PurchaseEditForm({
                   <Trash2 size={15} strokeWidth={2} />Eliminar
                 </button>
               )}
-              <button className="btn btn-secondary" type="button" onClick={finish}>Cancelar</button>
+              <button className="btn btn-secondary" type="button" onClick={cancelEdit}>Cancelar</button>
               <button className="btn btn-primary" type="button" disabled={!canSave} onClick={handleSubmit(onSubmit)}>
                 {pending ? 'Guardando…' : 'Guardar cambios'}
               </button>
@@ -512,7 +517,7 @@ export function PurchaseEditForm({
               items={watchedItems}
               models={models}
               onRemove={remove}
-              errorOf={(i) => errors.items?.[i]?.size?.message ?? errors.items?.[i]?.modelId?.message}
+              errorOf={(i) => rowError(errors.items?.[i])}
             />
           )}
           {summaryAndRate}
@@ -530,7 +535,7 @@ export function PurchaseEditForm({
     return (
       <div className="screen">
         <FormHead
-          onCancel={finish}
+          onCancel={cancelEdit}
           title="Editar compra"
           onSave={handleSubmit(onSubmit)}
           saveLabel="Guardar"

@@ -8,6 +8,13 @@ import { sizesForType, type ModelWithStats } from '@/app/lib/domain';
 
 type ItemValues = { modelId: string; size: string; basePriceUsd?: string; quantity: number };
 
+type RowErrors = Partial<Record<keyof ItemValues, { message?: string }>> | undefined;
+
+// First validation message of a purchase item row, for the table's `errorOf`.
+export function rowError(e: RowErrors): string | undefined {
+  return e?.modelId?.message ?? e?.size?.message ?? e?.quantity?.message ?? e?.basePriceUsd?.message;
+}
+
 // Desktop items table for the purchase builder. Each row's model is fixed
 // (picked from the catalog); size, quantity and price are edited inline.
 // Rows carry `data-prow={index}` so the caller can focus a new row's size.
@@ -25,6 +32,7 @@ export function PurchaseItemsTable<T extends FieldValues>({
   items: ItemValues[];
   models: ModelWithStats[];
   onRemove: (index: number) => void;
+  // First validation message for the row (model, size, quantity, price…).
   errorOf: (index: number) => string | undefined;
   // "Compra puntual" toggle, shown on the first row of each flagged model.
   oneOff?: { values: Map<string, boolean>; toggle: (modelId: string, next: boolean) => void };
