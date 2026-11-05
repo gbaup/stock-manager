@@ -6534,3 +6534,268 @@ body {
 
   .pi-model .field-error { margin-top: 4px; }
 }
+
+/* ============================================================
+   Desktop motion & polish — ≥1024px
+   Entrance choreography, hover depth, selection cues and
+   micro-feedback. Purely presentational: every animation sits
+   behind prefers-reduced-motion: no-preference, so reduced-motion
+   users get the static layout above unchanged.
+   ============================================================ */
+@media (min-width: 1024px) {
+  :root {
+    --ease-out: cubic-bezier(0.2, 0.9, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* ---- sidebar: active rail + icon nudge ---- */
+  .side-item::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.22s var(--ease-out);
+  }
+
+  .side-item.is-active::before { transform: scaleY(1); }
+
+  .side-item svg { transition: transform 0.18s var(--ease-out); }
+  .side-item:hover svg { transform: translateX(1px) scale(1.08); }
+
+  .side-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .side-mark {
+    background: linear-gradient(
+      145deg,
+      color-mix(in oklch, var(--accent) 78%, white),
+      var(--accent) 55%,
+      var(--accent-press)
+    );
+    box-shadow: 0 3px 10px color-mix(in oklch, var(--accent) 35%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .side-collapse:hover { transform: scale(1.08); }
+  .side-collapse { transition: left 0.2s ease, background 0.12s, color 0.12s, transform 0.15s var(--ease-out); }
+
+  /* ---- buttons: lift + glow ---- */
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 4px 14px color-mix(in oklch, var(--accent) 32%, transparent), var(--sh-sm);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+
+  .btn:focus-visible,
+  .iconbtn:focus-visible,
+  .month-nav-btn:focus-visible,
+  .mov-toggle button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---- cards: hover depth ---- */
+  .kpi-card,
+  .dbal-card,
+  .partner-rail-card,
+  .dsettle {
+    transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .kpi-card:hover,
+  .dbal-card:hover,
+  .partner-rail-card:hover,
+  .dsettle:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sh-md);
+    border-color: var(--border-strong);
+  }
+
+  /* accent hairline on top of KPI cards */
+  .kpi-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent 70%);
+    opacity: 0.55;
+    transition: opacity 0.2s ease;
+  }
+
+  .kpi-card:hover::before { opacity: 1; }
+  .kpi-card:has(.kpi-value.warn)::before { background: linear-gradient(90deg, var(--warn), transparent 70%); }
+
+  .kpi-value { font-variant-numeric: tabular-nums; }
+
+  /* ---- sale CTA: gradient + sheen sweep ---- */
+  .sale-cta-card {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--accent), var(--accent-press));
+    transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease, filter 0.2s ease;
+  }
+
+  .sale-cta-card:hover {
+    background: linear-gradient(135deg, var(--accent), var(--accent-press));
+    transform: translateY(-2px);
+    filter: brightness(1.04);
+  }
+
+  .sale-cta-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%);
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
+
+  /* ---- partner bars: smooth width changes (month nav) ---- */
+  .pr-bar-fill {
+    transform-origin: left center;
+    transition: width 0.45s var(--ease-out);
+    background: linear-gradient(90deg, color-mix(in oklch, var(--accent) 70%, white), var(--accent));
+  }
+
+  /* ---- tables: selection rail ---- */
+  .dtable tbody tr.is-selected {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .dtable tbody tr { transition: background 0.14s ease, box-shadow 0.14s ease; }
+
+  .pitems tbody tr { transition: background 0.2s ease; }
+  .pitems tbody tr:hover { background: color-mix(in oklch, var(--surface-2) 60%, transparent); }
+
+  /* ---- detail empty state: soft halo ---- */
+  .detail-empty-ico {
+    box-shadow: 0 0 0 8px color-mix(in oklch, var(--surface-3) 45%, transparent);
+  }
+
+  /* ---- modal: deeper scrim ---- */
+  .dm-scrim {
+    backdrop-filter: blur(6px) saturate(120%);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+  }
+
+  .dm-card {
+    box-shadow: 0 24px 64px rgba(20, 28, 40, 0.18), 0 4px 12px rgba(20, 28, 40, 0.08);
+  }
+
+  .dm-close { transition: background 0.12s, transform 0.18s var(--ease-out); }
+  .dm-close:hover { transform: rotate(90deg); }
+
+  /* ---- thin, quiet scrollbars everywhere (Firefox + WebKit) ---- */
+  .page,
+  .panel-body-scroll,
+  .pcat-scroll,
+  .pbuilder-cart,
+  .dm-body {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  /* ============ motion (opt-out via reduced motion) ============ */
+  @media (prefers-reduced-motion: no-preference) {
+    /* Page entrance. Routes are kept alive with display:none while hidden
+       (cacheComponents), and CSS animations restart when an element is
+       displayed again — so this replays on every navigation, not just the
+       first mount. fill-mode is backwards (not both) so nothing is held
+       after the run: hover transforms keep working and no transform lingers
+       to become a containing block. */
+    .main-header { animation: d-fade 0.25s ease backwards; }
+
+    .page,
+    .split,
+    .pbuilder {
+      animation: d-rise 0.32s var(--ease-out) backwards;
+    }
+
+    /* staggered card groups */
+    .kpi-row > *,
+    .bal-grid > *,
+    .partner-rail > * {
+      animation: d-rise 0.4s var(--ease-out) backwards;
+    }
+
+    .kpi-row > :nth-child(2),
+    .bal-grid > :nth-child(2),
+    .partner-rail > :nth-child(2) { animation-delay: 0.05s; }
+
+    .kpi-row > :nth-child(3),
+    .bal-grid > :nth-child(3),
+    .partner-rail > :nth-child(3) { animation-delay: 0.1s; }
+
+    .kpi-row > :nth-child(4),
+    .partner-rail > :nth-child(4) { animation-delay: 0.15s; }
+
+    .partner-rail > :nth-child(n + 5) { animation-delay: 0.2s; }
+
+    .pr-bar-fill { animation: d-grow-x 0.7s var(--ease-out) 0.2s backwards; }
+
+    /* detail pane: content slides in whenever the selection changes */
+    .split-detail > * {
+      animation: d-slide-in 0.28s var(--ease-out) backwards;
+    }
+
+    /* sheen sweep on the CTA */
+    .sale-cta-card:hover::after {
+      transform: translateX(120%);
+      transition: transform 0.7s ease;
+    }
+
+    /* purchase builder: count badge pops on each add, new rows fade in */
+    .pcat-count { animation: d-pop 0.32s var(--ease-spring); }
+    .pitems tbody tr { animation: d-row-in 0.3s var(--ease-out) backwards; }
+
+    .detail-empty-ico { animation: d-float 3.2s ease-in-out infinite; }
+  }
+
+  @keyframes d-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes d-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes d-slide-in {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes d-grow-x {
+    from { transform: scaleX(0); }
+    to   { transform: none; }
+  }
+
+  @keyframes d-pop {
+    0%   { transform: scale(0.6); }
+    100% { transform: none; }
+  }
+
+  @keyframes d-row-in {
+    from { opacity: 0; transform: translateY(-4px); background: var(--accent-soft); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes d-float {
+    0%, 100% { transform: none; }
+    50%      { transform: translateY(-4px); }
+  }
+}

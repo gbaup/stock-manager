@@ -111,7 +111,8 @@ export function PurchaseCatalog({
                         photo={coverOf(m)}
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: 0, fontSize: 22 }}
                       />
-                      {count > 0 && <span className="pcat-count">×{count}</span>}
+                      {/* keyed by count so the pop animation replays on every add */}
+                      {count > 0 && <span key={count} className="pcat-count">×{count}</span>}
                       <span className="pcat-add"><Plus size={16} strokeWidth={2.4} /></span>
                     </div>
                     <div className="pcat-body">

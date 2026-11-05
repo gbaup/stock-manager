@@ -128,6 +128,7 @@ export function PurchasesScreen({
           <div className="split-detail">
             {selBatch ? (
               <BuyDetailPanel
+                key={selBatch.id}
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
                 onEdit={() => router.push(`/purchases/${selBatch.id}/edit`)}
