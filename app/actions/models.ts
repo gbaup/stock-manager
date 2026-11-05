@@ -17,11 +17,11 @@ function parseNumber(s: string | undefined): number | null {
 export async function createModel(
   data: ModelFormValues,
   opts?: { fromPurchase?: boolean; skipRedirect?: boolean },
-): Promise<{ errors: Record<string, string[]> } | void> {
+): Promise<{ errors: Record<string, string[]> } | { id: string } | void> {
   const result = modelSchema.safeParse(data);
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { teamId, season, version, type, sleeve, color, number, player, description, photos } = result.data;
+  const { teamId, season, version, type, sleeve, color, number, player, description, photos, isOneOff } = result.data;
 
   let modelId: string;
   try {
@@ -37,6 +37,7 @@ export async function createModel(
         player: player ? n(player) : null,
         description: description ? n(description) : null,
         photos,
+        isOneOff,
       },
     });
     modelId = model.id;
@@ -47,7 +48,7 @@ export async function createModel(
     throw e;
   }
   updateTag('models');
-  if (opts?.skipRedirect) return;
+  if (opts?.skipRedirect) return { id: modelId };
   if (opts?.fromPurchase) redirect(`/purchases/new?newModelId=${modelId}`);
   redirect(`/inventory/${modelId}`);
 }
@@ -60,7 +61,7 @@ export async function updateModel(
   const result = modelSchema.safeParse(data);
   if (!result.success) return { errors: result.error.flatten().fieldErrors };
 
-  const { teamId, season, version, type, sleeve, color, number, player, description, photos } = result.data;
+  const { teamId, season, version, type, sleeve, color, number, player, description, photos, isOneOff } = result.data;
 
   try {
     await prisma.catalogProduct.update({
@@ -76,6 +77,7 @@ export async function updateModel(
         player: player ? n(player) : null,
         description: description ? n(description) : null,
         photos,
+        isOneOff,
       },
     });
   } catch (e) {

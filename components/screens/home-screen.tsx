@@ -16,6 +16,8 @@ import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { QuickSaleForm } from '@/components/screens/quick-sale-form';
+import { SaleDetail, saleDetailLine } from '@/components/screens/sale-detail';
+import { Avatar } from '@/components/ui/avatar';
 
 const PAGE = 8;
 
@@ -50,18 +52,6 @@ function monthFromOffset(offset: number) {
   const label = MONTHS[d.getUTCMonth()];
   const showYear = d.getUTCFullYear() !== now.getUTCFullYear();
   return { key, label, year: d.getUTCFullYear(), showYear };
-}
-
-function Avatar({ name, size }: { name: string; size: number }) {
-  return (
-    <div
-      className="avatar"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}
-      aria-hidden
-    >
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
 }
 
 function MonthNav({
@@ -172,6 +162,7 @@ function HomeContent({
   const [visible, setVisible] = useState(PAGE);
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, negative = past
   const [editingSale, setEditingSale] = useState<HomeSaleItem | null>(null);
+  const [viewingSale, setViewingSale] = useState<HomeSaleItem | null>(null);
 
   const pickPerson = (id: string) => { setPersonFilter(id); setVisible(PAGE); };
   const pickRange = (r: Range) => { setRange(r); setVisible(PAGE); };
@@ -240,6 +231,20 @@ function HomeContent({
         models={models}
         users={users}
         onDone={() => setEditingSale(null)}
+      />
+    </DModal>
+  );
+
+  const detailModal = viewingSale && (
+    <DModal title="Detalle de venta" size="md" onClose={() => setViewingSale(null)}>
+      <SaleDetail
+        sale={viewingSale}
+        model={modelById(viewingSale.catalogProductId)}
+        onClose={() => setViewingSale(null)}
+        onEdit={() => { setEditingSale(viewingSale); setViewingSale(null); }}
+        // Close before navigating: with cacheComponents the Home route is kept
+        // alive (hidden) and would otherwise reopen this modal on return.
+        onOpenModel={(id) => { setViewingSale(null); onOpenModel(id); }}
       />
     </DModal>
   );
@@ -349,8 +354,8 @@ function HomeContent({
                       return (
                         <tr
                           key={s.id}
-                          onClick={() => m && onOpenModel(m.id)}
-                          style={{ cursor: m ? 'pointer' : 'default', opacity: cancelled ? 0.55 : 1 }}
+                          onClick={() => setViewingSale(s)}
+                          style={{ cursor: 'pointer', opacity: cancelled ? 0.55 : 1 }}
                         >
                           <td>
                             <div className="dt-cell-model">
@@ -375,9 +380,7 @@ function HomeContent({
                           <td>
                             <div className="dt-meta capitalize">
                               <ColorDot color={s.color} />
-                              {s.version ? ` ${s.version}` : ''}
-                              {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
-                              {s.size ? ` · ${s.size.toUpperCase()}` : ''}
+                              {saleDetailLine(s)}
                             </div>
                           </td>
                           <td>
@@ -462,6 +465,7 @@ function HomeContent({
             </div>
           </FixedPage.Fill>
         </FixedPage>
+        {detailModal}
         {editModal}
       </div>
     );
@@ -637,9 +641,7 @@ function HomeContent({
                       <div className="sale-team capitalize">{s.teamName}</div>
                       <div className="sale-meta capitalize">
                         <ColorDot color={s.color} />
-                        {s.version ? ` ${s.version}` : ''}
-                        {s.number ? ` · ${s.number}` : ''}{s.player ? ` ${s.player}` : ''}
-                        {s.size ? ` · Talle ${s.size.toUpperCase()}` : ''}
+                        {saleDetailLine(s, { sizeLabel: 'Talle ' })}
                       </div>
                     </div>
                     <div className="sale-end">

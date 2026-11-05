@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
+import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { FixedPage } from '@/components/ui/fixed-page';
 import { ScrollPanel } from '@/components/ui/scroll-panel';
@@ -234,7 +234,6 @@ export function SaldosScreen({
           </DModal>
         )}
 
-        <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
       </div>
     );
@@ -296,7 +295,6 @@ export function SaldosScreen({
       <button className="fab" onClick={() => router.push('/saldos/expense/new')} aria-label="Agregar gasto">
         <Plus size={26} strokeWidth={2.2} />
       </button>
-      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );

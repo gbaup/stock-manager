@@ -8,10 +8,10 @@ import { FormHead } from '@/components/ui/chrome';
 import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
-import { ChevronRight, Plus, Shirt, X, Truck } from 'lucide-react';
+import { ChevronRight, Plus, Shirt, X, Truck, Check, FileSpreadsheet } from 'lucide-react';
+import { DModal } from '@/components/ui/d-modal';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
-import { applyCardTax } from '@/app/lib/pricing';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
@@ -20,9 +20,27 @@ import { coverOf } from '@/components/ui/swatch';
 import { ProductPicker } from '@/components/ui/product-picker';
 import { purchaseSchema, type PurchaseFormValues } from '@/app/lib/schemas';
 import { Modal } from '@/components/ui/modal';
-import { useConfirmGate } from '@/app/lib/hooks';
+import { useConfirmGate, useIsDesktop } from '@/app/lib/hooks';
+import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
+import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
+import { PurchaseItemsTable, rowError } from '@/components/purchase/purchase-items-table';
+import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
+import { usePurchaseBuilderRows } from '@/components/purchase/use-purchase-builder-rows';
 
 const DRAFT_KEY = 'purchase-draft';
+
+function emptyValues(presetModelId?: string): PurchaseFormValues {
+  return {
+    purchaseDate: todayISO(),
+    supplier: '',
+    description: '',
+    supplierPayments: {},
+    supplierCardTaxPcts: {},
+    items: presetModelId ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }] : [],
+  };
+}
+const PAY_HINT =
+  'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.';
 
 export function PurchaseForm({
   models,
@@ -30,16 +48,17 @@ export function PurchaseForm({
   newModelId,
   users,
   rate,
-  onDone,
+  teams,
 }: {
   models: ModelWithStats[];
   presetModelId?: string;
   newModelId?: string;
   users: UserSummary[];
   rate: RateResult;
-  onDone?: () => void;
+  teams: { id: string; name: string }[];
 }) {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
 
@@ -53,19 +72,10 @@ export function PurchaseForm({
     formState: { errors },
   } = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
-    defaultValues: {
-      purchaseDate: todayISO(),
-      supplier: '',
-      description: '',
-      supplierPayments: {},
-      supplierCardTaxPcts: {},
-      items: presetModelId
-        ? [{ modelId: presetModelId, size: '', basePriceUsd: '', quantity: 1 }]
-        : [],
-    },
+    defaultValues: emptyValues(presetModelId),
   });
 
-  const { fields, prepend, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, prepend, append, remove } = useFieldArray({ control, name: 'items' });
 
   // Restaura el borrador al volver de "Nuevo modelo" (la navegación desmonta el form).
   useEffect(() => {
@@ -78,7 +88,6 @@ export function PurchaseForm({
         draft.values.items[draft.pendingIndex].modelId = newModelId;
       }
       reset(draft.values);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(draft.step ?? 2);
     } catch {
       // borrador corrupto: lo ignoramos
@@ -98,6 +107,23 @@ export function PurchaseForm({
 
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const validItems = watchedItems.filter((it) => it.modelId);
+
+  // "Compra puntual" suggestion, per model (sizes ignored): suggested when the
+  // model was never bought before and this purchase brings a single unit. A
+  // model already flagged as one-off also shows the toggle, checked — the flag
+  // is kept unless the user unchecks it. User overrides win.
+  const [oneOffOverrides, setOneOffOverrides] = useState<Record<string, boolean>>({});
+  const { countsById: qtyByModel, addModel } = usePurchaseBuilderRows(watchedItems, fields.length, append);
+  const oneOffToggles = new Map<string, boolean>(); // modelId -> effective value, only for models showing the toggle
+  const currentOneOff = new Map<string, boolean>(); // modelId -> flag stored today, to send only real changes
+  for (const [modelId, qty] of qtyByModel) {
+    const m = models.find((x) => x.id === modelId);
+    if (!m) continue;
+    const suggested = m.totalUnits === 0 && qty === 1;
+    if (!suggested && !m.isOneOff) continue;
+    oneOffToggles.set(modelId, oneOffOverrides[modelId] ?? (m.isOneOff || suggested));
+    currentOneOff.set(modelId, m.isOneOff);
+  }
   const totalQty = validItems.reduce((s, it) => s + (it.quantity ?? 1), 0);
   const totalUsd = baseCostUsd(
     validItems.map((it) => ({ basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0, quantity: it.quantity ?? 1 })),
@@ -105,16 +131,39 @@ export function PurchaseForm({
   const needsSupplierPayer = totalUsd > 0;
 
   const watchedPayments = useWatch({ control, name: 'supplierPayments' }) ?? {};
-  const watchedCardTaxPcts = useWatch({ control, name: 'supplierCardTaxPcts' }) ?? {};
-  const { paidSum, status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
+  const { status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
   const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
 
-  const grossPayments = toSupplierPaymentArray(watchedPayments).map((p) => {
-    const pct = parseFloat(watchedCardTaxPcts[p.userId] ?? '') || 0;
-    return { ...p, grossUsd: applyCardTax(p.amountUsd, pct) };
-  });
-  const totalGrossUsd = grossPayments.reduce((s, p) => s + p.grossUsd, 0);
-  const hasTax = grossPayments.some((p) => p.grossUsd > p.amountUsd);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  // Bumped on reset so the catalog (search box) remounts clean too.
+  const [resetKey, setResetKey] = useState(0);
+  // Desktop-only "Importar Excel" entry point; the importer itself is pending.
+  const [showImport, setShowImport] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // With cacheComponents, Next keeps visited routes mounted (React <Activity>)
+  // and restores their state on return — so leaving /purchases/new must clear
+  // it, or the next "Nueva compra" reopens the old batch (and any open modal).
+  // Keeps the preset model, in case the same /purchases/new?modelId=X is
+  // reopened on this kept-alive instance (a different modelId remounts it
+  // via the page's `key`).
+  function resetForm() {
+    reset(emptyValues(presetModelId));
+    setStep(1);
+    setOneOffOverrides({});
+    setConfirmLeave(false);
+    setShowImport(false);
+    setSaveError(null);
+    setResetKey((k) => k + 1);
+  }
+  function resetAndExit() {
+    resetForm();
+    router.push('/purchases');
+  }
+  function leave() {
+    if (fields.length > 0) setConfirmLeave(true);
+    else resetAndExit();
+  }
 
   async function handleNextStep() {
     const valid = await trigger(['purchaseDate']);
@@ -122,29 +171,44 @@ export function PurchaseForm({
   }
 
   function doSubmit(data: PurchaseFormValues) {
+    setSaveError(null);
     startTransition(async () => {
-      const cardTaxPcts = data.supplierCardTaxPcts ?? {};
-      await createPurchase({
-        purchaseDate: data.purchaseDate,
-        supplier: data.supplier || undefined,
-        description: data.description || undefined,
-        supplierPayments: toSupplierPaymentArray(data.supplierPayments).map((p) => ({
-          ...p,
-          cardTaxPct: parseFloat(cardTaxPcts[p.userId] ?? '') || undefined,
-        })),
-        exchangeRate: rate.value,
-        items: data.items
-          .filter((it) => it.modelId)
-          .map((it) => ({
-            modelId: it.modelId,
-            size: it.size,
-            basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
-            quantity: it.quantity ?? 1,
+      try {
+        const cardTaxPcts = data.supplierCardTaxPcts ?? {};
+        await createPurchase({
+          purchaseDate: data.purchaseDate,
+          supplier: data.supplier || undefined,
+          description: data.description || undefined,
+          supplierPayments: toSupplierPaymentArray(data.supplierPayments).map((p) => ({
+            ...p,
+            cardTaxPct: parseFloat(cardTaxPcts[p.userId] ?? '') || undefined,
           })),
-      }, { skipRedirect: !!onDone });
-      onDone?.();
+          exchangeRate: rate.value,
+          items: data.items
+            .filter((it) => it.modelId)
+            .map((it) => ({
+              modelId: it.modelId,
+              size: it.size,
+              basePriceUsd: parseFloat(it.basePriceUsd ?? '') || 0,
+              quantity: it.quantity ?? 1,
+            })),
+          oneOffFlags: [...oneOffToggles]
+            .filter(([modelId, isOneOff]) => currentOneOff.get(modelId) !== isOneOff)
+            .map(([modelId, isOneOff]) => ({ modelId, isOneOff })),
+        }, { skipRedirect: true });
+        resetAndExit();
+      } catch (e) {
+        // Keep the batch on screen so it can be retried.
+        setSaveError(e instanceof Error ? e.message : 'Error al registrar la compra');
+      }
     });
   }
+
+  const saveErrorNode = saveError ? (
+    <div style={{ fontSize: 13, color: 'var(--danger)', margin: '8px 0', fontWeight: 600 }}>
+      {saveError}
+    </div>
+  ) : null;
 
   const { showConfirm, requestConfirm, confirm, cancel } = useConfirmGate(doSubmit);
 
@@ -191,12 +255,10 @@ export function PurchaseForm({
         El número de seguimiento se carga al marcar la llegada — un pedido puede dividirse en varios envíos.
       </div>
 
-      {!onDone && (
-        <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
-          Siguiente: agregar items
-          <ChevronRight size={18} strokeWidth={1.8} />
-        </button>
-      )}
+      <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={handleNextStep}>
+        Siguiente: agregar items
+        <ChevronRight size={18} strokeWidth={1.8} />
+      </button>
     </>
   );
 
@@ -241,6 +303,10 @@ export function PurchaseForm({
         {fields.map((field, index) => {
           const modelId = watchedItems[index]?.modelId;
           const m = models.find((x) => x.id === modelId);
+          // The toggle is per model, so show it only on that model's first line.
+          const showOneOff = !!modelId && oneOffToggles.has(modelId)
+            && watchedItems.findIndex((it) => it.modelId === modelId) === index;
+          const oneOff = showOneOff && oneOffToggles.get(modelId);
           return (
             <div key={field.id} className="item-card">
               <div className="item-head">
@@ -291,7 +357,7 @@ export function PurchaseForm({
                     )}
                   />
                 </Field>
-                <Field label="Cantidad">
+                <Field label="Cantidad" error={errors.items?.[index]?.quantity?.message}>
                   <Controller
                     name={`items.${index}.quantity`}
                     control={control}
@@ -320,63 +386,37 @@ export function PurchaseForm({
                   />
                 </Field>
               </div>
+              {showOneOff && (
+                <button
+                  type="button"
+                  className={`chip${oneOff ? ' is-active' : ''}`}
+                  style={{ marginTop: 8 }}
+                  aria-pressed={oneOff}
+                  onClick={() => setOneOffOverrides((o) => ({ ...o, [modelId]: !oneOff }))}
+                  title="Se oculta del inventario cuando se agota"
+                >
+                  {oneOff && <Check size={14} strokeWidth={2.2} />}
+                  Compra puntual
+                </button>
+              )}
             </div>
           );
         })}
       </div>
 
-      {needsSupplierPayer && (
-        <div style={{ marginTop: 14 }}>
-          <div className="section-label" style={{ margin: '0 0 8px' }}>
-            Pago al proveedor · {usd(totalUsd)}
-          </div>
-          {users.map((u) => (
-            <div key={u.id} className="field-row" style={{ alignItems: 'flex-end', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <Field label={u.alias} optional>
-                  <Controller
-                    name={`supplierPayments.${u.id}` as const}
-                    control={control}
-                    render={({ field: f }) => (
-                      <MoneyInput prefix="US$" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                    )}
-                  />
-                </Field>
-              </div>
-              <div style={{ width: 112 }}>
-                <Field label="Recargo tarjeta" optional>
-                  <Controller
-                    name={`supplierCardTaxPcts.${u.id}` as const}
-                    control={control}
-                    render={({ field: f }) => (
-                      <MoneyInput prefix="%" value={f.value ?? ''} onChange={f.onChange} placeholder="0" />
-                    )}
-                  />
-                </Field>
-              </div>
-            </div>
-          ))}
-          <div style={{ fontSize: 12, color: payMismatch ? 'var(--danger)' : 'var(--text-faint)', marginTop: 2, marginBottom: 8 }}>
-            {paidSum > 0
-              ? <>
-                  {`Suma ${usd(paidSum)} de ${usd(totalUsd)}${payMismatch ? ' — los montos deben coincidir' : ' ✓'}`}
-                  {hasTax && !payMismatch && ` · Costo real ${usd(totalGrossUsd)}`}
-                </>
-              : 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó. El envío se carga aparte al marcar la llegada.'}
-          </div>
-        </div>
-      )}
+      <div style={{ marginTop: 14 }}>
+        <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
+      </div>
 
       <div className="callout callout-warn">
         <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
         <span>Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada y suma al stock.</span>
       </div>
 
-      {!onDone && (
-        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
-          {pending ? 'Registrando…' : 'Registrar compra'}
-        </button>
-      )}
+      {saveErrorNode}
+      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+        {pending ? 'Registrando…' : 'Registrar compra'}
+      </button>
     </>
   );
 
@@ -393,30 +433,132 @@ export function PurchaseForm({
     </Modal>
   ) : null;
 
-  if (onDone) {
+  if (isDesktop) {
     return (
       <>
-        <div className="dm-body">
-          {step === 1 ? step1Body : step2Body}
-        </div>
-        <div className="dm-foot">
-          {step === 1 ? (
+        <PurchaseBuilder
+          title="Nueva compra"
+          sub={validItems.length ? `${totalQty} ${totalQty === 1 ? 'item' : 'items'} · ${usd(totalUsd)}` : 'Sin items todavía'}
+          onBack={leave}
+          actions={
             <>
-              <button className="btn btn-secondary" onClick={onDone}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleNextStep}>
-                Siguiente <ChevronRight size={16} strokeWidth={1.8} />
+              <button className="btn btn-secondary" type="button" onClick={() => setShowImport(true)}>
+                <FileSpreadsheet size={16} strokeWidth={1.8} />Importar Excel
               </button>
-            </>
-          ) : (
-            <>
-              <button className="btn btn-secondary" onClick={() => setStep(1)}>← Volver</button>
-              <button className="btn btn-primary" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
+              <button className="btn btn-secondary" type="button" onClick={leave}>Cancelar</button>
+              <button className="btn btn-primary" type="button" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
                 {pending ? 'Registrando…' : 'Registrar compra'}
               </button>
             </>
+          }
+          catalog={<PurchaseCatalog key={resetKey} models={models} teams={teams} counts={qtyByModel} onAdd={addModel} />}
+        >
+          <div className="pb-info">
+            <Field label="Fecha de compra" error={errors.purchaseDate?.message}>
+              <input className="input mono" type="date" {...register('purchaseDate')} />
+            </Field>
+            <Field label="Proveedor" optional>
+              <Controller
+                name="supplier"
+                control={control}
+                render={({ field }) => (
+                  <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Ej: Yupoo — Kingjerseys" />
+                )}
+              />
+            </Field>
+          </div>
+          <Field label="Descripción" optional>
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <TextInput value={field.value ?? ''} onChange={field.onChange} placeholder="Notas del pedido…" />
+              )}
+            />
+          </Field>
+
+          <div className="section-label">Items del batch</div>
+          {errors.items?.root?.message && (
+            <span className="field-error" style={{ marginBottom: 8, display: 'block' }}>
+              {errors.items.root.message}
+            </span>
           )}
-        </div>
+          {fields.length === 0 ? (
+            <Empty title="Sin items todavía" desc="Elegí modelos del catálogo de la izquierda para agregarlos." icon="box" />
+          ) : (
+            <PurchaseItemsTable
+              control={control}
+              rowKeys={fields.map((f) => f.id)}
+              items={watchedItems}
+              models={models}
+              onRemove={remove}
+              errorOf={(i) => rowError(errors.items?.[i])}
+              oneOff={{
+                values: oneOffToggles,
+                toggle: (modelId, next) => setOneOffOverrides((o) => ({ ...o, [modelId]: next })),
+              }}
+            />
+          )}
+
+          {validItems.length > 0 && (
+            <div className="batch-summary">
+              <div className="bs-row">
+                <span>Cantidad</span>
+                <strong>{totalQty} {totalQty === 1 ? 'item' : 'items'}</strong>
+              </div>
+              <div className="bs-row">
+                <span>Costo base total</span>
+                <strong>{usd(totalUsd)}</strong>
+              </div>
+              <div className="bs-row">
+                <span>Tipo de cambio</span>
+                <strong>$U {fmtRate(rate.value)}</strong>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            <SupplierPaymentFields control={control} users={users} totalUsd={totalUsd} emptyHint={PAY_HINT} />
+          </div>
+          {saveErrorNode}
+
+          <div className="callout callout-warn" style={{ marginTop: 8 }}>
+            <Truck size={18} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>
+              Se registra como <strong>en camino</strong>. Cuando llegue, marcás la llegada (con el nº de seguimiento) y suma al stock.
+            </span>
+          </div>
+        </PurchaseBuilder>
         {confirmModal}
+        {showImport && (
+          <DModal
+            size="sm"
+            title="Importar Excel"
+            sub="Próximamente"
+            iconNode={<FileSpreadsheet size={18} strokeWidth={1.8} />}
+            onClose={() => setShowImport(false)}
+          >
+            <div className="dm-body">
+              Pronto vas a poder cargar los items de la compra desde una planilla de Excel en lugar de agregarlos uno por uno.
+            </div>
+            <div className="dm-foot">
+              <button className="btn btn-primary" type="button" onClick={() => setShowImport(false)}>Entendido</button>
+            </div>
+          </DModal>
+        )}
+        {confirmLeave && (
+          <Modal
+            icon="trash"
+            tone="danger"
+            title="¿Descartar la compra?"
+            confirmLabel="Descartar"
+            cancelLabel="Seguir editando"
+            onConfirm={resetAndExit}
+            onCancel={() => setConfirmLeave(false)}
+          >
+            Los items cargados no se van a guardar.
+          </Modal>
+        )}
       </>
     );
   }
@@ -424,7 +566,7 @@ export function PurchaseForm({
   return (
     <div className="screen">
       <FormHead
-        onCancel={step === 1 ? () => router.back() : () => setStep(1)}
+        onCancel={step === 1 ? () => { resetForm(); router.back(); } : () => setStep(1)}
         title={step === 1 ? 'Nueva compra · info' : 'Nueva compra · items'}
         onSave={step === 1 ? handleNextStep : handleSubmit(onSubmit)}
         saveLabel={step === 1 ? 'Siguiente' : 'Registrar'}

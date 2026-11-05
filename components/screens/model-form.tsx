@@ -26,7 +26,8 @@ export function ModelForm({
   teams: { id: string; name: string }[];
   prefillTeam?: string;
   fromPurchase?: boolean;
-  onDone?: () => void;
+  // Receives the new model's id after a create (undefined on edit or cancel).
+  onDone?: (createdId?: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -51,6 +52,7 @@ export function ModelForm({
       player: initial?.player ?? '',
       description: initial?.description ?? '',
       photos: initial?.photos ?? [],
+      isOneOff: initial?.isOneOff ?? false,
     },
   });
 
@@ -63,13 +65,13 @@ export function ModelForm({
       const result = initial?.id
         ? await updateModel(initial.id, data, { skipRedirect: !!onDone })
         : await createModel(data, { fromPurchase, skipRedirect: !!onDone });
-      if (result?.errors) {
+      if (result && 'errors' in result) {
         for (const [field, messages] of Object.entries(result.errors)) {
           setError(field as keyof ModelFormValues, { message: (messages as string[])[0] });
         }
         return;
       }
-      onDone?.();
+      onDone?.(result && 'id' in result ? result.id : undefined);
     });
   }
 
@@ -199,6 +201,21 @@ export function ModelForm({
           )}
         />
       </Field>
+      <Field label="Compra puntual">
+        <Controller
+          name="isOneOff"
+          control={control}
+          render={({ field }) => (
+            <Segmented
+              options={['no', 'si']}
+              value={field.value ? 'si' : 'no'}
+              onChange={(v) => field.onChange(v === 'si')}
+              renderLabel={(v) => (v === 'si' ? 'Sí' : 'No')}
+              full
+            />
+          )}
+        />
+      </Field>
 
       {!onDone && (
         <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={handleSubmit(onSubmit)}>
@@ -214,7 +231,7 @@ export function ModelForm({
         <div className="dm-body">{formFields}</div>
         <ModalFooter
           pending={pending}
-          onCancel={onDone}
+          onCancel={() => onDone()}
           onConfirm={handleSubmit(onSubmit)}
           confirmLabel={initial ? 'Guardar cambios' : 'Crear modelo'}
           pendingLabel={initial ? 'Guardando…' : 'Creando…'}

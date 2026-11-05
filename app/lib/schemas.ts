@@ -177,6 +177,7 @@ export const modelFormSchema = z.object({
     url: z.string().min(1),
     publicId: z.string(),
   })),
+  isOneOff: z.boolean(),
 });
 
 export type ModelFormValues = z.infer<typeof modelFormSchema>;
@@ -196,7 +197,7 @@ const purchaseItemSchema = z.object({
   modelId: z.string().min(1, 'Elegí un producto'),
   size: z.string().min(1, 'Elegí un talle'),
   basePriceUsd: z.string().optional(),
-  quantity: z.number().int().min(1),
+  quantity: z.number({ error: 'Cantidad inválida' }).int('Cantidad inválida').min(1, 'La cantidad debe ser al menos 1'),
 });
 
 export const purchaseSchema = z
