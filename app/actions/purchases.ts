@@ -31,6 +31,12 @@ const purchaseBaseSchema = z.object({
 
 const createPurchaseSchema = purchaseBaseSchema.extend({
   items: z.array(purchaseItemInput).min(1),
+  // "Compra puntual" decisions from the purchase form, one per model whose
+  // toggle was shown. Only models in this purchase may be flagged.
+  oneOffFlags: z.array(z.object({
+    modelId: z.string().min(1),
+    isOneOff: z.boolean(),
+  })).optional(),
 });
 
 // On edit, `items` is the desired EDITABLE (unshipped) set with PRE-TAX prices;
@@ -61,8 +67,12 @@ export async function createPurchase(data: {
   supplierPayments?: { userId: string; amountUsd: number; cardTaxPct?: number }[];
   exchangeRate: number;
   items: PurchaseItem[];
+  oneOffFlags?: { modelId: string; isOneOff: boolean }[];
 }, opts?: { skipRedirect?: boolean }) {
   parseOrThrow(createPurchaseSchema, data);
+
+  const purchasedModelIds = new Set(data.items.map((it) => it.modelId));
+  const oneOffFlags = (data.oneOffFlags ?? []).filter((f) => purchasedModelIds.has(f.modelId));
 
   const expandedItems = expandItems(data.items);
 
@@ -99,6 +109,13 @@ export async function createPurchase(data: {
     });
 
     await addBatchItems(batch.id, itemsWithTax, data.exchangeRate, tx);
+
+    for (const f of oneOffFlags) {
+      await tx.catalogProduct.update({
+        where: { id: f.modelId },
+        data: { isOneOff: f.isOneOff },
+      });
+    }
   });
 
   invalidatePurchase();

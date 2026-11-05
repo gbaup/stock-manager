@@ -46,6 +46,7 @@ function productMeta(p: {
   type: string | null; sleeve: string | null;
   photos: unknown;
   description?: string | null;
+  isOneOff?: boolean;
 }, sizes: string[] = []): ModelMeta {
   return {
     id: p.id, team: p.team.name, season: p.season,
@@ -57,6 +58,7 @@ function productMeta(p: {
     photos: parsePhotos(p.photos),
     sizes,
     description: p.description ?? null,
+    isOneOff: p.isOneOff ?? false,
   };
 }
 
@@ -196,6 +198,8 @@ export async function getModels(): Promise<ModelWithStats[]> {
       stock: c?.available ?? 0,
       inTransit: c?.inTransit ?? 0,
       reserved: c?.reserved ?? 0,
+      // Units ever bought for this model, across every size and status.
+      totalUnits: c ? c.available + c.inTransit + c.reserved + c.sold : 0,
       availableBySize: sizes.get(p.id) ?? [],
     };
   });
@@ -452,6 +456,7 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     stock,
     inTransit,
     reserved,
+    totalUnits: p.items.length,
     availableBySize,
     reservedBySize,
     reservedItems,

@@ -1,4 +1,4 @@
-import { getModels, getUsers } from '@/app/lib/queries';
+import { getModels, getTeams, getUsers } from '@/app/lib/queries';
 import { getRate } from '@/app/lib/exchange-rate';
 import { PurchaseForm } from '@/components/screens/purchase-form';
 
@@ -8,14 +8,18 @@ export default async function NewPurchasePage({
   searchParams: Promise<{ modelId?: string; newModelId?: string }>;
 }) {
   const { modelId, newModelId } = await searchParams;
-  const [models, users, rate] = await Promise.all([getModels(), getUsers(), getRate()]);
+  const [models, users, rate, teams] = await Promise.all([getModels(), getUsers(), getRate(), getTeams()]);
   return (
     <PurchaseForm
+      // A different preset model must start a fresh form: useForm only reads
+      // defaultValues on mount, and Next keeps this route's instance alive.
+      key={modelId ?? 'new'}
       models={models}
       presetModelId={modelId}
       newModelId={newModelId}
       users={users}
       rate={rate}
+      teams={teams}
     />
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
+import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
@@ -13,7 +13,6 @@ import { useIsDesktop } from '@/app/lib/hooks';
 import { compareVersions } from '@/app/lib/domain';
 import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
-import { PurchaseForm } from '@/components/screens/purchase-form';
 import { PurchaseEditForm } from '@/components/screens/purchase-edit-form';
 import { ArrivalForm } from '@/components/screens/arrival-form';
 import { ShipmentEditForm } from '@/components/screens/shipment-edit-form';
@@ -35,7 +34,6 @@ export function PurchasesScreen({
   const isDesktop = useIsDesktop();
   const [tab, setTab] = useState<'pending' | 'arrived'>('pending');
   const [buySel, setBuySel] = useState<string | null>(null);
-  const [showNewPurchase, setShowNewPurchase] = useState(false);
   const [showArrival, setShowArrival] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editShipment, setEditShipment] = useState<{ batchId: string; shipmentId: string } | null>(null);
@@ -58,7 +56,7 @@ export function PurchasesScreen({
       .map((b, i) => [b.id, i + 1]),
   );
 
-  // Same modal on desktop and mobile, mirroring the sale edit in home-screen.
+  // Mobile only — desktop edits on the full-screen /purchases/[id]/edit.
   const editBatch = batches.find((b) => b.id === editId) ?? null;
   const editModal = editBatch && (
     <DModal title="Editar compra" size="lg" onClose={() => setEditId(null)}>
@@ -96,7 +94,7 @@ export function PurchasesScreen({
             <div className="mh-sub">{transitCount} en camino · {arrivedCount} recibidas</div>
           </div>
           <div className="mh-actions">
-            <button className="btn btn-primary" onClick={() => setShowNewPurchase(true)}>
+            <button className="btn btn-primary" onClick={() => router.push('/purchases/new')}>
               Nueva compra
             </button>
           </div>
@@ -130,9 +128,10 @@ export function PurchasesScreen({
           <div className="split-detail">
             {selBatch ? (
               <BuyDetailPanel
+                key={selBatch.id}
                 batch={selBatch}
                 onArrive={() => setShowArrival(true)}
-                onEdit={() => setEditId(selBatch.id)}
+                onEdit={() => router.push(`/purchases/${selBatch.id}/edit`)}
                 onEditShipment={(shipmentId) => setEditShipment({ batchId: selBatch.id, shipmentId })}
               />
             ) : (
@@ -145,20 +144,13 @@ export function PurchasesScreen({
           </div>
         </div>
 
-        {showNewPurchase && (
-          <DModal title="Nueva compra" size="lg" onClose={() => setShowNewPurchase(false)}>
-            <PurchaseForm models={models} users={users} rate={rate} onDone={() => setShowNewPurchase(false)} />
-          </DModal>
-        )}
         {showArrival && selBatch && (
           <DModal title="Marcar llegada" size="lg" onClose={() => setShowArrival(false)}>
             <ArrivalForm batch={selBatch} users={users} rate={rate} onDone={() => setShowArrival(false)} />
           </DModal>
         )}
-        {editModal}
         {shipmentEditModal}
 
-        <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
       </div>
     );
@@ -208,7 +200,6 @@ export function PurchasesScreen({
       </button>
       {editModal}
       {shipmentEditModal}
-      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );

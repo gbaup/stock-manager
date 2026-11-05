@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { TopBar, BottomNav, Sidebar } from '@/components/ui/chrome';
+import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
 import { Tag } from '@/components/ui/tag';
 import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
 import { Modal } from '@/components/ui/modal';
+import { Spinner } from '@/components/ui/spinner';
 import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark, Share2 } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
 import { fmtType, compareSizes, sizeStockOf, costBySizeOf, matchesModel } from '@/app/lib/domain';
@@ -22,6 +23,9 @@ import { ShareStockModal } from '@/components/screens/share-stock-modal';
 import { releaseReservation } from '@/app/actions/reservations';
 
 type Layout = 'cards' | 'rows' | 'grid';
+
+const isFinishedOneOff = (m: ModelWithStats) =>
+  m.isOneOff && m.stock === 0 && m.inTransit === 0 && m.reserved === 0;
 type Filter = 'all' | 'instock' | 'transit' | 'out';
 
 export function InventoryScreen({
@@ -44,12 +48,16 @@ export function InventoryScreen({
   const [invSel, setInvSel] = useState<string | null>(null);
   const [selDetail, setSelDetail] = useState<ModelDetail | null>(null);
   const [detailPending, startDetailTransition] = useTransition();
+  // Last model whose detail was requested — a slower, older response must not
+  // overwrite a newer selection (it would leave the panel stuck loading).
+  const latestDetailReq = useRef<string | null>(null);
   const [showNewModel, setShowNewModel] = useState(false);
   const [showEditModel, setShowEditModel] = useState(false);
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showShareStock, setShowShareStock] = useState(false);
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => new Set());
+  const [includeOneOff, setIncludeOneOff] = useState(false);
 
   function toggleTeam(team: string) {
     setExpandedTeams((prev) => {
@@ -60,7 +68,12 @@ export function InventoryScreen({
     });
   }
 
-  let list = models.filter((m) => matchesModel(m, query));
+  // Sold-out one-off purchases are hidden unless asked for. A one-off still in
+  // stock, in transit or reserved stays visible — it still needs handling.
+  const hiddenOneOffs = models.filter(isFinishedOneOff).length;
+  const baseModels = includeOneOff ? models : models.filter((m) => !isFinishedOneOff(m));
+
+  let list = baseModels.filter((m) => matchesModel(m, query));
   if (filter === 'instock') list = list.filter((m) => m.stock > 0);
   else if (filter === 'out') list = list.filter((m) => m.stock === 0);
   else if (filter === 'transit') list = list.filter((m) => m.inTransit > 0);
@@ -77,11 +90,22 @@ export function InventoryScreen({
   });
 
   const counts = {
-    all: models.length,
-    instock: models.filter((m) => m.stock > 0).length,
-    transit: models.filter((m) => m.inTransit > 0).length,
-    out: models.filter((m) => m.stock === 0).length,
+    all: baseModels.length,
+    instock: baseModels.filter((m) => m.stock > 0).length,
+    transit: baseModels.filter((m) => m.inTransit > 0).length,
+    out: baseModels.filter((m) => m.stock === 0).length,
   };
+
+  const oneOffChip = hiddenOneOffs > 0 && (
+    <button
+      className={`chip${includeOneOff ? ' is-active' : ''}`}
+      onClick={() => setIncludeOneOff((v) => !v)}
+      aria-pressed={includeOneOff}
+    >
+      Incluir compras puntuales
+      <span className="count">{hiddenOneOffs}</span>
+    </button>
+  );
   const totalUnits = models.reduce((s, m) => s + m.stock, 0);
 
   const FILTERS: { id: Filter; label: string }[] = [
@@ -94,9 +118,13 @@ export function InventoryScreen({
   function selectModel(id: string) {
     if (id === invSel) return;
     setInvSel(id);
+    latestDetailReq.current = id;
     startDetailTransition(async () => {
       const detail = await fetchModelDetail(id);
+      if (latestDetailReq.current !== id) return;
       setSelDetail(detail);
+      // Unknown/deleted model: drop the selection instead of spinning forever.
+      if (!detail) setInvSel(null);
     });
   }
 
@@ -105,8 +133,11 @@ export function InventoryScreen({
   // immediately in the still-open panel rather than on the next selection.
   function refreshDetail() {
     if (!invSel) return;
+    const id = invSel;
+    latestDetailReq.current = id;
     startDetailTransition(async () => {
-      const detail = await fetchModelDetail(invSel);
+      const detail = await fetchModelDetail(id);
+      if (latestDetailReq.current !== id) return;
       setSelDetail(detail);
     });
   }
@@ -118,7 +149,6 @@ export function InventoryScreen({
     const params = new URLSearchParams(window.location.search);
     const modelId = params.get('model');
     if (!modelId) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     selectModel(modelId);
     params.delete('model');
     const qs = params.toString();
@@ -191,6 +221,7 @@ export function InventoryScreen({
                     <span className="count">{counts[f.id]}</span>
                   </button>
                 ))}
+                {oneOffChip}
               </div>
             </div>
 
@@ -212,7 +243,9 @@ export function InventoryScreen({
           </div>
 
           <div className="split-detail">
-            {invSel && selDetail ? (
+            {invSel && selDetail?.id !== invSel ? (
+              <DetailLoading />
+            ) : invSel && selDetail ? (
               <ModelDetailPanel
                 model={selDetail}
                 loading={detailPending}
@@ -255,7 +288,6 @@ export function InventoryScreen({
           <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
         )}
 
-        <Sidebar transitCount={transitCount} />
         <BottomNav transitCount={transitCount} />
       </div>
     );
@@ -319,6 +351,7 @@ export function InventoryScreen({
                 <span className="count">{counts[f.id]}</span>
               </button>
             ))}
+            {oneOffChip}
           </div>
 
           {list.length === 0 ? (
@@ -339,7 +372,6 @@ export function InventoryScreen({
       {showShareStock && (
         <ShareStockModal models={models} onClose={() => setShowShareStock(false)} />
       )}
-      <Sidebar transitCount={transitCount} />
       <BottomNav transitCount={transitCount} />
     </div>
   );
@@ -512,6 +544,15 @@ function DetailEmpty() {
   );
 }
 
+function DetailLoading() {
+  return (
+    <div className="detail-empty" role="status" aria-live="polite">
+      <Spinner size={28} />
+      <div className="detail-empty-s" style={{ marginTop: 12 }}>Cargando modelo…</div>
+    </div>
+  );
+}
+
 function ModelDetailPanel({
   model,
   loading,
@@ -581,6 +622,7 @@ function ModelDetailPanel({
             <Tag><ColorDot color={model.color} />{model.color}</Tag>
             {model.player && <Tag kind="player" className="capitalize">{model.player}</Tag>}
             {model.number && <Tag kind="player">#{model.number}</Tag>}
+            {model.isOneOff && <Tag>Compra puntual</Tag>}
           </div>
         </div>
         <button className="d-hero-edit" onClick={onEdit} aria-label="Editar modelo">
