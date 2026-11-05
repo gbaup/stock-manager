@@ -24,6 +24,8 @@ When adding a migration: edit `prisma/schema.prisma`, then run `npx prisma migra
 - `app/lib/schemas.ts` — Zod schemas shared between server actions and client forms
 - `app/lib/domain.ts` — serialization-safe domain types, domain constants (`PEOPLE`, `SIZES`, `VERSIONS`, etc.), and formatting utilities (`fmtDate`, `uyu`, `usd`)
 
+**Docs**: `CONTEXT.md` is the domain glossary, `docs/adr/` holds technical decisions, and `docs/product/` holds product/business notes (positioning, roadmap, pricing — each split into decisions, hypotheses and open questions). Read `docs/product/` before discussing product direction.
+
 **Routing**: The `app/(app)/` group wraps authenticated screens. `app/public/` is unauthenticated.
 
 **Components** live in two layers:
@@ -69,6 +71,7 @@ WHATSAPP_MESSAGE  # optional. Pre-filled chat text for the WhatsApp button. Unse
 
 ## Conventions
 
+- **Language standard: English for everything written into the repo** — code, identifiers, comments, commit messages, PR descriptions, and documentation (`docs/`, `CONTEXT.md`, ADRs, product notes). This holds even when the conversation or the request is in Spanish. The one standing exception is user-facing UI text (below). If the user asks for something else, or it's unclear which language a piece of content should be in, ask instead of assuming.
 - UI text is in Spanish (Rioplatense). Domain constants like `PEOPLE = ['Caja', 'Bauer']` are business-specific, not generic.
 - Monetary values: always stored as `Decimal` in DB; converted to `number` in query layer before passing to client. USD rate is `USD_RATE = 40.5` in `domain.ts`.
 - Prisma field names use `camelCase` in code and `snake_case` in DB via `@map`.
