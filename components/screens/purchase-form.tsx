@@ -8,7 +8,8 @@ import { FormHead } from '@/components/ui/chrome';
 import { Stepper } from '@/components/ui/stepper';
 import { Empty } from '@/components/ui/empty';
 import { Swatch } from '@/components/ui/swatch';
-import { ChevronRight, Plus, Shirt, X, Truck, Check } from 'lucide-react';
+import { ChevronRight, Plus, Shirt, X, Truck, Check, FileSpreadsheet } from 'lucide-react';
+import { DModal } from '@/components/ui/d-modal';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import { sizesForType, baseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray } from '@/app/lib/domain';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
@@ -153,6 +154,8 @@ export function PurchaseForm({
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Bumped on reset so the catalog (search box) remounts clean too.
   const [resetKey, setResetKey] = useState(0);
+  // Desktop-only "Importar Excel" entry point; the importer itself is pending.
+  const [showImport, setShowImport] = useState(false);
 
   // With cacheComponents, Next keeps visited routes mounted (React <Activity>)
   // and restores their state on return — so leaving /purchases/new must clear
@@ -162,6 +165,7 @@ export function PurchaseForm({
     setStep(1);
     setOneOffOverrides({});
     setConfirmLeave(false);
+    setShowImport(false);
     setResetKey((k) => k + 1);
     router.push('/purchases');
   }
@@ -432,6 +436,9 @@ export function PurchaseForm({
           onBack={leave}
           actions={
             <>
+              <button className="btn btn-secondary" type="button" onClick={() => setShowImport(true)}>
+                <FileSpreadsheet size={16} strokeWidth={1.8} />Importar Excel
+              </button>
               <button className="btn btn-secondary" type="button" onClick={leave}>Cancelar</button>
               <button className="btn btn-primary" type="button" disabled={pending || payMismatch} onClick={handleSubmit(onSubmit)}>
                 {pending ? 'Registrando…' : 'Registrar compra'}
@@ -516,6 +523,22 @@ export function PurchaseForm({
           </div>
         </PurchaseBuilder>
         {confirmModal}
+        {showImport && (
+          <DModal
+            size="sm"
+            title="Importar Excel"
+            sub="Próximamente"
+            iconNode={<FileSpreadsheet size={18} strokeWidth={1.8} />}
+            onClose={() => setShowImport(false)}
+          >
+            <div className="dm-body">
+              Pronto vas a poder cargar los items de la compra desde una planilla de Excel en lugar de agregarlos uno por uno.
+            </div>
+            <div className="dm-foot">
+              <button className="btn btn-primary" type="button" onClick={() => setShowImport(false)}>Entendido</button>
+            </div>
+          </DModal>
+        )}
         {confirmLeave && (
           <Modal
             icon="trash"
