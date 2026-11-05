@@ -37,6 +37,13 @@ export function PurchaseItemsTable<T extends FieldValues>({
   // "Compra puntual" toggle, shown on the first row of each flagged model.
   oneOff?: { values: Map<string, boolean>; toggle: (modelId: string, next: boolean) => void };
 }) {
+  // Built once per render so rows don't each scan the catalog / item list.
+  const modelById = new Map(models.map((m) => [m.id, m]));
+  const firstRowOf = new Map<string, number>();
+  items.forEach((it, i) => {
+    if (it?.modelId && !firstRowOf.has(it.modelId)) firstRowOf.set(it.modelId, i);
+  });
+
   return (
     <table className="pitems">
       <thead>
@@ -52,9 +59,9 @@ export function PurchaseItemsTable<T extends FieldValues>({
       <tbody>
         {rowKeys.map((key, index) => {
           const modelId = items[index]?.modelId ?? '';
-          const m = models.find((x) => x.id === modelId);
+          const m = modelById.get(modelId);
           const showOneOff = !!oneOff && !!modelId && oneOff.values.has(modelId)
-            && items.findIndex((it) => it.modelId === modelId) === index;
+            && firstRowOf.get(modelId) === index;
           const isOneOff = showOneOff && !!oneOff?.values.get(modelId);
           const error = errorOf(index);
           return (

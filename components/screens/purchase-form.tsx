@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +25,7 @@ import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
 import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
 import { PurchaseItemsTable, rowError } from '@/components/purchase/purchase-items-table';
 import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
+import { usePurchaseBuilderRows } from '@/components/purchase/use-purchase-builder-rows';
 
 const DRAFT_KEY = 'purchase-draft';
 
@@ -112,8 +113,7 @@ export function PurchaseForm({
   // model already flagged as one-off also shows the toggle, checked — the flag
   // is kept unless the user unchecks it. User overrides win.
   const [oneOffOverrides, setOneOffOverrides] = useState<Record<string, boolean>>({});
-  const qtyByModel = new Map<string, number>();
-  for (const it of validItems) qtyByModel.set(it.modelId, (qtyByModel.get(it.modelId) ?? 0) + (it.quantity ?? 1));
+  const { countsById: qtyByModel, addModel } = usePurchaseBuilderRows(watchedItems, fields.length, append);
   const oneOffToggles = new Map<string, boolean>(); // modelId -> effective value, only for models showing the toggle
   const currentOneOff = new Map<string, boolean>(); // modelId -> flag stored today, to send only real changes
   for (const [modelId, qty] of qtyByModel) {
@@ -134,24 +134,6 @@ export function PurchaseForm({
   const { status: payStatus } = reconcileSupplierPayments(toSupplierPaymentArray(watchedPayments), totalUsd);
   const payMismatch = needsSupplierPayer && payStatus === 'mismatch';
 
-  // Desktop: units per model (catalog badges) and focus on a freshly added row.
-  const countsById = new Map<string, number>();
-  for (const it of validItems) countsById.set(it.modelId, (countsById.get(it.modelId) ?? 0) + (it.quantity ?? 1));
-  const focusRowRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (focusRowRef.current === null) return;
-    const row = document.querySelector<HTMLElement>(`[data-prow="${focusRowRef.current}"] select`);
-    if (row) {
-      row.focus();
-      focusRowRef.current = null;
-    }
-  });
-  // A repeated model starts at the price of its last line — usually the same.
-  function addModel(modelId: string) {
-    const last = [...watchedItems].reverse().find((it) => it.modelId === modelId);
-    focusRowRef.current = fields.length;
-    append({ modelId, size: '', basePriceUsd: last?.basePriceUsd ?? '', quantity: 1 });
-  }
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Bumped on reset so the catalog (search box) remounts clean too.
   const [resetKey, setResetKey] = useState(0);
@@ -469,7 +451,7 @@ export function PurchaseForm({
               </button>
             </>
           }
-          catalog={<PurchaseCatalog key={resetKey} models={models} teams={teams} counts={countsById} onAdd={addModel} />}
+          catalog={<PurchaseCatalog key={resetKey} models={models} teams={teams} counts={qtyByModel} onAdd={addModel} />}
         >
           <div className="pb-info">
             <Field label="Fecha de compra" error={errors.purchaseDate?.message}>

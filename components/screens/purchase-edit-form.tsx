@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,6 +26,7 @@ import { PurchaseBuilder } from '@/components/purchase/purchase-builder';
 import { PurchaseCatalog } from '@/components/purchase/purchase-catalog';
 import { PurchaseItemsTable, rowError } from '@/components/purchase/purchase-items-table';
 import { SupplierPaymentFields } from '@/components/purchase/supplier-payment-fields';
+import { usePurchaseBuilderRows } from '@/components/purchase/use-purchase-builder-rows';
 
 const PAY_HINT = 'Repartí el costo entre ambos (deben sumar el total). Dejá ambos vacíos si todavía nadie pagó.';
 
@@ -140,22 +141,7 @@ export function PurchaseEditForm({
   const noItemsLeft = lockedItems.length + validItems.length === 0;
 
   // Desktop builder: catalog badges, append + focus the new row's size.
-  const countsById = new Map<string, number>();
-  for (const it of validItems) countsById.set(it.modelId, (countsById.get(it.modelId) ?? 0) + (it.quantity ?? 1));
-  const focusRowRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (focusRowRef.current === null) return;
-    const row = document.querySelector<HTMLElement>(`[data-prow="${focusRowRef.current}"] select`);
-    if (row) {
-      row.focus();
-      focusRowRef.current = null;
-    }
-  });
-  function addModel(modelId: string) {
-    const last = [...watchedItems].reverse().find((it) => it.modelId === modelId);
-    focusRowRef.current = fields.length;
-    append({ modelId, size: '', basePriceUsd: last?.basePriceUsd ?? '', quantity: 1 });
-  }
+  const { countsById, addModel } = usePurchaseBuilderRows(watchedItems, fields.length, append);
 
   function doSubmit(data: PurchaseEditFormValues) {
     setSaveError(null);
