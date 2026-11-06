@@ -6,7 +6,7 @@ import { Tag } from '@/components/ui/tag';
 import { Avatar } from '@/components/ui/avatar';
 import { ModalFooter } from '@/components/ui/modal-footer';
 import { fmtDate, uyu } from '@/app/lib/format';
-import { SALE_STATUS } from '@/app/lib/domain';
+import { SALE_STATUS, fmtVersion } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 
@@ -17,7 +17,7 @@ export function saleDetailLine(
   { sizeLabel = '' }: { sizeLabel?: string } = {},
 ): string {
   return [
-    s.version ? ` ${s.version}` : '',
+    s.version ? ` ${fmtVersion(s.version)}` : '',
     s.number ? ` · ${s.number}` : '',
     s.player ? ` ${s.player}` : '',
     s.size ? ` · ${sizeLabel}${s.size.toUpperCase()}` : '',

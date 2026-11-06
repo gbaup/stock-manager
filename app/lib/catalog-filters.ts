@@ -1,4 +1,4 @@
-import { ITEM_TYPES, sizesForType, compareSizes, compareVersions, matchesModel, fmtType, fmtVersion, fmtSize } from './domain';
+import { ITEM_TYPES, sizesForType, compareSizes, compareVersions, matchesModel, fmtTypeEs, fmtVersion, fmtSize } from './domain';
 import type { ModelWithStats } from './domain';
 
 type ItemType = typeof ITEM_TYPES[number];
@@ -88,8 +88,11 @@ export function shareStockBlocks(
 export function shareStockText(blocks: ShareStockBlock[]): string {
   return blocks
     .map(({ model: m, sizeEntries }) => {
-      const header = [titleCase(m.team), fmtVersion(m.version), fmtType(m.type)].filter(Boolean).join(' · ');
-      const sizesLine = 'Talles disponibles: ' + sizeEntries.map((s) => `${fmtSize(s.size)} (${s.count})`).join(', ');
+      const player = [m.number, m.player && titleCase(m.player)].filter(Boolean).join(' ');
+      const header = [titleCase(m.team), m.season, fmtVersion(m.version), fmtTypeEs(m.type), player]
+        .filter(Boolean)
+        .join(' · ');
+      const sizesLine = 'Talles: ' + sizeEntries.map((s) => fmtSize(s.size)).join(', ');
       return `${header}\n${sizesLine}`;
     })
     .join('\n\n');

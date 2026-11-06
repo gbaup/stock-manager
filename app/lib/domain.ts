@@ -64,12 +64,17 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA', jacket: 'Jacket',
 };
 export const fmtType = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS[t] ?? cap(t) : '');
-export const fmtVersion = (v: string | null | undefined): string => (v ? cap(v) : '');
-// Public catalog shows versions in Spanish; stored values and admin labels stay as-is.
-const VERSION_LABELS_ES: Record<string, string> = {
-  home: 'Titular', away: 'Suplente', third: 'Tercera', fourth: 'Cuarta', arquero: 'Arquero',
+// Spanish display labels for item types, used where English would read odd
+// to a customer (shared stock text). Admin chips keep fmtType.
+const ITEM_TYPE_LABELS_ES: Record<string, string> = {
+  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'Conjunto de niño', short: 'Short', nba: 'NBA', jacket: 'Campera',
 };
-export const fmtVersionEs = (v: string | null | undefined): string => (v ? VERSION_LABELS_ES[v] ?? cap(v) : '');
+export const fmtTypeEs = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS_ES[t] ?? cap(t) : '');
+// Versions display in Spanish everywhere; stored values stay as-is.
+const VERSION_LABELS: Record<string, string> = {
+  home: 'Titular', away: 'Alternativa', third: 'Tercera', fourth: 'Cuarta', arquero: 'Arquero',
+};
+export const fmtVersion = (v: string | null | undefined): string => (v ? VERSION_LABELS[v] ?? cap(v) : '');
 export const fmtSleeve = (s: string | null | undefined): string => (s ? cap(s) : '');
 
 export const JERSEY_COLORS = [
@@ -132,7 +137,7 @@ const normalizeText = (s: string | null | undefined): string =>
 // Shared by every model picker so search behaves identically everywhere.
 export function modelHaystack(m: ModelMeta): string {
   return normalizeText(
-    [m.team, m.version, m.season, m.player, m.number && '#' + m.number, m.type, m.sleeve, m.color, m.description]
+    [m.team, m.version, fmtVersion(m.version), m.season, m.player, m.number && '#' + m.number, m.type, m.sleeve, m.color, m.description]
       .filter(Boolean)
       .join(' '),
   );

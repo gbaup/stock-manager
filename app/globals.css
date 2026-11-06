@@ -6677,6 +6677,23 @@ body {
 
   .dtable tbody tr { transition: background 0.14s ease, box-shadow 0.14s ease; }
 
+  /* ---- inventory table: stable columns + micro-interactions ---- */
+  /* Fixed layout so column widths don't shift as teams expand (see <colgroup>). */
+  .dtable-inv { table-layout: fixed; }
+
+  .dtable-group-chevron { transition: transform 0.2s var(--ease-out); }
+  .dtable-group-chevron.is-open { transform: rotate(90deg); }
+
+  .dt-cell-model .swatch { transition: transform 0.2s var(--ease-out); }
+  .dtable tbody tr.dt-row:hover .swatch { transform: translateX(2px) scale(1.05); }
+
+  .split-inventory .tile {
+    transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .split-inventory .tile:hover { transform: translateY(-3px); }
+  .split-inventory .tile-top img { transition: transform 0.45s var(--ease-out); }
+  .split-inventory .tile:hover .tile-top img { transform: scale(1.05); }
+
   .pitems tbody tr { transition: background 0.2s ease; }
   .pitems tbody tr:hover { background: color-mix(in oklch, var(--surface-2) 60%, transparent); }
 
@@ -6762,6 +6779,29 @@ body {
     .pitems tbody tr { animation: d-row-in 0.3s var(--ease-out) backwards; }
 
     .detail-empty-ico { animation: d-float 3.2s ease-in-out infinite; }
+
+    /* inventory: team groups cascade in; an expanded team's rows drop in
+       one after another; tiles rise in a stagger. --i is set inline. */
+    .split-inventory .dtable-group {
+      animation: d-rise 0.3s var(--ease-out) backwards;
+      animation-delay: calc(var(--i, 0) * 18ms);
+    }
+
+    .split-inventory .dtable tbody tr.dt-row {
+      animation: d-row-in 0.32s var(--ease-out) backwards;
+      animation-delay: calc(var(--i, 0) * 28ms);
+    }
+
+    .split-inventory .dt-row .stock-pill,
+    .split-inventory .dt-row .transit-pill {
+      animation: d-pop 0.34s var(--ease-spring) backwards;
+      animation-delay: calc(var(--i, 0) * 28ms + 120ms);
+    }
+
+    .split-inventory .tile {
+      animation: d-rise 0.38s var(--ease-out) backwards;
+      animation-delay: calc(var(--i, 0) * 22ms);
+    }
   }
 
   @keyframes d-fade {

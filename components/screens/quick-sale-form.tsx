@@ -11,7 +11,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { SizePicker } from '@/components/ui/size-picker';
 import { uyu, usd } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
-import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
+import { METHODS, fmtType, fmtVersion, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
 import { ModalFooter } from '@/components/ui/modal-footer';
@@ -59,8 +59,7 @@ export function QuickSaleForm({
 
   const results = models
     .filter((m) => matchesModel(m, query))
-    .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
-    .slice(0, 7);
+    .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock);
 
   function resetForm() {
     setSelectedModelId('');
@@ -89,8 +88,13 @@ export function QuickSaleForm({
           description: description || undefined,
           collectedByUserId,
         });
-        resetForm();
-        onDone?.();
+        // Desktop modal: close it. Mobile route: back to home, not a fresh form.
+        if (onDone) {
+          resetForm();
+          onDone();
+        } else {
+          router.push('/home');
+        }
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al registrar la venta');
       }
@@ -150,7 +154,7 @@ export function QuickSaleForm({
                   <div className="qs-r-main">
                     <div className="qs-r-team capitalize">{m.team}</div>
                     <div className="qs-r-meta">
-                      {m.season} · {m.version} · {fmtType(m.type)}
+                      {m.season} · {fmtVersion(m.version)} · {fmtType(m.type)}
                       {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
                     </div>
                   </div>
@@ -178,7 +182,7 @@ export function QuickSaleForm({
             <div className="qs-p-main">
               <div className="qs-p-team">{model.team}</div>
               <div className="qs-p-meta">
-                {model.season} · {model.version} · {stock} en stock
+                {model.season} · {fmtVersion(model.version)} · {stock} en stock
               </div>
             </div>
             <span className="qs-change">Cambiar</span>

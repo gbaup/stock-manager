@@ -10,6 +10,7 @@ import { Plus, Shirt, X, Lock, Trash2 } from 'lucide-react';
 import { Field, TextInput, TextAreaInput, SelectInput, MoneyInput } from '@/components/ui/field';
 import {
   sizesForType, editBatchBaseCostUsd, reconcileSupplierPayments, toSupplierPaymentArray,
+  fmtVersion,
 } from '@/app/lib/domain';
 import { unbakeBatch } from '@/app/lib/pricing';
 import { usd } from '@/app/lib/format';
@@ -248,7 +249,7 @@ export function PurchaseEditForm({
             <tbody>
               {Array.from(lockedGroups.values()).map((g, i) => (
                 <tr key={i}>
-                  <td className="capitalize dt-team">{g.product.team} · {g.product.version}</td>
+                  <td className="capitalize dt-team">{g.product.team} · {fmtVersion(g.product.version)}</td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{g.size.toUpperCase()}</td>
                   <td className="num">{g.count}</td>
                 </tr>
