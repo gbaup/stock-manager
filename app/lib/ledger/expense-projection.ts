@@ -7,6 +7,7 @@ export function projectExpense(expense: ExpenseRecord): Movement[] {
     id: `gasto-${expense.id}`,
     kind: 'gasto',
     date: expense.date,
+    createdAt: expense.createdAt,
     person: expense.paidByAlias,
     title: expense.title,
     sub: expense.currency,

@@ -9,7 +9,7 @@ import { Empty } from '@/components/ui/empty';
 import { Field, TextInput, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { SizePicker } from '@/components/ui/size-picker';
-import { uyu, usd } from '@/app/lib/format';
+import { uyu, usd, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
 import { METHODS, fmtType, fmtVersion, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
@@ -46,7 +46,7 @@ export function QuickSaleForm({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setDate(new Date().toISOString().split('T')[0]); }, []);
+  useEffect(() => { setDate(todayISO()); }, []);
 
   const model = models.find((m) => m.id === selectedModelId) ?? null;
   const stock = model?.stock ?? 0;
@@ -67,7 +67,7 @@ export function QuickSaleForm({
     setSize('');
     setPrice('');
     setQuantity('1');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(todayISO());
     setMethod('');
     setDescription('');
     setCollectedByUserId(sessionUserId);

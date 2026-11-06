@@ -13,7 +13,7 @@ export default function SaldosLoading() {
           ))}
         </div>
       </div>
-      <BottomNavShell active="saldos" />
+      <BottomNavShell active="balances" />
     </div>
   );
 }

@@ -292,7 +292,7 @@ export function SaldosScreen({
         </div>
       </div>
 
-      <button className="fab" onClick={() => router.push('/saldos/expense/new')} aria-label="Agregar gasto">
+      <button className="fab" onClick={() => router.push('/balances/expense/new')} aria-label="Agregar gasto">
         <Plus size={26} strokeWidth={2.2} />
       </button>
       <BottomNav transitCount={transitCount} />
@@ -444,7 +444,7 @@ function SettleHeader({
 function ConvActionButton() {
   const router = useRouter();
   return (
-    <button className="conv-action" onClick={() => router.push('/saldos/cambio/new')}>
+    <button className="conv-action" onClick={() => router.push('/balances/conversion/new')}>
       <span className="conv-ico"><ArrowLeftRight size={18} strokeWidth={2} /></span>
       <span className="conv-tx">
         <span className="conv-t">Cambiar monedas</span>

@@ -1,6 +1,6 @@
 import { cacheTag, cacheLife } from 'next/cache';
 import { prisma } from './prisma';
-import { fmtDate } from './format';
+import { fmtDate, todayISO } from './format';
 import { stockByModel, countStock, availableSizesByModel } from './inventory';
 import { CACHE_TAGS } from './cache-tags';
 import { parsePhotos } from './photo';
@@ -449,7 +449,11 @@ export async function getModelById(id: string): Promise<ModelDetail | null> {
     events.push({ type: 'sale', date: dateKey, data: saleData, qty });
   }
 
-  events.sort((a, b) => b.date.localeCompare(a.date));
+  // Newest first. Events are day-granular, so same-day ties follow the
+  // lifecycle in reverse: a sale happens after an arrival, which follows the
+  // purchase (and its transit leg).
+  const lifecycle: Record<string, number> = { purchase: 0, transit: 1, arrived: 2, sale: 3 };
+  events.sort((a, b) => b.date.localeCompare(a.date) || (lifecycle[b.type] ?? 0) - (lifecycle[a.type] ?? 0));
 
   return {
     ...productMeta(p),
@@ -486,7 +490,7 @@ export async function getPurchases(): Promise<BatchSummary[]> {
         orderBy: { date: 'asc' },
       },
     },
-    orderBy: [{ purchaseDate: 'desc' }, { id: 'desc' }],
+    orderBy: [{ purchaseDate: 'desc' }, { createdAt: 'desc' }],
   });
 
   return batches.map((b) =>
@@ -542,7 +546,7 @@ export async function getPublicModels() {
     })
     .filter((p) => SHOW_ALL_MODELS || p.stock > 0);
 
-  return { models, today: fmtDate(new Date().toISOString().split('T')[0]) };
+  return { models, today: fmtDate(todayISO()) };
 }
 
 export async function getHomeSales(): Promise<HomeSaleItem[]> {
@@ -626,6 +630,7 @@ export type LedgerSaleRow = {
   id: string;
   price: string;
   date: Date;
+  created_at: Date;
   collected_by_user_id: string | null;
   collected_by_alias: string | null;
   team_name: string;
@@ -641,6 +646,7 @@ export async function getActiveSalesForLedger(): Promise<LedgerSaleRow[]> {
       s.id,
       s.price,
       s.date,
+      s.created_at,
       s.collected_by_user_id,
       u.alias  AS collected_by_alias,
       t.name   AS team_name
@@ -650,7 +656,7 @@ export async function getActiveSalesForLedger(): Promise<LedgerSaleRow[]> {
     JOIN catalog_products cp ON ii.catalog_product_id = cp.id
     JOIN teams            t  ON cp.team_id            = t.id
     WHERE s.status = ${SALE_STATUS.active}
-    ORDER BY s.date DESC
+    ORDER BY s.date DESC, s.created_at DESC
   `;
 }
 

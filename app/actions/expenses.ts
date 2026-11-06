@@ -34,5 +34,5 @@ export async function createExpense(
 
   updateTag('saldos');
   if (opts?.skipRedirect) return;
-  redirect('/saldos');
+  redirect('/balances');
 }

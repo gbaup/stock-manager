@@ -351,6 +351,7 @@ export type ExpenseRecord = {
   paidByUserId: string;
   paidByAlias: string;
   date: string;
+  createdAt?: string;
 };
 
 export type AdjustmentRecord = {
@@ -360,12 +361,14 @@ export type AdjustmentRecord = {
   amountUyu: number;
   amountUsd: number;
   date: string;
+  createdAt?: string;
   note: string | null;
 };
 
 export type ConversionRecord = {
   id: string;
   date: string;
+  createdAt?: string;
   fromUserId: string;
   fromUserAlias: string;
   fromCur: 'UYU' | 'USD';
