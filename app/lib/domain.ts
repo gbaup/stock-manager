@@ -224,6 +224,26 @@ export type BatchSummary = {
 export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
 export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 
+// A partner keeping a jersey for themselves is recorded as a sale at this
+// token price (UYU), collected by that partner.
+export const SELF_TAKE_PRICE_UYU = 1;
+
+// Jerseys each partner kept for themselves, keyed by user id: how many and
+// their total landed cost in USD (supplier + shipping share). Active sales
+// only — a cancelled one went back to stock.
+export function selfTakesByUser(
+  sales: { price: number; costUsd: number; status: string; collectedByUserId: string | null }[],
+): Record<string, { count: number; costUsd: number }> {
+  const out: Record<string, { count: number; costUsd: number }> = {};
+  for (const s of sales) {
+    if (s.status !== SALE_STATUS.active || s.price !== SELF_TAKE_PRICE_UYU || !s.collectedByUserId) continue;
+    const entry = (out[s.collectedByUserId] ??= { count: 0, costUsd: 0 });
+    entry.count += 1;
+    entry.costUsd += s.costUsd;
+  }
+  return out;
+}
+
 // An InventoryItem's lifecycle: 'available' (sellable) -> 'reserved' (spoken
 // for by a client, hidden from the public catalog) -> 'sold', or back to
 // 'available' if a reservation is released.

@@ -8,6 +8,8 @@ export type Movement = {
   // When the event was recorded (ISO timestamp). `date` is day-only, so this
   // breaks same-day ties to keep the list strictly newest-first.
   createdAt?: string;
+  // Set on 'cobro' movements: the sale behind it, so the UI can open its detail.
+  saleId?: string;
   person: string;
   title: string;
   sub: string;

@@ -14,6 +14,7 @@ export function projectSale(sale: SaleRow): Movement[] {
     kind: 'cobro',
     date: sale.date,
     createdAt: sale.createdAt,
+    saleId: sale.id,
     person: sale.collectedByAlias ?? '',
     title: `Venta ×${sale.quantity}`,
     sub: sale.model,

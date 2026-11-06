@@ -2470,6 +2470,32 @@ body {
   box-shadow: var(--sh-sm);
 }
 
+/* Footnote on a partner card ("Se quedó con N camisetas"). */
+.bal-foot,
+.dbal-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* Sale movements in Saldos open the sale detail. */
+.mov[data-openable],
+.lrow[data-openable],
+tr[data-openable] {
+  cursor: pointer;
+}
+/* .dtable rows look clickable by default; in the ledger only sales are. */
+.dtable-ledger tbody tr:not([data-openable]) { cursor: default; }
+.mov[data-openable]:active,
+.lrow[data-openable]:active {
+  background: var(--surface-2);
+}
+
 .bal-head {
   display: flex;
   align-items: center;

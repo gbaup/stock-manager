@@ -25,7 +25,8 @@ export function saleDetailLine(
 }
 
 // Body + footer for a DModal showing one sale. "Ver modelo" is the primary
-// action; editing reuses the existing sale edit modal via `onEdit`.
+// action; editing reuses the existing sale edit modal via `onEdit`. Without
+// `onEdit` the modal is read-only (e.g. opened from Saldos).
 export function SaleDetail({
   sale,
   model,
@@ -35,7 +36,7 @@ export function SaleDetail({
 }: {
   sale: HomeSaleItem;
   model: ModelWithStats | undefined;
-  onEdit: () => void;
+  onEdit?: () => void;
   onOpenModel: (id: string) => void;
   onClose: () => void;
 }) {
@@ -112,8 +113,8 @@ export function SaleDetail({
       <ModalFooter
         pending={false}
         canSave={!!model}
-        cancelLabel={cancelled ? 'Cerrar' : 'Editar venta'}
-        onCancel={cancelled ? onClose : onEdit}
+        cancelLabel={cancelled || !onEdit ? 'Cerrar' : 'Editar venta'}
+        onCancel={cancelled || !onEdit ? onClose : onEdit}
         onConfirm={() => model && onOpenModel(model.id)}
         confirmLabel="Ver modelo"
       />

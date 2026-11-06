@@ -6,15 +6,18 @@ import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Empty } from '@/components/ui/empty';
 import { FixedPage } from '@/components/ui/fixed-page';
 import { ScrollPanel } from '@/components/ui/scroll-panel';
-import { Plus, ArrowLeftRight, Check, ChevronRight, Tag as TagIcon, Package, Truck, Receipt } from 'lucide-react';
-import type { ComponentType } from 'react';
+import { Plus, ArrowLeftRight, Check, ChevronRight, Tag as TagIcon, Package, Truck, Receipt, Shirt } from 'lucide-react';
+import type { ComponentType, KeyboardEvent } from 'react';
 import { Segmented } from '@/components/ui/segmented';
 import { uyu, usd, fmtDate, personInitial } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { DModal } from '@/components/ui/d-modal';
 import { GastoForm } from '@/components/screens/gasto-form';
 import { ConversionForm } from '@/components/screens/conversion-form';
-import type { UserSummary } from '@/app/lib/domain';
+import { selfTakesByUser } from '@/app/lib/domain';
+import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
+import type { HomeSaleItem } from '@/app/lib/queries';
+import { SaleDetail } from '@/components/screens/sale-detail';
 import { hasUsdActivity } from '@/app/lib/ledger';
 import type { Movement, PersonBalance, SettleTransfer } from '@/app/lib/ledger';
 
@@ -62,6 +65,8 @@ export function SaldosScreen({
   settle,
   users,
   transitCount,
+  sales,
+  models,
 }: {
   movements: Movement[];
   balances: Record<string, PersonBalance>;
@@ -69,6 +74,8 @@ export function SaldosScreen({
   settle: SettleTransfer[];
   users: UserSummary[];
   transitCount: number;
+  sales: HomeSaleItem[];
+  models: ModelWithStats[];
 }) {
   const router = useRouter();
   const isDesktop = useIsDesktop();
@@ -77,6 +84,28 @@ export function SaldosScreen({
   const [kindFilter, setKindFilter] = useState('todos');
   const [showGasto, setShowGasto] = useState(false);
   const [showConversion, setShowConversion] = useState(false);
+  const [viewingSaleId, setViewingSaleId] = useState<string | null>(null);
+
+  const selfTakes = selfTakesByUser(sales);
+  const viewingSale = viewingSaleId ? sales.find((s) => s.id === viewingSaleId) ?? null : null;
+  // Only sale movements open a detail; everything else stays inert.
+  const openMovement = (m: Movement) => (m.saleId ? () => setViewingSaleId(m.saleId!) : undefined);
+
+  const saleModal = viewingSale && (
+    <DModal title="Detalle de venta" size="md" onClose={() => setViewingSaleId(null)}>
+      <SaleDetail
+        sale={viewingSale}
+        model={models.find((m) => m.id === viewingSale.catalogProductId)}
+        onClose={() => setViewingSaleId(null)}
+        // Close before navigating: the route is kept alive (hidden) with
+        // cacheComponents and would otherwise reopen this modal on return.
+        onOpenModel={(id) => {
+          setViewingSaleId(null);
+          router.push(isDesktop ? `/inventory?model=${id}` : `/inventory/${id}`);
+        }}
+      />
+    </DModal>
+  );
 
   const { uyu: totalUyu, usd: totalUsd } = totals;
 
@@ -145,6 +174,7 @@ export function SaldosScreen({
                       </div>
                     )}
                   </div>
+                  <SelfTakeNote take={selfTakes[user.id]} className="dbal-foot" />
                 </div>
               );
             })}
@@ -202,7 +232,7 @@ export function SaldosScreen({
               {ledgerMoves.length === 0 ? (
                 <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
               ) : (
-                <table className="dtable">
+                <table className="dtable dtable-ledger">
                   <thead>
                     <tr>
                       <th>Concepto</th>
@@ -214,7 +244,7 @@ export function SaldosScreen({
                   </thead>
                   <tbody>
                     {ledgerMoves.map((m) => (
-                      <DesktopLedgerRow key={m.id} m={m} />
+                      <DesktopLedgerRow key={m.id} m={m} onOpen={openMovement(m)} />
                     ))}
                   </tbody>
                 </table>
@@ -233,6 +263,7 @@ export function SaldosScreen({
             <ConversionForm users={users} onDone={() => setShowConversion(false)} />
           </DModal>
         )}
+        {saleModal}
 
         <BottomNav transitCount={transitCount} />
       </div>
@@ -258,13 +289,13 @@ export function SaldosScreen({
           </div>
 
           {layout === 'resumen' && (
-            <CardsHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} />
+            <CardsHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} selfTakes={selfTakes} />
           )}
           {layout === 'saldar' && (
             <SettleHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} settle={settle} users={users} />
           )}
           {layout === 'planilla' && (
-            <LedgerLayout balances={balances} movements={movements} users={users} />
+            <LedgerLayout balances={balances} movements={movements} users={users} onOpen={openMovement} />
           )}
 
           {layout !== 'planilla' && <ConvActionButton />}
@@ -284,7 +315,7 @@ export function SaldosScreen({
                 <Empty icon="wallet" title="Sin movimientos" desc="Registrá un cobro, una compra o un gasto." />
               ) : (
                 <div className="mov-list">
-                  {filteredMovements.map((m) => <MovCard key={m.id} m={m} />)}
+                  {filteredMovements.map((m) => <MovCard key={m.id} m={m} onOpen={openMovement(m)} />)}
                 </div>
               )}
             </>
@@ -295,18 +326,33 @@ export function SaldosScreen({
       <button className="fab" onClick={() => router.push('/balances/expense/new')} aria-label="Agregar gasto">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      {saleModal}
       <BottomNav transitCount={transitCount} />
     </div>
   );
 }
 
+// Footnote on a partner's balance card: jerseys they kept for themselves
+// (sold to themselves at SELF_TAKE_PRICE_UYU) and what they cost the business
+// in USD (supplier + shipping share). Hidden when there are none.
+function SelfTakeNote({ take, className }: { take?: { count: number; costUsd: number }; className: string }) {
+  if (!take || take.count === 0) return null;
+  return (
+    <div className={className}>
+      <Shirt size={13} strokeWidth={1.8} />
+      Se quedó con {take.count} {take.count === 1 ? 'camiseta' : 'camisetas'} · costo {usd(take.costUsd)}
+    </div>
+  );
+}
+
 function CardsHeader({
-  balances, totalUyu, totalUsd, users,
+  balances, totalUyu, totalUsd, users, selfTakes,
 }: {
   balances: Record<string, PersonBalance>;
   totalUyu: number;
   totalUsd: number;
   users: UserSummary[];
+  selfTakes: Record<string, { count: number; costUsd: number }>;
 }) {
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
@@ -358,6 +404,7 @@ function CardsHeader({
                   </div>
                 )}
               </div>
+              <SelfTakeNote take={selfTakes[user.id]} className="bal-foot" />
             </div>
           );
         })}
@@ -456,11 +503,12 @@ function ConvActionButton() {
 }
 
 function LedgerLayout({
-  balances, movements, users,
+  balances, movements, users, onOpen,
 }: {
   balances: Record<string, PersonBalance>;
   movements: Movement[];
   users: UserSummary[];
+  onOpen: (m: Movement) => (() => void) | undefined;
 }) {
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
@@ -495,7 +543,7 @@ function LedgerLayout({
             <span style={{ width: 56 }}>Socio</span>
             <span style={{ width: 86, textAlign: 'right' }}>Monto</span>
           </div>
-          {movements.map((m) => <LedgerRow key={m.id} m={m} />)}
+          {movements.map((m) => <LedgerRow key={m.id} m={m} onOpen={onOpen(m)} />)}
         </div>
       )}
     </>
@@ -510,14 +558,31 @@ const KIND_DOT_CLASS: Record<string, string> = {
   cambio: 'cambio',
 };
 
-function DesktopLedgerRow({ m }: { m: Movement }) {
+// Click/keyboard props for a movement that opens something (sales only).
+function openableProps(onOpen?: () => void) {
+  if (!onOpen) return {};
+  return {
+    role: 'button',
+    tabIndex: 0,
+    'data-openable': '',
+    onClick: onOpen,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onOpen();
+      }
+    },
+  };
+}
+
+function DesktopLedgerRow({ m, onOpen }: { m: Movement; onOpen?: () => void }) {
   const dotCls = KIND_DOT_CLASS[m.kind] ?? '';
   const chips = [
     ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
     ...(m.usd !== 0 ? [{ cur: 'USD' as const, n: m.usd }] : []),
   ];
   return (
-    <tr>
+    <tr {...openableProps(onOpen)}>
       <td>
         <div className="ledger-concept">
           <span className={`ledger-dot ${dotCls}`} />
@@ -548,7 +613,7 @@ function DesktopLedgerRow({ m }: { m: Movement }) {
   );
 }
 
-function LedgerRow({ m }: { m: Movement }) {
+function LedgerRow({ m, onOpen }: { m: Movement; onOpen?: () => void }) {
   const dotCls = KIND_DOT_CLASS[m.kind] ?? '';
   const chips = [
     ...(m.uyu !== 0 ? [{ cur: 'UYU' as const, n: m.uyu }] : []),
@@ -556,7 +621,7 @@ function LedgerRow({ m }: { m: Movement }) {
   ];
 
   return (
-    <div className="lrow">
+    <div className="lrow" {...openableProps(onOpen)}>
       <div className="lrow-main">
         <div className="lrow-title">
           <span className={`lrow-dot ${dotCls}`} />
@@ -594,7 +659,7 @@ const MOV_ICON: Record<string, ComponentType<{ size?: number; strokeWidth?: numb
   cambio: ArrowLeftRight,
 };
 
-function MovCard({ m }: { m: Movement }) {
+function MovCard({ m, onOpen }: { m: Movement; onOpen?: () => void }) {
   const icoCls = MOV_ICO_CLASS[m.kind] ?? '';
   const MovIcon = MOV_ICON[m.kind] ?? Receipt;
   const chips = [
@@ -603,7 +668,7 @@ function MovCard({ m }: { m: Movement }) {
   ];
 
   return (
-    <div className="mov">
+    <div className="mov" {...openableProps(onOpen)}>
       <div className={`mov-ico ${icoCls}`}>
         <MovIcon size={17} strokeWidth={1.8} />
       </div>

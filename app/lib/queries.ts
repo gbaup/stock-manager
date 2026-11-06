@@ -23,6 +23,9 @@ export type HomeSaleItem = {
   price: number;
   profit: number;
   profitPending: boolean;
+  // Landed cost of the unit in USD: supplier base price + its equal share of
+  // the shipment's USD shipping (0 while in transit / not yet priced).
+  costUsd: number;
   date: string;
   method: string | null;
   description: string | null;
@@ -568,9 +571,11 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
           catalogProductId: true,
           size: true,
           basePriceUyu: true,
+          basePriceUsd: true,
           shipment: {
             select: {
               shippingPriceUyu: true,
+              shippingPriceUsd: true,
               _count: { select: { items: true } },
             },
           },
@@ -603,6 +608,13 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
         )
       : 0;
     const cost = Number(s.item.basePriceUyu) + share;
+    // Same equal split as the UYU share (and as getModelById's USD share).
+    const shareUsd = shipment
+      ? shippingShareUyu(
+          shipment.shippingPriceUsd === null ? null : Number(shipment.shippingPriceUsd),
+          shipment._count.items,
+        )
+      : 0;
     const profitPending = shipment === null || shipment.shippingPriceUyu === null;
     return {
       id: s.id,
@@ -616,6 +628,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       price: Number(s.price),
       profit: Number(s.price) - cost,
       profitPending,
+      costUsd: Number(s.item.basePriceUsd) + shareUsd,
       date: toISODate(s.date)!,
       method: s.method,
       description: s.description,
