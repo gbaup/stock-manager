@@ -16,8 +16,12 @@ export function fmtDate(date: Date | string | null | undefined): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
 }
 
-export function todayISO(): string {
-  return new Date().toISOString().split('T')[0];
+// Today's date (YYYY-MM-DD) in Uruguay time. The business runs on UYT
+// (UTC-3), so a plain toISOString() would already be "tomorrow" after 21:00.
+// Pinned to a zone rather than the runtime's local one so server (UTC on
+// Vercel) and browser agree.
+export function todayISO(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo' }).format(now);
 }
 
 export function uyu(n: number): string {

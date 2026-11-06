@@ -10,6 +10,7 @@ import { Package, Check } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
 import { Field, TextInput, MoneyInput, WeightInput } from '@/components/ui/field';
 import { usd, todayISO, fmtRate } from '@/app/lib/format';
+import { fmtVersion } from '@/app/lib/domain';
 import type { BatchSummary, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { markArrived } from '@/app/actions/purchases';
@@ -151,7 +152,7 @@ export function ArrivalForm({ batch, users, rate, onDone }: { batch: BatchSummar
               />
               <div className="ai-main">
                 <div className="ai-team capitalize">
-                  {it.product.team}{it.product.version ? ` · ${it.product.version}` : ''}
+                  {it.product.team}{it.product.version ? ` · ${fmtVersion(it.product.version)}` : ''}
                   {it.product.number ? ` · ${it.product.number}` : ''}{it.product.player ? ` · ${it.product.player}` : ''}
                 </div>
                 <div className="ai-meta">

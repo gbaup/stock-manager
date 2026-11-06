@@ -6,7 +6,7 @@ import { Tag } from '@/components/ui/tag';
 import { Avatar } from '@/components/ui/avatar';
 import { ModalFooter } from '@/components/ui/modal-footer';
 import { fmtDate, uyu } from '@/app/lib/format';
-import { SALE_STATUS } from '@/app/lib/domain';
+import { SALE_STATUS, fmtVersion } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 
@@ -17,7 +17,7 @@ export function saleDetailLine(
   { sizeLabel = '' }: { sizeLabel?: string } = {},
 ): string {
   return [
-    s.version ? ` ${s.version}` : '',
+    s.version ? ` ${fmtVersion(s.version)}` : '',
     s.number ? ` · ${s.number}` : '',
     s.player ? ` ${s.player}` : '',
     s.size ? ` · ${sizeLabel}${s.size.toUpperCase()}` : '',
@@ -25,7 +25,8 @@ export function saleDetailLine(
 }
 
 // Body + footer for a DModal showing one sale. "Ver modelo" is the primary
-// action; editing reuses the existing sale edit modal via `onEdit`.
+// action; editing reuses the existing sale edit modal via `onEdit`. Without
+// `onEdit` the modal is read-only (e.g. opened from Saldos).
 export function SaleDetail({
   sale,
   model,
@@ -35,7 +36,7 @@ export function SaleDetail({
 }: {
   sale: HomeSaleItem;
   model: ModelWithStats | undefined;
-  onEdit: () => void;
+  onEdit?: () => void;
   onOpenModel: (id: string) => void;
   onClose: () => void;
 }) {
@@ -112,8 +113,8 @@ export function SaleDetail({
       <ModalFooter
         pending={false}
         canSave={!!model}
-        cancelLabel={cancelled ? 'Cerrar' : 'Editar venta'}
-        onCancel={cancelled ? onClose : onEdit}
+        cancelLabel={cancelled || !onEdit ? 'Cerrar' : 'Editar venta'}
+        onCancel={cancelled || !onEdit ? onClose : onEdit}
         onConfirm={() => model && onOpenModel(model.id)}
         confirmLabel="Ver modelo"
       />

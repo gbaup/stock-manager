@@ -74,7 +74,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { id: 'home',      label: 'Inicio',    Icon: Home,    href: '/home' },
       { id: 'inventory', label: 'Inventario', Icon: Package, href: '/inventory' },
       { id: 'purchases', label: 'Compras',   Icon: Truck,   href: '/purchases' },
-      { id: 'saldos',    label: 'Saldos',    Icon: Wallet,  href: '/saldos' },
+      { id: 'balances',  label: 'Saldos',    Icon: Wallet,  href: '/balances' },
     ],
   },
   {

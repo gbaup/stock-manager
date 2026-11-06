@@ -58,8 +58,8 @@ export async function createSaleFromHome(
 ) {
   await executeSale(modelId, data);
   // No redirect: recordSale already calls updateTag(models/saldos), so the
-  // /home route re-renders with fresh data. The client resets the form itself
-  // (QuickSaleForm.resetForm) — redirecting here would throw NEXT_REDIRECT,
+  // /home route re-renders with fresh data. The client navigates itself
+  // (QuickSaleForm.handleSave) — redirecting here would throw NEXT_REDIRECT,
   // which the caller's try/catch would swallow as a bogus save error.
 }
 

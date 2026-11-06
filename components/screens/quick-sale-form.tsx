@@ -9,9 +9,9 @@ import { Empty } from '@/components/ui/empty';
 import { Field, TextInput, MoneyInput, SelectInput, TextAreaInput } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { SizePicker } from '@/components/ui/size-picker';
-import { uyu, usd } from '@/app/lib/format';
+import { uyu, usd, todayISO } from '@/app/lib/format';
 import { money } from '@/app/lib/money';
-import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
+import { METHODS, fmtType, fmtVersion, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { createSaleFromHome } from '@/app/actions/sales';
 import { ModalFooter } from '@/components/ui/modal-footer';
@@ -46,7 +46,7 @@ export function QuickSaleForm({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setDate(new Date().toISOString().split('T')[0]); }, []);
+  useEffect(() => { setDate(todayISO()); }, []);
 
   const model = models.find((m) => m.id === selectedModelId) ?? null;
   const stock = model?.stock ?? 0;
@@ -58,9 +58,8 @@ export function QuickSaleForm({
   const canSave = !!model && !!size && priceNum > 0 && qty > 0 && qty <= sizeAvail && !!collectedByUserId;
 
   const results = models
-    .filter((m) => matchesModel(m, query))
-    .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
-    .slice(0, 7);
+    .filter((m) => m.stock > 0 && matchesModel(m, query))
+    .sort((a, b) => b.stock - a.stock);
 
   function resetForm() {
     setSelectedModelId('');
@@ -68,7 +67,7 @@ export function QuickSaleForm({
     setSize('');
     setPrice('');
     setQuantity('1');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(todayISO());
     setMethod('');
     setDescription('');
     setCollectedByUserId(sessionUserId);
@@ -89,8 +88,13 @@ export function QuickSaleForm({
           description: description || undefined,
           collectedByUserId,
         });
-        resetForm();
-        onDone?.();
+        // Desktop modal: close it. Mobile route: back to home, not a fresh form.
+        if (onDone) {
+          resetForm();
+          onDone();
+        } else {
+          router.push('/home');
+        }
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al registrar la venta');
       }
@@ -137,8 +141,7 @@ export function QuickSaleForm({
                 <button
                   key={m.id}
                   className="qs-result"
-                  disabled={m.stock === 0}
-                  onClick={() => m.stock > 0 && selectModel(m)}
+                  onClick={() => selectModel(m)}
                 >
                   <Swatch
                     color={m.color}
@@ -150,16 +153,13 @@ export function QuickSaleForm({
                   <div className="qs-r-main">
                     <div className="qs-r-team capitalize">{m.team}</div>
                     <div className="qs-r-meta">
-                      {m.season} · {m.version} · {fmtType(m.type)}
+                      {m.season} · {fmtVersion(m.version)} · {fmtType(m.type)}
                       {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
                     </div>
                   </div>
-                  <div
-                    className="qs-r-stock"
-                    style={{ color: m.stock === 0 ? 'var(--text-faint)' : 'var(--text)' }}
-                  >
+                  <div className="qs-r-stock" style={{ color: 'var(--text)' }}>
                     <span className="qsr-n">{m.stock}</span>
-                    <span className="qsr-l">{m.stock === 0 ? 'sin stock' : 'stock'}</span>
+                    <span className="qsr-l">stock</span>
                   </div>
                 </button>
               ))
@@ -178,7 +178,7 @@ export function QuickSaleForm({
             <div className="qs-p-main">
               <div className="qs-p-team">{model.team}</div>
               <div className="qs-p-meta">
-                {model.season} · {model.version} · {stock} en stock
+                {model.season} · {fmtVersion(model.version)} · {stock} en stock
               </div>
             </div>
             <span className="qs-change">Cambiar</span>

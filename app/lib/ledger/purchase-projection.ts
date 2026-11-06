@@ -8,6 +8,7 @@ import { applyCardTax } from '../pricing';
 export type ProjectableShipment = {
   id: string;
   date: string;
+  createdAt?: string;
   shippingPriceUsd: number | null;
   shippingPriceUyu: number | null;
   shippingPaidByUserId: string | null;
@@ -19,6 +20,7 @@ export type ProjectableShipment = {
 export type ProjectableBatch = {
   id: string;
   purchaseDate: string;
+  createdAt?: string;
   arrivalDate: string | null;
   supplier: string | null;
   quantity: number;
@@ -49,6 +51,7 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
       id: `pago-prov-${batch.id}-${p.userId}`,
       kind: 'pago-prov',
       date: batch.purchaseDate,
+      createdAt: batch.createdAt,
       person: p.alias,
       title: batch.supplier ?? 'Proveedor',
       sub: paying.length > 1 ? `${itemsLabel} · ${splitPct}%${taxSuffix}` : `${itemsLabel}${taxSuffix}`,
@@ -66,6 +69,7 @@ export function projectPurchase(batch: ProjectableBatch): Movement[] {
         id: `pago-envio-${batch.id}-${sh.id}`,
         kind: 'pago-envio',
         date: sh.date,
+        createdAt: sh.createdAt,
         person: sh.shippingPaidByAlias ?? '',
         title: 'Envío',
         sub: sh.weight ? `${itemsLabel} · ${sh.weight} kg` : itemsLabel,

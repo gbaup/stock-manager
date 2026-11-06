@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { buildSaldos } from './ledger-queries';
 import { fetchExchangeRate } from './exchange-rate';
 import { money } from './money';
+import { todayISO } from './format';
 
 // Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. /api/cron skips the
 // session cookie (see proxy.ts), so this is the only gate.
@@ -15,10 +16,6 @@ export function isCronAuthorized(request: Request): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-// The business runs on Uruguay time; the cron fires in UTC.
-function montevideoToday(now: Date): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo' }).format(now);
-}
 
 function isLastDayOfMonth(isoDate: string): boolean {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -34,7 +31,7 @@ export type MonthCloseResult =
 // Throws if BCU is down: nothing is recorded rather than using a guessed rate.
 // Safe to re-run: after a close the peso balances are ~0, so a retry is a no-op.
 export async function closeMonthToUsd(now = new Date()): Promise<MonthCloseResult> {
-  const date = montevideoToday(now);
+  const date = todayISO(now);
   if (!isLastDayOfMonth(date)) return { status: 'skipped', reason: 'not_last_day', date };
 
   const { compra: rate } = await fetchExchangeRate();

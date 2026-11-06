@@ -43,14 +43,15 @@ const MONTHS = [
 ];
 
 function monthFromOffset(offset: number) {
-  // UTC throughout: sale dates come from toISODate (d.toISOString()), so the
-  // month key must be built on the same UTC basis or a sale near a month
-  // boundary would bucket into the wrong month in UYU (UTC-3).
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+  // Sale dates are plain calendar days (YYYY-MM-DD), so the current month is
+  // taken from today's Uruguay date (todayISO) — not from UTC, which flips to
+  // the next month after 21:00 on the last day. The arithmetic itself stays UTC
+  // so it never depends on the browser's zone.
+  const [curYear, curMonth] = todayISO().split('-').map(Number);
+  const d = new Date(Date.UTC(curYear, curMonth - 1 + offset, 1));
   const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; // "YYYY-MM"
   const label = MONTHS[d.getUTCMonth()];
-  const showYear = d.getUTCFullYear() !== now.getUTCFullYear();
+  const showYear = d.getUTCFullYear() !== curYear;
   return { key, label, year: d.getUTCFullYear(), showYear };
 }
 

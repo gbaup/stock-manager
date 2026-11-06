@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar, BottomNav } from '@/components/ui/chrome';
 import { Swatch, ColorDot, coverOf } from '@/components/ui/swatch';
@@ -9,9 +9,9 @@ import { Empty } from '@/components/ui/empty';
 import { DModal } from '@/components/ui/d-modal';
 import { Modal } from '@/components/ui/modal';
 import { Spinner } from '@/components/ui/spinner';
-import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronDown, ChevronRight, Bookmark, Share2 } from 'lucide-react';
+import { Package, List, LayoutGrid, Search, X, Plus, Shirt, Pencil, Tag as TagIcon, Truck, ShoppingCart, ChevronRight, Bookmark, Share2 } from 'lucide-react';
 import { colorByName, fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
-import { fmtType, compareSizes, sizeStockOf, costBySizeOf, matchesModel } from '@/app/lib/domain';
+import { fmtType, fmtVersion, compareSizes, sizeStockOf, costBySizeOf, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
 import { useIsDesktop } from '@/app/lib/hooks';
 import { fetchModelDetail } from '@/app/actions/read';
@@ -385,7 +385,7 @@ function CardList({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: strin
           <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 56, height: 64, fontSize: 21 }} />
           <div className="mcard-main">
             <div className="mcard-team capitalize">{m.team}</div>
-            <div className="mcard-meta">{m.season} · {m.version} · {m.type}</div>
+            <div className="mcard-meta">{m.season} · {fmtVersion(m.version)} · {m.type}</div>
             <div className="mcard-tags capitalize">
               <Tag><ColorDot color={m.color} />{m.color}</Tag>
               {m.player && <Tag kind="player" className="capitalize">{m.number} {m.player}</Tag>}
@@ -418,7 +418,7 @@ function DenseRows({ list, onOpen }: { list: ModelWithStats[]; onOpen: (id: stri
         <div key={m.id} className="row" onClick={() => onOpen(m.id)}>
           <Swatch color={m.color} number={m.number} photo={coverOf(m)} style={{ width: 30, height: 30, fontSize: 12 }} />
           <div className="row-main">
-            <div className="row-team capitalize">{m.team} · {m.version}</div>
+            <div className="row-team capitalize">{m.team} · {fmtVersion(m.version)}</div>
             <div className="row-meta capitalize">{m.season}{m.player ? ` · ${m.player}` : ''} · {m.color}</div>
           </div>
           <div className="row-transit">{m.inTransit > 0 ? `+${m.inTransit}` : ''}</div>
@@ -449,17 +449,27 @@ function InvTable({
 
   const rows: ReactNode[] = [];
   let currentTeam: string | null = null;
+  // Stagger indexes for the entrance animation: one per group header, and one
+  // per row inside its group so an expanded team cascades in on its own.
+  let groupIdx = 0;
+  let rowIdx = 0;
 
   list.forEach((m) => {
     if (m.team !== currentTeam) {
       currentTeam = m.team;
+      rowIdx = 0;
       const collapsed = !expandedTeams.has(m.team);
       rows.push(
-        <tr key={`group-${m.team}`} className="dtable-group" onClick={() => onToggleTeam(m.team)}>
+        <tr
+          key={`group-${m.team}`}
+          className="dtable-group"
+          style={{ '--i': Math.min(groupIdx++, 20) } as CSSProperties}
+          onClick={() => onToggleTeam(m.team)}
+        >
           <td colSpan={4}>
             <div className="dtable-group-inner">
-              <span className="dtable-group-chevron">
-                {collapsed ? <ChevronRight size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
+              <span className={`dtable-group-chevron${collapsed ? '' : ' is-open'}`}>
+                <ChevronRight size={14} strokeWidth={2} />
               </span>
               <span className="dtable-group-name capitalize">{m.team}</span>
               <span className="dtable-group-count">{teamCounts.get(m.team)}</span>
@@ -474,7 +484,8 @@ function InvTable({
     rows.push(
       <tr
         key={m.id}
-        className={`${selected === m.id ? 'is-selected' : ''}${m.stock === 0 ? ' is-out' : ''}`}
+        className={`dt-row${selected === m.id ? ' is-selected' : ''}${m.stock === 0 ? ' is-out' : ''}`}
+        style={{ '--i': Math.min(rowIdx++, 12) } as CSSProperties}
         onClick={() => onOpen(m.id)}
       >
         <td>
@@ -488,7 +499,7 @@ function InvTable({
             <div className="dt-cell-main">
               <div className="dt-team capitalize">{m.team}</div>
               <div className="dt-meta capitalize">
-                {m.version}
+                {fmtVersion(m.version)}
                 {m.color ? ` · ${m.color}` : ''}
                 {m.player ? ` · ${m.player}` : ''}
               </div>
@@ -516,7 +527,15 @@ function InvTable({
   });
 
   return (
-    <table className="dtable">
+    <table className="dtable dtable-inv">
+      {/* Fixed column widths: with auto layout the columns resized whenever a
+          team was expanded and rows with longer content became visible. */}
+      <colgroup>
+        <col />
+        <col style={{ width: 110 }} />
+        <col style={{ width: 96 }} />
+        <col style={{ width: 84 }} />
+      </colgroup>
       <thead>
         <tr>
           <th>Modelo</th>
@@ -614,7 +633,7 @@ function ModelDetailPanel({
         <div className="d-hero-tx">
           <div className="d-hero-team capitalize">{model.team}</div>
           <div className="d-hero-meta capitalize">
-            {model.season} · {model.version}
+            {model.season} · {fmtVersion(model.version)}
             {model.type ? ` · ${fmtType(model.type)}` : ''}
             {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
           </div>
@@ -893,11 +912,16 @@ function PanelEventRow({ ev }: { ev: TimelineEvent }) {
 function VisualGrid({ list, onOpen, selected }: { list: ModelWithStats[]; onOpen: (id: string) => void; selected?: string | null }) {
   return (
     <div className="grid">
-      {list.map((m) => {
+      {list.map((m, idx) => {
         const c = colorByName(m.color);
         const cover = coverOf(m);
         return (
-          <div key={m.id} className={`tile${selected === m.id ? ' is-selected' : ''}`} onClick={() => onOpen(m.id)}>
+          <div
+            key={m.id}
+            className={`tile${selected === m.id ? ' is-selected' : ''}`}
+            style={{ '--i': Math.min(idx, 16) } as CSSProperties}
+            onClick={() => onOpen(m.id)}
+          >
             <div className="tile-top" style={{ background: c.bg, color: c.fg, overflow: 'hidden' }}>
               {cover && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -918,7 +942,7 @@ function VisualGrid({ list, onOpen, selected }: { list: ModelWithStats[]; onOpen
             </div>
             <div className="tile-body">
               <div className="tile-team capitalize">{m.team}</div>
-              <div className="tile-meta">{m.season} · {m.version}</div>
+              <div className="tile-meta">{m.season} · {fmtVersion(m.version)}</div>
               {(m.inTransit > 0 || m.reserved > 0) && (
                 <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {m.inTransit > 0 && <Tag kind="transit">+{m.inTransit} en camino</Tag>}

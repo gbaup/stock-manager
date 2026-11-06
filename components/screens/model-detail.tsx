@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/modal';
 import { ChevronUp, ChevronDown, Tag as TagIcon, Truck, Package, ShoppingCart, Bookmark } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
 import { fmtDate, uyu, usd, signedUyu } from '@/app/lib/format';
-import { fmtType, compareSizes, sizeStockOf, costBySizeOf } from '@/app/lib/domain';
+import { fmtType, fmtVersion, compareSizes, sizeStockOf, costBySizeOf } from '@/app/lib/domain';
 import type { ModelDetail, TimelineEvent, UserSummary } from '@/app/lib/domain';
 import { ReserveForm } from '@/components/screens/reserve-form';
 import { ReservedSaleForm } from '@/components/screens/reserved-sale-form';
@@ -85,7 +85,7 @@ export function ModelDetailScreen({
             <div style={{ minWidth: 0 }}>
               <div className="detail-team capitalize">{model.team}</div>
               <div className="detail-meta capitalize">
-                {model.season} · {model.version}
+                {model.season} · {fmtVersion(model.version)}
                 {model.type ? ` · ${fmtType(model.type)}` : ''}
                 {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
               </div>

@@ -10,7 +10,7 @@ import { DModal } from '@/components/ui/d-modal';
 import { Plus, Check, ChevronRight, Pencil } from 'lucide-react';
 import { fmtDate, usd } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
-import { compareVersions } from '@/app/lib/domain';
+import { compareVersions, fmtVersion } from '@/app/lib/domain';
 import type { BatchSummary, ShipmentRecord, ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { RateResult } from '@/app/lib/exchange-rate';
 import { PurchaseEditForm } from '@/components/screens/purchase-edit-form';
@@ -224,7 +224,7 @@ function PurchaseCard({
   const isPartial = batch.status === 'partial';
 
   const title = single
-    ? `${single.team} · ${single.version}`
+    ? `${single.team} · ${fmtVersion(single.version)}`
     : `${qty} items`;
 
   const sub = batch.supplier || batch.description || '';
@@ -522,7 +522,7 @@ function BuyDetailPanel({
                 <td>
                   <div className="dt-meta capitalize">
                     <ColorDot color={g.product.color} />
-                    {g.product.version ? ` ${g.product.version}` : ''}
+                    {g.product.version ? ` ${fmtVersion(g.product.version)}` : ''}
                     {g.product.number ? ` · ${g.product.number}` : ''}{g.product.player ? ` ${g.product.player}` : ''}
                     {g.size ? ` · ${g.size.toUpperCase()}` : ''}
                   </div>
