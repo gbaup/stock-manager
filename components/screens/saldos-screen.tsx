@@ -14,10 +14,11 @@ import { useIsDesktop } from '@/app/lib/hooks';
 import { DModal } from '@/components/ui/d-modal';
 import { GastoForm } from '@/components/screens/gasto-form';
 import { ConversionForm } from '@/components/screens/conversion-form';
-import { selfTakesByUser } from '@/app/lib/domain';
+import { selfTakesByUser, isSelfTake } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
-import { SaleDetail } from '@/components/screens/sale-detail';
+import { SaleDetail, saleDetailLine } from '@/components/screens/sale-detail';
+import { Swatch, coverOf } from '@/components/ui/swatch';
 import { hasUsdActivity } from '@/app/lib/ledger';
 import type { Movement, PersonBalance, SettleTransfer } from '@/app/lib/ledger';
 
@@ -85,11 +86,25 @@ export function SaldosScreen({
   const [showGasto, setShowGasto] = useState(false);
   const [showConversion, setShowConversion] = useState(false);
   const [viewingSaleId, setViewingSaleId] = useState<string | null>(null);
+  // Partner whose self-kept jerseys are listed. Stays set while a sale detail
+  // opened from that list is showing, so closing the detail returns to it.
+  const [selfTakeUserId, setSelfTakeUserId] = useState<string | null>(null);
 
   const selfTakes = selfTakesByUser(sales);
   const viewingSale = viewingSaleId ? sales.find((s) => s.id === viewingSaleId) ?? null : null;
   // Only sale movements open a detail; everything else stays inert.
   const openMovement = (m: Movement) => (m.saleId ? () => setViewingSaleId(m.saleId!) : undefined);
+
+  const selfTakeUser = selfTakeUserId ? users.find((u) => u.id === selfTakeUserId) ?? null : null;
+  const selfTakeModal = selfTakeUser && !viewingSale && (
+    <SelfTakesModal
+      user={selfTakeUser}
+      sales={sales.filter((s) => isSelfTake(s, selfTakeUser.id))}
+      models={models}
+      onOpenSale={setViewingSaleId}
+      onClose={() => setSelfTakeUserId(null)}
+    />
+  );
 
   const saleModal = viewingSale && (
     <DModal title="Detalle de venta" size="md" onClose={() => setViewingSaleId(null)}>
@@ -101,6 +116,7 @@ export function SaldosScreen({
         // cacheComponents and would otherwise reopen this modal on return.
         onOpenModel={(id) => {
           setViewingSaleId(null);
+          setSelfTakeUserId(null);
           router.push(isDesktop ? `/inventory?model=${id}` : `/inventory/${id}`);
         }}
       />
@@ -174,7 +190,7 @@ export function SaldosScreen({
                       </div>
                     )}
                   </div>
-                  <SelfTakeNote take={selfTakes[user.id]} className="dbal-foot" />
+                  <SelfTakeNote take={selfTakes[user.id]} className="dbal-foot" onOpen={() => setSelfTakeUserId(user.id)} />
                 </div>
               );
             })}
@@ -263,6 +279,7 @@ export function SaldosScreen({
             <ConversionForm users={users} onDone={() => setShowConversion(false)} />
           </DModal>
         )}
+        {selfTakeModal}
         {saleModal}
 
         <BottomNav transitCount={transitCount} />
@@ -289,7 +306,14 @@ export function SaldosScreen({
           </div>
 
           {layout === 'resumen' && (
-            <CardsHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} users={users} selfTakes={selfTakes} />
+            <CardsHeader
+              balances={balances}
+              totalUyu={totalUyu}
+              totalUsd={totalUsd}
+              users={users}
+              selfTakes={selfTakes}
+              onOpenSelfTakes={setSelfTakeUserId}
+            />
           )}
           {layout === 'saldar' && (
             <SettleHeader balances={balances} totalUyu={totalUyu} totalUsd={totalUsd} settle={settle} users={users} />
@@ -326,6 +350,7 @@ export function SaldosScreen({
       <button className="fab" onClick={() => router.push('/balances/expense/new')} aria-label="Agregar gasto">
         <Plus size={26} strokeWidth={2.2} />
       </button>
+      {selfTakeModal}
       {saleModal}
       <BottomNav transitCount={transitCount} />
     </div>
@@ -335,24 +360,90 @@ export function SaldosScreen({
 // Footnote on a partner's balance card: jerseys they kept for themselves
 // (sold to themselves at SELF_TAKE_PRICE_UYU) and what they cost the business
 // in USD (supplier + shipping share). Hidden when there are none.
-function SelfTakeNote({ take, className }: { take?: { count: number; costUsd: number }; className: string }) {
+function SelfTakeNote({
+  take, className, onOpen,
+}: {
+  take?: { count: number; costUsd: number };
+  className: string;
+  onOpen: () => void;
+}) {
   if (!take || take.count === 0) return null;
   return (
-    <div className={className}>
+    <button type="button" className={`self-take-note ${className}`} onClick={onOpen}>
       <Shirt size={13} strokeWidth={1.8} />
-      Se quedó con {take.count} {take.count === 1 ? 'camiseta' : 'camisetas'} · costo {usd(take.costUsd)}
-    </div>
+      <span>
+        Se quedó con {take.count} {take.count === 1 ? 'camiseta' : 'camisetas'} · costo {usd(take.costUsd)}
+      </span>
+      <ChevronRight size={14} strokeWidth={1.8} className="self-take-chev" />
+    </button>
+  );
+}
+
+// The units behind a partner's SelfTakeNote, newest first. Each row opens the
+// read-only sale detail; the footer total matches the note on the card.
+function SelfTakesModal({
+  user, sales, models, onOpenSale, onClose,
+}: {
+  user: UserSummary;
+  sales: HomeSaleItem[];
+  models: ModelWithStats[];
+  onOpenSale: (saleId: string) => void;
+  onClose: () => void;
+}) {
+  // getHomeSales already returns newest first (date, then createdAt).
+  const totalUsd = sales.reduce((a, s) => a + s.costUsd, 0);
+  return (
+    <DModal
+      title={`Camisetas de ${user.alias} · ${sales.length}`}
+      sub="A costo de proveedor + envío"
+      size="md"
+      onClose={onClose}
+    >
+      <div className="dm-body">
+        <div className="st-list">
+          {sales.map((s) => {
+            const model = models.find((m) => m.id === s.catalogProductId);
+            return (
+              <button key={s.id} type="button" className="st-row" onClick={() => onOpenSale(s.id)}>
+                <Swatch
+                  color={s.color}
+                  number={s.number}
+                  photo={model ? coverOf(model) : null}
+                  style={{ width: 36, height: 42, fontSize: 13, flexShrink: 0 }}
+                />
+                <div className="st-main">
+                  <div className="st-team capitalize">{s.teamName}</div>
+                  <div className="st-meta capitalize">
+                    {[model?.season, saleDetailLine(s).trim()].filter(Boolean).join(' · ')}
+                  </div>
+                  <div className="st-date">{fmtDate(s.date)}</div>
+                </div>
+                <div className="st-amt">
+                  <span className="st-cost">{usd(s.costUsd)}</span>
+                  {s.profitPending && <span className="st-pending">sin envío</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="dm-foot st-foot">
+        <span className="st-total-l">Total</span>
+        <span className="st-total">{usd(totalUsd)}</span>
+      </div>
+    </DModal>
   );
 }
 
 function CardsHeader({
-  balances, totalUyu, totalUsd, users, selfTakes,
+  balances, totalUyu, totalUsd, users, selfTakes, onOpenSelfTakes,
 }: {
   balances: Record<string, PersonBalance>;
   totalUyu: number;
   totalUsd: number;
   users: UserSummary[];
   selfTakes: Record<string, { count: number; costUsd: number }>;
+  onOpenSelfTakes: (userId: string) => void;
 }) {
   const hasUsd = users.some((u) => {
     const b = balances[u.alias];
@@ -404,7 +495,7 @@ function CardsHeader({
                   </div>
                 )}
               </div>
-              <SelfTakeNote take={selfTakes[user.id]} className="bal-foot" />
+              <SelfTakeNote take={selfTakes[user.id]} className="bal-foot" onOpen={() => onOpenSelfTakes(user.id)} />
             </div>
           );
         })}

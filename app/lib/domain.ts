@@ -228,15 +228,28 @@ export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
 // token price (UYU), collected by that partner.
 export const SELF_TAKE_PRICE_UYU = 1;
 
+type SelfTakeCandidate = { price: number; status: string; collectedByUserId: string | null };
+
+// Is this sale a partner keeping the jersey? Active only — a cancelled one
+// went back to stock. With `userId`, also requires that partner collected it.
+export function isSelfTake(s: SelfTakeCandidate, userId?: string): boolean {
+  return (
+    s.status === SALE_STATUS.active &&
+    s.price === SELF_TAKE_PRICE_UYU &&
+    !!s.collectedByUserId &&
+    (userId === undefined || s.collectedByUserId === userId)
+  );
+}
+
 // Jerseys each partner kept for themselves, keyed by user id: how many and
 // their total landed cost in USD (supplier + shipping share). Active sales
 // only — a cancelled one went back to stock.
 export function selfTakesByUser(
-  sales: { price: number; costUsd: number; status: string; collectedByUserId: string | null }[],
+  sales: (SelfTakeCandidate & { costUsd: number })[],
 ): Record<string, { count: number; costUsd: number }> {
   const out: Record<string, { count: number; costUsd: number }> = {};
   for (const s of sales) {
-    if (s.status !== SALE_STATUS.active || s.price !== SELF_TAKE_PRICE_UYU || !s.collectedByUserId) continue;
+    if (!isSelfTake(s) || !s.collectedByUserId) continue;
     const entry = (out[s.collectedByUserId] ??= { count: 0, costUsd: 0 });
     entry.count += 1;
     entry.costUsd += s.costUsd;
