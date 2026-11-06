@@ -58,8 +58,8 @@ export function QuickSaleForm({
   const canSave = !!model && !!size && priceNum > 0 && qty > 0 && qty <= sizeAvail && !!collectedByUserId;
 
   const results = models
-    .filter((m) => matchesModel(m, query))
-    .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock);
+    .filter((m) => m.stock > 0 && matchesModel(m, query))
+    .sort((a, b) => b.stock - a.stock);
 
   function resetForm() {
     setSelectedModelId('');
@@ -141,8 +141,7 @@ export function QuickSaleForm({
                 <button
                   key={m.id}
                   className="qs-result"
-                  disabled={m.stock === 0}
-                  onClick={() => m.stock > 0 && selectModel(m)}
+                  onClick={() => selectModel(m)}
                 >
                   <Swatch
                     color={m.color}
@@ -158,12 +157,9 @@ export function QuickSaleForm({
                       {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
                     </div>
                   </div>
-                  <div
-                    className="qs-r-stock"
-                    style={{ color: m.stock === 0 ? 'var(--text-faint)' : 'var(--text)' }}
-                  >
+                  <div className="qs-r-stock" style={{ color: 'var(--text)' }}>
                     <span className="qsr-n">{m.stock}</span>
-                    <span className="qsr-l">{m.stock === 0 ? 'sin stock' : 'stock'}</span>
+                    <span className="qsr-l">stock</span>
                   </div>
                 </button>
               ))

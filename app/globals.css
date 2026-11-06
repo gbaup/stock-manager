@@ -6829,9 +6829,11 @@ body {
     100% { transform: none; }
   }
 
+  /* No `to` frame on purpose: the row animates to its own resting values, so
+     a dimmed row (.is-out, opacity 0.55) isn't shown at full opacity until
+     the animation ends and then snaps down. */
   @keyframes d-row-in {
     from { opacity: 0; transform: translateY(-4px); background: var(--accent-soft); }
-    to   { opacity: 1; transform: none; }
   }
 
   @keyframes d-float {

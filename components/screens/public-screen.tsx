@@ -17,8 +17,8 @@ type View = 'grid' | 'list';
 const VIEW_KEY = 'sc_pub_view';
 
 // URL params for the catalog filters, so a filtered view can be shared as a link
-// (e.g. /public?tipo=kidkit&talle=24,26). Spanish keys: the link is customer-facing.
-const PARAM = { query: 'q', types: 'tipo', sizes: 'talle', versions: 'version', sort: 'orden' } as const;
+// (e.g. /public?type=kidkit&size=24,26).
+const PARAM = { query: 'q', types: 'type', sizes: 'size', versions: 'version', sort: 'sort' } as const;
 const VALID_SIZES: readonly string[] = [...SIZES, ...KID_SIZES];
 
 function readListParam(params: URLSearchParams, key: string, allowed: readonly string[]): string[] {
@@ -99,7 +99,7 @@ export function PublicScreen({
     setOrDelete(PARAM.types, filterTypes.join(','));
     setOrDelete(PARAM.sizes, filterSizes.join(','));
     setOrDelete(PARAM.versions, filterVersions.join(','));
-    setOrDelete(PARAM.sort, sort === 'newest' ? 'nuevos' : '');
+    setOrDelete(PARAM.sort, sort === 'newest' ? 'newest' : '');
     const qs = params.toString();
     const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
     if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
@@ -117,7 +117,7 @@ export function PublicScreen({
     setFilterTypes(types);
     setFilterSizes(sizes);
     setFilterVersions(versions);
-    if (params.get(PARAM.sort) === 'nuevos') setSort('newest');
+    if (params.get(PARAM.sort) === 'newest') setSort('newest');
     // Mobile hides the filter panel behind a toggle; open it so the shared
     // link shows which filters are applied.
     if (types.length + sizes.length + versions.length > 0) setFiltersOpen(true);
