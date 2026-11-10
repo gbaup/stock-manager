@@ -52,5 +52,5 @@ export async function createConversion(
 
   updateTag('saldos');
   if (opts?.skipRedirect) return;
-  redirect('/saldos');
+  redirect('/balances');
 }

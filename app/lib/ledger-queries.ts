@@ -26,7 +26,7 @@ function toISODate(d: Date | null): string | null {
 
 function toExpenseRecord(e: {
   id: string; title: string; amount: unknown; currency: string;
-  paidByUserId: string; paidByUser: { alias: string }; date: Date;
+  paidByUserId: string; paidByUser: { alias: string }; date: Date; createdAt: Date;
 }): ExpenseRecord {
   return {
     id: e.id,
@@ -36,11 +36,12 @@ function toExpenseRecord(e: {
     paidByUserId: e.paidByUserId,
     paidByAlias: e.paidByUser.alias,
     date: toISODate(e.date)!,
+    createdAt: e.createdAt.toISOString(),
   };
 }
 
 function toConversionRecord(c: {
-  id: string; date: Date;
+  id: string; date: Date; createdAt: Date;
   fromUserId: string; fromUser: { alias: string }; fromCur: string;
   toUserId: string; toUser: { alias: string }; toCur: string;
   fromAmount: unknown; rate: unknown; toAmount: unknown;
@@ -48,6 +49,7 @@ function toConversionRecord(c: {
   return {
     id: c.id,
     date: toISODate(c.date)!,
+    createdAt: c.createdAt.toISOString(),
     fromUserId: c.fromUserId,
     fromUserAlias: c.fromUser.alias,
     fromCur: c.fromCur as 'UYU' | 'USD',
@@ -62,7 +64,7 @@ function toConversionRecord(c: {
 
 function toAdjustmentRecord(a: {
   id: string; userId: string; user: { alias: string };
-  amountUyu: unknown; amountUsd: unknown; date: Date; note: string | null;
+  amountUyu: unknown; amountUsd: unknown; date: Date; createdAt: Date; note: string | null;
 }): AdjustmentRecord {
   return {
     id: a.id,
@@ -71,6 +73,7 @@ function toAdjustmentRecord(a: {
     amountUyu: Number(a.amountUyu),
     amountUsd: Number(a.amountUsd),
     date: toISODate(a.date)!,
+    createdAt: a.createdAt.toISOString(),
     note: a.note,
   };
 }
@@ -96,6 +99,7 @@ export async function buildSaldos(): Promise<BuiltSaldos> {
       select: {
         id: true,
         purchaseDate: true,
+        createdAt: true,
         arrivalDate: true,
         supplier: true,
         supplierPayments: { select: { userId: true, amountUsd: true, cardTaxPct: true, user: { select: { alias: true } } } },
@@ -104,6 +108,7 @@ export async function buildSaldos(): Promise<BuiltSaldos> {
           select: {
             id: true,
             date: true,
+            createdAt: true,
             shippingPriceUsd: true,
             shippingPriceUyu: true,
             shippingPaidByUserId: true,
@@ -126,6 +131,7 @@ export async function buildSaldos(): Promise<BuiltSaldos> {
   const purchases: ProjectableBatch[] = batchRows.map((b) => ({
     id: b.id,
     purchaseDate: toISODate(b.purchaseDate)!,
+    createdAt: b.createdAt.toISOString(),
     arrivalDate: toISODate(b.arrivalDate),
     supplier: b.supplier,
     quantity: b._count.items,
@@ -138,6 +144,7 @@ export async function buildSaldos(): Promise<BuiltSaldos> {
     shipments: b.shipments.map((s) => ({
       id: s.id,
       date: toISODate(s.date)!,
+      createdAt: s.createdAt.toISOString(),
       shippingPriceUsd: s.shippingPriceUsd ? Number(s.shippingPriceUsd) : null,
       shippingPriceUyu: s.shippingPriceUyu ? Number(s.shippingPriceUyu) : null,
       shippingPaidByUserId: s.shippingPaidByUserId,
@@ -152,6 +159,7 @@ export async function buildSaldos(): Promise<BuiltSaldos> {
   const sales = saleRows.map((s) => ({
     id: s.id,
     date: toISODate(s.date)!,
+    createdAt: s.created_at.toISOString(),
     price: Number(s.price),
     collectedByUserId: s.collected_by_user_id,
     collectedByAlias: s.collected_by_alias,

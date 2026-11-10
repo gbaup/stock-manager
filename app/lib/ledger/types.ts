@@ -5,6 +5,11 @@ export type Movement = {
   id: string;
   kind: MovementKind;
   date: string;
+  // When the event was recorded (ISO timestamp). `date` is day-only, so this
+  // breaks same-day ties to keep the list strictly newest-first.
+  createdAt?: string;
+  // Set on 'cobro' movements: the sale behind it, so the UI can open its detail.
+  saleId?: string;
   person: string;
   title: string;
   sub: string;
@@ -31,6 +36,7 @@ export type SettleTransfer = {
 export type SaleRow = {
   id: string;
   date: string;
+  createdAt?: string;
   price: number;
   collectedByUserId: string | null;
   collectedByAlias: string | null;

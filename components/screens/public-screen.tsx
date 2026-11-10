@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
 import { WhatsAppButton } from '@/components/ui/whatsapp-button';
-import { fmtSize, fmtType, fmtVersionEs } from '@/app/lib/domain';
+import { fmtSize, fmtType, fmtVersion, ITEM_TYPES, VERSIONS, SIZES, KID_SIZES } from '@/app/lib/domain';
 import { catalogFilterOptions, modelMatchesFacets } from '@/app/lib/catalog-filters';
 import { colorByName } from '@/app/lib/format';
 import { useIsDesktop } from '@/app/lib/hooks';
@@ -15,6 +15,21 @@ type PublicModel = ModelMeta & { stock: number };
 type View = 'grid' | 'list';
 
 const VIEW_KEY = 'sc_pub_view';
+
+// URL params for the catalog filters, so a filtered view can be shared as a link
+// (e.g. /public?type=kidkit&size=24,26).
+const PARAM = { query: 'q', types: 'type', sizes: 'size', versions: 'version', sort: 'sort' } as const;
+const VALID_SIZES: readonly string[] = [...SIZES, ...KID_SIZES];
+
+// Case-insensitive (a hand-typed ?size=xl,m works), returning the canonical
+// spelling from `allowed`; unknown values are dropped.
+function readListParam(params: URLSearchParams, key: string, allowed: readonly string[]): string[] {
+  const raw = params.get(key);
+  if (!raw) return [];
+  const byLower = new Map(allowed.map((v) => [v.toLowerCase(), v]));
+  const values = raw.split(',').map((v) => byLower.get(v.trim().toLowerCase())).filter((v): v is string => !!v);
+  return [...new Set(values)];
+}
 
 function SizeChips({ sizes }: { sizes: string[] }) {
   if (!sizes.length) return null;
@@ -72,6 +87,50 @@ export function PublicScreen({
   const [filterVersions, setFilterVersions] = useState<string[]>([]);
   const [viewer, setViewer] = useState<{ model: PublicModel; idx: number } | null>(null);
 
+  // Filters <-> URL. The page is prerendered, so state can't be seeded from the
+  // URL during render (hydration mismatch, and useSearchParams would bail the
+  // Suspense fallback). Instead: read once on mount, then mirror every change
+  // back with replaceState (no history spam). Writing waits for `urlLoaded` so
+  // the still-empty initial state never wipes the incoming params. It's state,
+  // not a ref: dev StrictMode runs effects twice, and a ref flipped by the first
+  // run would let the second write pass clear the URL before it's read. A state
+  // flag only takes effect on the next render, once the filters are loaded.
+  const [urlLoaded, setUrlLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!urlLoaded) return;
+    const params = new URLSearchParams(window.location.search);
+    const setOrDelete = (key: string, value: string) => (value ? params.set(key, value) : params.delete(key));
+    setOrDelete(PARAM.query, query.trim());
+    setOrDelete(PARAM.types, filterTypes.join(','));
+    setOrDelete(PARAM.sizes, filterSizes.join(','));
+    setOrDelete(PARAM.versions, filterVersions.join(','));
+    setOrDelete(PARAM.sort, sort === 'newest' ? 'newest' : '');
+    const qs = params.toString();
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, '', next);
+    }
+  }, [urlLoaded, query, filterTypes, filterSizes, filterVersions, sort]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const types = readListParam(params, PARAM.types, ITEM_TYPES);
+    const sizes = readListParam(params, PARAM.sizes, VALID_SIZES);
+    const versions = readListParam(params, PARAM.versions, VERSIONS);
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setQuery(params.get(PARAM.query) ?? '');
+    setFilterTypes(types);
+    setFilterSizes(sizes);
+    setFilterVersions(versions);
+    if (params.get(PARAM.sort) === 'newest') setSort('newest');
+    // Mobile hides the filter panel behind a toggle; open it so the shared
+    // link shows which filters are applied.
+    if (types.length + sizes.length + versions.length > 0) setFiltersOpen(true);
+    setUrlLoaded(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
   function setViewPersisted(v: View) {
     setView(v);
     localStorage.setItem(VIEW_KEY, v);
@@ -85,7 +144,7 @@ export function PublicScreen({
 
   let list = models.filter((m) => {
     if (q) {
-      const haystack = [m.team, m.season, m.version, fmtVersionEs(m.version), m.color, m.player, m.number, m.type]
+      const haystack = [m.team, m.season, m.version, fmtVersion(m.version), m.color, m.player, m.number, m.type]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
@@ -371,7 +430,7 @@ function FilterGroups({
           <div className="multi-chips">
             {versions.map((v) => (
               <button key={v} className={`mchip${filterVersions.includes(v) ? ' is-active' : ''}`}
-                onClick={() => onToggleVersion(v)}>{fmtVersionEs(v)}</button>
+                onClick={() => onToggleVersion(v)}>{fmtVersion(v)}</button>
             ))}
           </div>
         </div>
@@ -404,7 +463,7 @@ function PublicCard({ model, onOpen }: { model: PublicModel; onOpen: () => void 
       <div className="pub-card-body">
         <div className="pub-card-team capitalize">{model.team}</div>
         <div className="pub-card-meta">
-          {[model.season, fmtVersionEs(model.version), fmtType(model.type), [model.number, model.player].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
+          {[model.season, fmtVersion(model.version), fmtType(model.type), [model.number, model.player].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
         </div>
         <SizeChips sizes={model.sizes} />
         <AvailBadge stock={model.stock} />
@@ -431,7 +490,7 @@ function PublicRow({ model, onOpen }: { model: PublicModel; onOpen: () => void }
         )}
       </div>
       <div className="pub-row-main">
-        <div className="pub-row-team">{model.team} · {fmtVersionEs(model.version)}</div>
+        <div className="pub-row-team">{model.team} · {fmtVersion(model.version)}</div>
         <div className="pub-row-meta">
           {model.season}{model.type ? ` · ${fmtType(model.type)}` : ''}{model.player ? ` · ${model.player}` : ''}
         </div>
@@ -554,7 +613,7 @@ function GalleryViewer({
         )}
         <div className="viewer-team">{model.team}</div>
         <div className="viewer-meta">
-          {model.season} · {fmtVersionEs(model.version)}{model.type ? ` · ${fmtType(model.type)}` : ''}
+          {model.season} · {fmtVersion(model.version)}{model.type ? ` · ${fmtType(model.type)}` : ''}
           {model.sleeve ? ` · manga ${model.sleeve.toLowerCase()}` : ''}
         </div>
         <div className="viewer-tags">
