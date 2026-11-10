@@ -3,6 +3,7 @@
 import { Swatch, coverOf } from '@/components/ui/swatch';
 import { SizePicker } from '@/components/ui/size-picker';
 import { Field, TextInput } from '@/components/ui/field';
+import { fmtVersion } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 
 // Hero + size + quantity block shared by SaleForm and ReserveForm — both
@@ -40,7 +41,7 @@ export function ClaimFields({
         />
         <div>
           <div className="detail-team" style={{ fontSize: 19 }}>{model.team}</div>
-          <div className="detail-meta">{model.season} · {model.version} · {stock} en stock</div>
+          <div className="detail-meta">{model.season} · {fmtVersion(model.version)} · {stock} en stock</div>
         </div>
       </div>
 

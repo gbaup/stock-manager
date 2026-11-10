@@ -64,12 +64,17 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'KidKit', short: 'Short', nba: 'NBA', jacket: 'Jacket',
 };
 export const fmtType = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS[t] ?? cap(t) : '');
-export const fmtVersion = (v: string | null | undefined): string => (v ? cap(v) : '');
-// Public catalog shows versions in Spanish; stored values and admin labels stay as-is.
-const VERSION_LABELS_ES: Record<string, string> = {
-  home: 'Titular', away: 'Suplente', third: 'Tercera', fourth: 'Cuarta', arquero: 'Arquero',
+// Spanish display labels for item types, used where English would read odd
+// to a customer (shared stock text). Admin chips keep fmtType.
+const ITEM_TYPE_LABELS_ES: Record<string, string> = {
+  fan: 'Fan', player: 'Player', retro: 'Retro', kidkit: 'Conjunto de niño', short: 'Short', nba: 'NBA', jacket: 'Campera',
 };
-export const fmtVersionEs = (v: string | null | undefined): string => (v ? VERSION_LABELS_ES[v] ?? cap(v) : '');
+export const fmtTypeEs = (t: string | null | undefined): string => (t ? ITEM_TYPE_LABELS_ES[t] ?? cap(t) : '');
+// Versions display in Spanish everywhere; stored values stay as-is.
+const VERSION_LABELS: Record<string, string> = {
+  home: 'Titular', away: 'Alternativa', third: 'Tercera', fourth: 'Cuarta', arquero: 'Arquero',
+};
+export const fmtVersion = (v: string | null | undefined): string => (v ? VERSION_LABELS[v] ?? cap(v) : '');
 export const fmtSleeve = (s: string | null | undefined): string => (s ? cap(s) : '');
 
 export const JERSEY_COLORS = [
@@ -132,7 +137,7 @@ const normalizeText = (s: string | null | undefined): string =>
 // Shared by every model picker so search behaves identically everywhere.
 export function modelHaystack(m: ModelMeta): string {
   return normalizeText(
-    [m.team, m.version, m.season, m.player, m.number && '#' + m.number, m.type, m.sleeve, m.color, m.description]
+    [m.team, m.version, fmtVersion(m.version), m.season, m.player, m.number && '#' + m.number, m.type, m.sleeve, m.color, m.description]
       .filter(Boolean)
       .join(' '),
   );
@@ -218,6 +223,39 @@ export type BatchSummary = {
 // through these constants, never a raw string. See CONTEXT.md "Sale".
 export const SALE_STATUS = { active: 'active', cancelled: 'cancelled' } as const;
 export type SaleStatus = (typeof SALE_STATUS)[keyof typeof SALE_STATUS];
+
+// A partner keeping a jersey for themselves is recorded as a sale at this
+// token price (UYU), collected by that partner.
+export const SELF_TAKE_PRICE_UYU = 1;
+
+type SelfTakeCandidate = { price: number; status: string; collectedByUserId: string | null };
+
+// Is this sale a partner keeping the jersey? Active only — a cancelled one
+// went back to stock. With `userId`, also requires that partner collected it.
+export function isSelfTake(s: SelfTakeCandidate, userId?: string): boolean {
+  return (
+    s.status === SALE_STATUS.active &&
+    s.price === SELF_TAKE_PRICE_UYU &&
+    !!s.collectedByUserId &&
+    (userId === undefined || s.collectedByUserId === userId)
+  );
+}
+
+// Jerseys each partner kept for themselves, keyed by user id: how many and
+// their total landed cost in USD (supplier + shipping share). Active sales
+// only — a cancelled one went back to stock.
+export function selfTakesByUser(
+  sales: (SelfTakeCandidate & { costUsd: number })[],
+): Record<string, { count: number; costUsd: number }> {
+  const out: Record<string, { count: number; costUsd: number }> = {};
+  for (const s of sales) {
+    if (!isSelfTake(s) || !s.collectedByUserId) continue;
+    const entry = (out[s.collectedByUserId] ??= { count: 0, costUsd: 0 });
+    entry.count += 1;
+    entry.costUsd += s.costUsd;
+  }
+  return out;
+}
 
 // An InventoryItem's lifecycle: 'available' (sellable) -> 'reserved' (spoken
 // for by a client, hidden from the public catalog) -> 'sold', or back to
@@ -346,6 +384,7 @@ export type ExpenseRecord = {
   paidByUserId: string;
   paidByAlias: string;
   date: string;
+  createdAt?: string;
 };
 
 export type AdjustmentRecord = {
@@ -355,12 +394,14 @@ export type AdjustmentRecord = {
   amountUyu: number;
   amountUsd: number;
   date: string;
+  createdAt?: string;
   note: string | null;
 };
 
 export type ConversionRecord = {
   id: string;
   date: string;
+  createdAt?: string;
   fromUserId: string;
   fromUserAlias: string;
   fromCur: 'UYU' | 'USD';

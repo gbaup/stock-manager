@@ -28,7 +28,9 @@ export function buildMovements(events: LedgerEvents): Movement[] {
     ...(events.conversions ?? []).flatMap(projectConversion),
     ...(events.adjustments ?? []).flatMap(projectAdjustment),
   ];
-  movements.sort((a, b) => b.date.localeCompare(a.date));
+  movements.sort(
+    (a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
+  );
   return movements;
 }
 

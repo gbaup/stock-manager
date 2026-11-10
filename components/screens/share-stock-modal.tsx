@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { DModal } from '@/components/ui/d-modal';
 import { Empty } from '@/components/ui/empty';
-import { fmtType, fmtSize } from '@/app/lib/domain';
+import { fmtTypeEs, fmtSize } from '@/app/lib/domain';
 import type { ModelWithStats } from '@/app/lib/domain';
 import { catalogFilterOptions, shareStockBlocks, shareStockText } from '@/app/lib/catalog-filters';
 
@@ -75,7 +75,7 @@ export function ShareStockModal({ models, onClose }: { models: ModelWithStats[];
                   className={`mchip${filterTypes.includes(t) ? ' is-active' : ''}`}
                   onClick={() => toggleFilter(filterTypes, setFilterTypes, t)}
                 >
-                  {fmtType(t)}
+                  {fmtTypeEs(t)}
                 </button>
               ))}
             </div>

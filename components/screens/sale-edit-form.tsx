@@ -8,7 +8,7 @@ import { Field, MoneyInput } from '@/components/ui/field';
 import { SizePicker } from '@/components/ui/size-picker';
 import { Modal } from '@/components/ui/modal';
 import { ModalFooter } from '@/components/ui/modal-footer';
-import { METHODS, fmtType, matchesModel } from '@/app/lib/domain';
+import { METHODS, fmtType, fmtVersion, matchesModel } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import type { HomeSaleItem } from '@/app/lib/queries';
 import { updateSale, cancelSale, swapSale } from '@/app/actions/sales';
@@ -56,10 +56,11 @@ export function SaleEditForm({
   const canSwap = !!swapModel && !!swapSize && parseFloat(swapPrice) > 0 && !sameUnit;
   const canSave = parseFloat(price) > 0 && !!date && !!collectedByUserId;
 
-  const results = models
+  // Every match once something is typed; a short list for an empty search.
+  const matches = models
     .filter((m) => matchesModel(m, query))
-    .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock)
-    .slice(0, 7);
+    .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock);
+  const results = query.trim() ? matches : matches.slice(0, 7);
 
   function run(action: () => Promise<void>, fallback: string) {
     setSaveError(null);
@@ -151,7 +152,7 @@ export function SaleEditForm({
                       <div className="qs-r-main">
                         <div className="qs-r-team capitalize">{m.team}</div>
                         <div className="qs-r-meta">
-                          {m.season} · {m.version} · {fmtType(m.type)}
+                          {m.season} · {fmtVersion(m.version)} · {fmtType(m.type)}
                           {m.number ? ` · ${m.number}` : ''}{m.player ? ` · ${m.player}` : ''}
                         </div>
                       </div>
@@ -182,7 +183,7 @@ export function SaleEditForm({
                 <div className="qs-p-main">
                   <div className="qs-p-team">{swapModel.team}</div>
                   <div className="qs-p-meta">
-                    {swapModel.season} · {swapModel.version} · {swapModel.stock} en stock
+                    {swapModel.season} · {fmtVersion(swapModel.version)} · {swapModel.stock} en stock
                   </div>
                 </div>
                 <span className="qs-change">Cambiar</span>

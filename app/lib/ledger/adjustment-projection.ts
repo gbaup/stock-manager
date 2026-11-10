@@ -8,6 +8,7 @@ export function projectAdjustment(a: AdjustmentRecord): Movement[] {
     id: `ajuste-${a.id}`,
     kind: 'ajuste',
     date: a.date,
+    createdAt: a.createdAt,
     person: a.userAlias,
     title: a.note ?? 'Ajuste',
     sub: '',

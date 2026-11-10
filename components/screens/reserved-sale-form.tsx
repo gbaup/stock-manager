@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Swatch, coverOf } from '@/components/ui/swatch';
 import { ModalFooter } from '@/components/ui/modal-footer';
+import { fmtVersion } from '@/app/lib/domain';
 import type { ModelWithStats, UserSummary } from '@/app/lib/domain';
 import { todayISO } from '@/app/lib/format';
 import { sellReservedItem } from '@/app/actions/reservations';
@@ -63,7 +64,7 @@ export function ReservedSaleForm({
           <div>
             <div className="detail-team" style={{ fontSize: 19 }}>{model.team}</div>
             <div className="detail-meta">
-              {model.season} · {model.version} · Talle {item.size.toUpperCase()}
+              {model.season} · {fmtVersion(model.version)} · Talle {item.size.toUpperCase()}
               {item.note ? ` · ${item.note}` : ''}
             </div>
           </div>

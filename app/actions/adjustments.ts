@@ -30,5 +30,5 @@ export async function createAdjustment(data: {
   });
 
   updateTag('saldos');
-  redirect('/saldos');
+  redirect('/balances');
 }
