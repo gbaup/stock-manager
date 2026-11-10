@@ -56,9 +56,11 @@ export function SaleEditForm({
   const canSwap = !!swapModel && !!swapSize && parseFloat(swapPrice) > 0 && !sameUnit;
   const canSave = parseFloat(price) > 0 && !!date && !!collectedByUserId;
 
-  const results = models
+  // Every match once something is typed; a short list for an empty search.
+  const matches = models
     .filter((m) => matchesModel(m, query))
     .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || b.stock - a.stock);
+  const results = query.trim() ? matches : matches.slice(0, 7);
 
   function run(action: () => Promise<void>, fallback: string) {
     setSaveError(null);

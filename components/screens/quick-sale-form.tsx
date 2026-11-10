@@ -17,6 +17,8 @@ import { createSaleFromHome } from '@/app/actions/sales';
 import { ModalFooter } from '@/components/ui/modal-footer';
 import { useIsDesktop } from '@/app/lib/hooks';
 
+const EMPTY_SEARCH_LIMIT = 7;
+
 export function QuickSaleForm({
   models,
   users,
@@ -57,9 +59,12 @@ export function QuickSaleForm({
 
   const canSave = !!model && !!size && priceNum > 0 && qty > 0 && qty <= sizeAvail && !!collectedByUserId;
 
-  const results = models
+  // Every match once something is typed; with an empty search, just a short
+  // list of the best-stocked models instead of the whole catalog.
+  const matches = models
     .filter((m) => m.stock > 0 && matchesModel(m, query))
     .sort((a, b) => b.stock - a.stock);
+  const results = query.trim() ? matches : matches.slice(0, EMPTY_SEARCH_LIMIT);
 
   function resetForm() {
     setSelectedModelId('');
@@ -88,13 +93,12 @@ export function QuickSaleForm({
           description: description || undefined,
           collectedByUserId,
         });
-        // Desktop modal: close it. Mobile route: back to home, not a fresh form.
-        if (onDone) {
-          resetForm();
-          onDone();
-        } else {
-          router.push('/home');
-        }
+        // Always clear first: routes stay alive (hidden) with cacheComponents,
+        // so a filled form would reappear on the next visit and could be saved
+        // twice. Then desktop closes the modal and mobile goes back home.
+        resetForm();
+        if (onDone) onDone();
+        else router.push('/home');
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Error al registrar la venta');
       }

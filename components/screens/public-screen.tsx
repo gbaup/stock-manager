@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Eye, Search, X, LayoutGrid, List, Filter, Shirt } from 'lucide-react';
 import { Empty } from '@/components/ui/empty';
@@ -21,10 +21,14 @@ const VIEW_KEY = 'sc_pub_view';
 const PARAM = { query: 'q', types: 'type', sizes: 'size', versions: 'version', sort: 'sort' } as const;
 const VALID_SIZES: readonly string[] = [...SIZES, ...KID_SIZES];
 
+// Case-insensitive (a hand-typed ?size=xl,m works), returning the canonical
+// spelling from `allowed`; unknown values are dropped.
 function readListParam(params: URLSearchParams, key: string, allowed: readonly string[]): string[] {
   const raw = params.get(key);
   if (!raw) return [];
-  return [...new Set(raw.split(',').map((v) => v.trim()))].filter((v) => allowed.includes(v));
+  const byLower = new Map(allowed.map((v) => [v.toLowerCase(), v]));
+  const values = raw.split(',').map((v) => byLower.get(v.trim().toLowerCase())).filter((v): v is string => !!v);
+  return [...new Set(values)];
 }
 
 function SizeChips({ sizes }: { sizes: string[] }) {
@@ -86,13 +90,15 @@ export function PublicScreen({
   // Filters <-> URL. The page is prerendered, so state can't be seeded from the
   // URL during render (hydration mismatch, and useSearchParams would bail the
   // Suspense fallback). Instead: read once on mount, then mirror every change
-  // back with replaceState (no history spam). The write effect is declared
-  // first on purpose — on mount it runs before the read and must not wipe the
-  // incoming params with the still-empty initial state.
-  const urlLoaded = useRef(false);
+  // back with replaceState (no history spam). Writing waits for `urlLoaded` so
+  // the still-empty initial state never wipes the incoming params. It's state,
+  // not a ref: dev StrictMode runs effects twice, and a ref flipped by the first
+  // run would let the second write pass clear the URL before it's read. A state
+  // flag only takes effect on the next render, once the filters are loaded.
+  const [urlLoaded, setUrlLoaded] = useState(false);
 
   useEffect(() => {
-    if (!urlLoaded.current) return;
+    if (!urlLoaded) return;
     const params = new URLSearchParams(window.location.search);
     const setOrDelete = (key: string, value: string) => (value ? params.set(key, value) : params.delete(key));
     setOrDelete(PARAM.query, query.trim());
@@ -105,7 +111,7 @@ export function PublicScreen({
     if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, '', next);
     }
-  }, [query, filterTypes, filterSizes, filterVersions, sort]);
+  }, [urlLoaded, query, filterTypes, filterSizes, filterVersions, sort]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -121,8 +127,8 @@ export function PublicScreen({
     // Mobile hides the filter panel behind a toggle; open it so the shared
     // link shows which filters are applied.
     if (types.length + sizes.length + versions.length > 0) setFiltersOpen(true);
+    setUrlLoaded(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-    urlLoaded.current = true;
   }, []);
 
   function setViewPersisted(v: View) {

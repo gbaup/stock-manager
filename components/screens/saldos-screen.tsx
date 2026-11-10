@@ -420,7 +420,7 @@ function SelfTakesModal({
                 </div>
                 <div className="st-amt">
                   <span className="st-cost">{usd(s.costUsd)}</span>
-                  {s.profitPending && <span className="st-pending">sin envío</span>}
+                  {s.costPending && <span className="st-pending">sin envío</span>}
                 </div>
               </button>
             );

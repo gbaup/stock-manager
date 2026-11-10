@@ -26,6 +26,9 @@ export type HomeSaleItem = {
   // Landed cost of the unit in USD: supplier base price + its equal share of
   // the shipment's USD shipping (0 while in transit / not yet priced).
   costUsd: number;
+  // costUsd still lacks the shipping share (no shipment yet, or its USD
+  // shipping price isn't entered). Checks USD, the same field costUsd uses.
+  costPending: boolean;
   date: string;
   method: string | null;
   description: string | null;
@@ -629,6 +632,7 @@ export async function getHomeSales(): Promise<HomeSaleItem[]> {
       profit: Number(s.price) - cost,
       profitPending,
       costUsd: Number(s.item.basePriceUsd) + shareUsd,
+      costPending: shipment === null || shipment.shippingPriceUsd === null,
       date: toISODate(s.date)!,
       method: s.method,
       description: s.description,
